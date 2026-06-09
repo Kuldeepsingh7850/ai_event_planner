@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
+import { useTheme } from '../../context/ThemeContext';
 import {
   CalendarDays,
   MapPin,
@@ -43,11 +44,125 @@ const formatRupee = (value) => {
   }).format(value);
 };
 
+const renderItemSafely = (item) => {
+  if (!item) return '';
+  if (typeof item === 'object') {
+    if (item.name && (item.description || item.desc)) {
+      return (
+        <>
+          <strong className="text-gray-200">{item.name}:</strong>{' '}
+          {item.description || item.desc}
+        </>
+      );
+    }
+    return item.description || item.desc || item.name || JSON.stringify(item);
+  }
+  return item;
+};
+
+const assigneeAvatars = {
+  'Rahul Sharma': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&fit=crop&auto=format',
+  'Priya Patel': 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&fit=crop&auto=format',
+  'Vikram Singh': 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&fit=crop&auto=format',
+  'Anjali Mehta': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&auto=format',
+  'Rohan Mehta': 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=80&fit=crop&auto=format',
+  'Sneha Iyer': 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=80&fit=crop&auto=format'
+};
+
+// Parse custom task parameters out of db title string
+const parseTask = (task) => {
+  if (!task || !task.title) return task;
+  const parts = task.title.split(' || ');
+  const displayName = parts[0];
+  const assigneeName = parts[1] || 'Self';
+  const priority = parts[2] || 'Medium';
+  const visualStatus = parts[3] || 'To Do';
+
+  let finalStatus = task.status === 'completed' ? 'Completed' : visualStatus;
+
+  return {
+    ...task,
+    displayName,
+    assigneeName,
+    priority,
+    visualStatus: finalStatus
+  };
+};
+
+const isTimelineTask = (taskTitle) => {
+  return /^\d{1,2}:\d{2}\s*(AM|PM)/i.test(taskTitle || '');
+};
+
+const getTimelineMinutes = (title) => {
+  const match = title.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!match) return 9999;
+  let hours = parseInt(match[1]);
+  const minutes = parseInt(match[2]);
+  const ampm = match[3].toUpperCase();
+  if (ampm === 'PM' && hours < 12) hours += 12;
+  if (ampm === 'AM' && hours === 12) hours = 0;
+  return hours * 60 + minutes;
+};
+
+
+const parsePayment = (exp, idx) => {
+  if (!exp || !exp.title) return {
+    id: exp?.id,
+    invoiceId: `INV-${String(idx + 1).padStart(3, '0')}`,
+    description: exp?.title || '',
+    amount: exp?.amount || 0,
+    date: exp?.date ? exp.date.split('T')[0] : 'N/A',
+    status: 'Paid'
+  };
+
+  const parts = exp.title.split(' || ');
+  if (parts.length < 2) {
+    return {
+      id: exp.id,
+      invoiceId: `INV-${String(idx + 1).padStart(3, '0')}`,
+      description: exp.title,
+      amount: exp.amount,
+      date: exp.date ? exp.date.split('T')[0] : 'N/A',
+      status: 'Paid'
+    };
+  }
+
+  const description = parts[0];
+  const invoiceId = parts[1] || `INV-${String(idx + 1).padStart(3, '0')}`;
+  const status = parts[2] || 'Paid';
+
+  return {
+    id: exp.id,
+    invoiceId,
+    description,
+    amount: exp.amount,
+    date: exp.date ? exp.date.split('T')[0] : 'N/A',
+    status
+  };
+};
+
+const getVenueImage = (venueName) => {
+  if (!venueName) return '/leela_palace.jpg';
+  const nameLower = venueName.toLowerCase();
+  if (nameLower.includes('leela')) return '/leela_palace.jpg';
+  if (nameLower.includes('fateh')) return '/monsoon_palace.jpg';
+  if (nameLower.includes('radisson')) return '/hero_udaipur_3.jpg';
+  if (nameLower.includes('bhanwar')) return '/hero_udaipur_1.jpg';
+  if (nameLower.includes('ramada')) return '/shiv_niwas.jpg';
+  if (nameLower.includes('bijolai')) return '/jag_mandir.jpg';
+  if (nameLower.includes('hilltop')) return '/hero_udaipur_2.jpg';
+  if (nameLower.includes('aravali')) return 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=600&q=80';
+  if (nameLower.includes('oberoi') || nameLower.includes('udaivilas')) return '/oberoi_udaivilas.jpg';
+  if (nameLower.includes('taj') || nameLower.includes('lake palace')) return '/taj_lake_palace.jpg';
+  return '/leela_palace.jpg';
+};
+
 export default function EventDetailHub() {
   const router = useRouter();
   const { id } = router.query;
   const { authFetch, user } = useAuth();
-  const { showToast } = useNotifications();
+  const { fetchNotifications, showToast } = useNotifications();
+  const { theme } = useTheme();
 
   // Active Tab
   const [activeTab, setActiveTab] = useState('overview');
@@ -81,6 +196,108 @@ export default function EventDetailHub() {
   const [expCategory, setExpCategory] = useState('Catering');
   const [expDate, setExpDate] = useState('');
 
+  // Payments / Transactions States
+  const [showAddPaymentModal, setShowAddPaymentModal] = useState(false);
+  const [payInvoiceId, setPayInvoiceId] = useState('');
+  const [payDescription, setPayDescription] = useState('');
+  const [payAmount, setPayAmount] = useState('');
+  const [payDate, setPayDate] = useState('');
+  const [payStatus, setPayStatus] = useState('Paid');
+
+  // AI Suggestions Modal States
+  const [showAISuggestionsModal, setShowAISuggestionsModal] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState(null);
+
+  const handleTriggerAISuggestions = () => {
+    setShowAISuggestionsModal(true);
+    setAiLoading(true);
+    
+    // Simulate AI model generation delay
+    setTimeout(() => {
+      if (!event) {
+        setAiSuggestions({
+          checklist: ["Review guest count and budget.", "Choose a theme vibe.", "Browse local vendors."],
+          decor: "Standard decor based on event scale.",
+          vendors: "Contact general event decorators and venue coordinators.",
+          budgetTip: "Set aside 15% of the total budget for unexpected costs."
+        });
+        setAiLoading(false);
+        return;
+      }
+      
+      const type = event.event_type || 'Event';
+      const guest = event.guest_count || 100;
+      const budgetVal = event.budget || 50000;
+      const location = event.location || 'Udaipur';
+      const themeVal = event.theme || 'Traditional';
+
+      let checklist = [];
+      let decor = "";
+      let vendors = "";
+      let budgetTip = "";
+
+      if (type.toLowerCase().includes('wedding') || type.toLowerCase().includes('shaadi') || type.toLowerCase().includes('marriage')) {
+        checklist = [
+          `Coordinate mandap decorations matching "${themeVal}".`,
+          `Hire a professional heritage photographer familiar with "${location}" locations.`,
+          `Finalize dynamic Rajasthani welcome folk dancers and buffet setup.`,
+          `Verify guest count (${guest} guests) with the venue seating plan.`,
+          `Send digital wedding e-invitations with RSVP deadlines.`
+        ];
+        decor = `Elegant combination of marigold hangings, vintage drapes, royal brass lanterns, and palacemandap floral setup.`;
+        vendors = `Delicious Bites Catering (specializing in Mewari buffet) and Epic Moments Photography (wedding specialist).`;
+        budgetTip = `For a budget of ${formatRupee(budgetVal)}, allocate around 40% for venue/catering, 25% for wedding decor, 15% for photography, and keep 10% as contingency backup.`;
+      } else if (type.toLowerCase().includes('birthday') || type.toLowerCase().includes('party')) {
+        checklist = [
+          `Book DJ and sound systems for a dance-floor setup.`,
+          `Order a customized themed cake and prepare dessert table.`,
+          `Setup colorful photo booth backdrop with matching props.`,
+          `Prepare child-friendly seating and game coordinator schedule.`,
+          `Create a playlist with guest requests.`
+        ];
+        decor = `Vibrant balloon arches, neon LED name boards, themed table centerpieces, and warm fairy light backdrops.`;
+        vendors = `Ananta Resort decorator team, local dessert bakers, and sound system vendors.`;
+        budgetTip = `Since you have a budget of ${formatRupee(budgetVal)}, focus 60% on food/drinks and sound, 20% on visual decorations, and 20% on birthday activities/gifts.`;
+      } else if (type.toLowerCase().includes('corporate') || type.toLowerCase().includes('conference') || type.toLowerCase().includes('college') || type.toLowerCase().includes('farewell')) {
+        checklist = [
+          `Confirm Audio/Visual setup (projectors, microphones, podium).`,
+          `Prepare custom badges, register notebooks and welcoming booths.`,
+          `Design customized banners and certificates for guests.`,
+          `Schedule tea/coffee breaks and lunch buffet timings.`,
+          `Draft event host speech and timeline slideshow slides.`
+        ];
+        decor = `Professional minimalism with company/college banners, corporate blue theme accents, stage podium spotlights, and clean presentation displays.`;
+        vendors = `Radisson Blu AV team, local corporate printers, and professional high-speed stage photographers.`;
+        budgetTip = `With ${formatRupee(budgetVal)} budget, prioritize 50% for high-quality food/AV rentals, 30% for marketing/banners/souvenirs, and 20% on guest hospitality.`;
+      } else {
+        checklist = [
+          `Setup clean seating arrangements for ${guest} guests at ${location}.`,
+          `Determine event flow checklist timeline milestones.`,
+          `Coordinate with decorators for traditional floral decor.`,
+          `Finalize menu catering choice and beverage service.`,
+          `Double check the AV sound system setup.`
+        ];
+        decor = `Contemporary setups with colorful drapes, warm yellow spotlight fills, and minimalist flower accents.`;
+        vendors = `Local general coordinators, sound equipment hire, and professional buffet caterers.`;
+        budgetTip = `Optimize budget allocation: 50% on food & drinks, 20% on venue, 20% on theme decor/AV, and 10% on miscellaneous items.`;
+      }
+
+      setAiSuggestions({ checklist, decor, vendors, budgetTip });
+      setAiLoading(false);
+    }, 850);
+  };
+
+  // Set default payDate and payInvoiceId when opening modal
+  useEffect(() => {
+    if (showAddPaymentModal) {
+      setPayDate(new Date().toISOString().split('T')[0]);
+      // Count existing expenses to generate invoice ID
+      const nextInvNum = expenses.length + 1;
+      setPayInvoiceId(`INV-${String(nextInvNum).padStart(3, '0')}`);
+    }
+  }, [showAddPaymentModal, expenses]);
+
   // Guest RSVP States
   const [guests, setGuests] = useState([]);
   const [guestName, setGuestName] = useState('');
@@ -91,30 +308,140 @@ export default function EventDetailHub() {
   const [tasks, setTasks] = useState([]);
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDeadline, setTaskDeadline] = useState('');
+  const [taskAssignee, setTaskAssignee] = useState('Self');
+  const [taskPriority, setTaskPriority] = useState('Medium');
+  const [taskStatus, setTaskStatus] = useState('To Do');
 
   // Vendors States
   const [vendors, setVendors] = useState([]);
   const [vendorName, setVendorName] = useState('');
   const [vendorCategory, setVendorCategory] = useState('Caterer');
-  const [vendorContact, setVendorContact] = useState('');
+  const [vendorOwner, setVendorOwner] = useState('');
+  const [vendorPhone, setVendorPhone] = useState('');
+  const [vendorEmail, setVendorEmail] = useState('');
   const [vendorCost, setVendorCost] = useState('');
   const [vendorStatus, setVendorStatus] = useState('contacted');
+  const [globalVendors, setGlobalVendors] = useState([]);
+  const [selectedGlobalVendorId, setSelectedGlobalVendorId] = useState('');
+
+  // Load global admin vendors
+  useEffect(() => {
+    try {
+      const savedVendors = localStorage.getItem('vendors_data');
+      if (savedVendors) {
+        setGlobalVendors(JSON.parse(savedVendors));
+      } else {
+        // Fallback to default admin vendors list
+        setGlobalVendors([
+          { id: 1, name: 'Apex Sound & Lights', category: 'Entertainment', contact_person: 'Harish Vyas', phone: '+91 94140 12345', email: 'contact@apexsound.com' },
+          { id: 2, name: 'Royal Decorators', category: 'Decoration', contact_person: 'Vikram Singh', phone: '+91 82900 67890', email: 'vikram@royaldecor.com' },
+          { id: 3, name: 'Marwar Catering Services', category: 'Catering', contact_person: 'Ramesh Patel', phone: '+91 98290 11223', email: 'info@marwarcatering.com' },
+          { id: 4, name: 'Lakeside Photography', category: 'Photography', contact_person: 'Priya Sharma', phone: '+91 99280 44556', email: 'priya@lakesidephoto.com' },
+          { id: 5, name: 'Udaipur Event Management', category: 'Event Planner', contact_person: 'Amit Mehta', phone: '+91 70140 77889', email: 'info@udaipurevents.com' },
+          { id: 6, name: 'Heritage Travels', category: 'Transport', contact_person: 'Sanjay Jain', phone: '+91 94600 33445', email: 'bookings@heritagetravels.com' },
+          { id: 7, name: 'Sweet Delights Bakery', category: 'Catering', contact_person: 'Divya Joshi', phone: '+91 94130 99887', email: 'orders@sweetdelights.com' },
+          { id: 8, name: 'Udaipur Tent & Stage', category: 'Equipment', contact_person: 'Suresh Sen', phone: '+91 98870 55667', email: 'contact@udaipurtent.com' },
+          { id: 9, name: 'Mewar Sound & DJ Udaipur', category: 'Entertainment', contact_person: 'Rajesh Menaria', phone: '+91 94141 66778', email: 'dj@mewarsound.com' },
+          { id: 10, name: 'The Wedding Filmer Udaipur', category: 'Photography', contact_person: 'Rohan Kothari', phone: '+91 98280 55443', email: 'rohan@weddingfilmer.com' },
+          { id: 11, name: 'Lake City Flowers & Decor', category: 'Decoration', contact_person: 'Manish Sharma', phone: '+91 94611 22334', email: 'manish@lakecityflowers.com' },
+          { id: 12, name: 'Shreeji Catering & Sweets', category: 'Catering', contact_person: 'Kailash Chandra', phone: '+91 99291 88990', email: 'kailash@shreejicaterers.com' },
+          { id: 13, name: 'Aravali Wedding Planners', category: 'Event Planner', contact_person: 'Shruti Paliwal', phone: '+91 77270 44556', email: 'shruti@aravaliwedding.com' }
+        ]);
+      }
+    } catch (e) {
+      console.error('Error loading global vendors:', e);
+    }
+  }, []);
+
+  const handleSelectGlobalVendor = (vId) => {
+    setSelectedGlobalVendorId(vId);
+  };
+
+  const handleAutoFillVendor = () => {
+    if (!selectedGlobalVendorId) return;
+    const selected = globalVendors.find(v => String(v.id) === String(selectedGlobalVendorId));
+    if (selected) {
+      setVendorName(selected.name || '');
+      
+      const catMap = {
+        'Catering': 'Caterer',
+        'Decoration': 'Decorator',
+        'Photography': 'Photographer',
+        'Entertainment': 'DJ/Sound',
+        'Florist': 'Florist',
+        'Event Planner': 'Venue Coordinator',
+        'Coordinator': 'Venue Coordinator',
+        'Transport': 'Venue Coordinator',
+        'Equipment': 'Decorator'
+      };
+      const mappedCat = catMap[selected.category] || 'Caterer';
+      setVendorCategory(mappedCat);
+
+      setVendorOwner(selected.contact_person || '');
+      setVendorPhone(selected.phone || '');
+      setVendorEmail(selected.email || '');
+      
+      // Do NOT populate hiring fee (cost)
+      setVendorCost('');
+
+      showToast('Vendor details filled! Set hiring fee.', 'success');
+    }
+  };
 
   // Important Notes Local Storage Cache
-  const [notes, setNotes] = useState([
-    'Special entry for Bride & Groom',
-    'Fireworks after dinner',
-    'Allergies: 5 guests (nuts)',
-    'Valet parking required'
-  ]);
+  const [notes, setNotes] = useState([]);
   const [newNote, setNewNote] = useState('');
   const [showNotesEdit, setShowNotesEdit] = useState(false);
 
   // Local storage cover photo
-  const [coverPhoto, setCoverPhoto] = useState('/udaipur_palace.png');
+  const [coverPhoto, setCoverPhoto] = useState('/leela_palace.jpg');
+
+  // Sync notes and coverPhoto with localStorage & event details
+  useEffect(() => {
+    if (id) {
+      const storedNotes = localStorage.getItem(`event_notes_${id}`);
+      if (storedNotes) {
+        setNotes(JSON.parse(storedNotes));
+      } else {
+        setNotes([]);
+      }
+
+      const storedCover = localStorage.getItem(`event_cover_${id}`);
+      if (storedCover && !storedCover.includes('.png')) {
+        setCoverPhoto(storedCover);
+      } else if (event) {
+        const cat = (event.event_type || '').toLowerCase();
+        if (cat.includes('wedding') || cat.includes('marriage')) {
+          setCoverPhoto('/leela_palace.jpg');
+        } else if (cat.includes('birthday') || cat.includes('anniversary')) {
+          setCoverPhoto('/hero_udaipur_3.jpg');
+        } else if (cat.includes('corporate') || cat.includes('seminar') || cat.includes('conference')) {
+          setCoverPhoto('/oberoi_udaivilas.jpg');
+        } else if (cat.includes('college') || cat.includes('festival') || cat.includes('fest')) {
+          setCoverPhoto('/monsoon_palace.jpg');
+        } else if (cat.includes('private') || cat.includes('party')) {
+          setCoverPhoto('/jag_mandir.jpg');
+        } else {
+          setCoverPhoto('/hero_udaipur_1.jpg');
+        }
+      } else {
+        setCoverPhoto('/leela_palace.jpg');
+      }
+    }
+  }, [id, event]);
+
+  useEffect(() => {
+    if (id && notes.length > 0) {
+      localStorage.setItem(`event_notes_${id}`, JSON.stringify(notes));
+    } else if (id && notes.length === 0) {
+      localStorage.removeItem(`event_notes_${id}`);
+    }
+  }, [notes, id]);
 
   // Hydration date formatting state
   const [formattedDateText, setFormattedDateText] = useState('');
+  const [createdDateText, setCreatedDateText] = useState('');
+  const [lastUpdatedText, setLastUpdatedText] = useState('');
 
   // Fetch Event Data
   const fetchEventDetails = useCallback(async () => {
@@ -132,6 +459,7 @@ export default function EventDetailHub() {
         setEditBudget(data.budget);
         setEditGuests(data.guest_count);
         setEditType(data.event_type);
+        setEditTheme(data.theme || 'Royal / Traditional');
       } else {
         throw new Error('Event not found');
       }
@@ -215,6 +543,39 @@ export default function EventDetailHub() {
     initFetch();
   }, [id]);
 
+  // Real-Time Background Refetching for Event Hub
+  useEffect(() => {
+    if (id) {
+      const fetchEventHubDataSilent = async () => {
+        try {
+          await Promise.all([
+            fetchEventDetails(),
+            fetchBudgetDetails(),
+            fetchGuestDetails(),
+            fetchTaskDetails(),
+            fetchVendorDetails()
+          ]);
+        } catch (err) {
+          console.error('Silent event hub fetch failed:', err);
+        }
+      };
+
+      const interval = setInterval(() => {
+        fetchEventHubDataSilent();
+      }, 5000);
+
+      const handleFocus = () => {
+        fetchEventHubDataSilent();
+      };
+      window.addEventListener('focus', handleFocus);
+
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener('focus', handleFocus);
+      };
+    }
+  }, [id, fetchEventDetails, fetchBudgetDetails, fetchGuestDetails, fetchTaskDetails, fetchVendorDetails]);
+
   // Handle Hydration Date
   useEffect(() => {
     if (event?.date) {
@@ -227,7 +588,31 @@ export default function EventDetailHub() {
         }) + ` at ${event.time || '6:00 PM'}`
       );
     }
-  }, [event]);
+
+    if (event?.created_at) {
+      const cDate = new Date(event.created_at);
+      setCreatedDateText(
+        cDate.toLocaleDateString('en-IN', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric'
+        })
+      );
+
+      const storedUpdated = localStorage.getItem(`event_updated_${id}`);
+      const lastUpdatedDate = storedUpdated ? new Date(storedUpdated) : cDate;
+      setLastUpdatedText(
+        lastUpdatedDate.toLocaleString('en-IN', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        })
+      );
+    }
+  }, [event, id]);
 
   // Handle Edit Submit
   const handleEditEvent = async (e) => {
@@ -243,11 +628,13 @@ export default function EventDetailHub() {
           location: editLocation,
           budget: parseFloat(editBudget),
           guest_count: parseInt(editGuests),
-          event_type: editType
+          event_type: editType,
+          theme: editTheme
         })
       });
       if (res.ok) {
         showToast('Event updated successfully!', 'success');
+        localStorage.setItem(`event_updated_${id}`, new Date().toISOString());
         setShowEditModal(false);
         fetchEventDetails();
         fetchBudgetDetails();
@@ -291,6 +678,7 @@ export default function EventDetailHub() {
       if (res.ok) {
         setEvent(prev => ({ ...prev, status: newStatus }));
         showToast(`Status updated to ${newStatus}`, 'success');
+        localStorage.setItem(`event_updated_${id}`, new Date().toISOString());
       }
     } catch (err) {
       showToast(err.message, 'error');
@@ -336,6 +724,42 @@ export default function EventDetailHub() {
     }
   };
 
+  const handleAddPayment = async (e) => {
+    e.preventDefault();
+    if (!payDescription || !payAmount || !payDate || !payInvoiceId) return;
+
+    const serializedTitle = `${payDescription} || ${payInvoiceId} || ${payStatus}`;
+
+    try {
+      const res = await authFetch('/expense/add', {
+        method: 'POST',
+        body: JSON.stringify({
+          eventId: id,
+          title: serializedTitle,
+          amount: parseFloat(payAmount),
+          category: 'Payment',
+          date: payDate
+        })
+      });
+
+      if (res.ok) {
+        showToast('Payment transaction recorded successfully!', 'success');
+        setPayDescription('');
+        setPayAmount('');
+        setPayDate(new Date().toISOString().split('T')[0]);
+        setPayStatus('Paid');
+        setPayInvoiceId('');
+        setShowAddPaymentModal(false);
+        fetchBudgetDetails();
+      } else {
+        const data = await res.json();
+        throw new Error(data.message || 'Failed to record payment transaction');
+      }
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
   // Guest RSVP lists
   const handleAddGuest = async (e) => {
     e.preventDefault();
@@ -355,6 +779,7 @@ export default function EventDetailHub() {
         setGuestName('');
         setGuestEmail('');
         fetchGuestDetails();
+        fetchNotifications();
       }
     } catch (err) {
       showToast(err.message, 'error');
@@ -397,20 +822,28 @@ export default function EventDetailHub() {
   const handleAddTask = async (e) => {
     e.preventDefault();
     if (!taskTitle || !taskDeadline) return;
+
+    // Serialize task details into task.title
+    const serializedTitle = `${taskTitle} || ${taskAssignee} || ${taskPriority} || ${taskStatus}`;
+    const dbStatus = taskStatus === 'Completed' ? 'completed' : 'pending';
+
     try {
       const res = await authFetch('/task/add', {
         method: 'POST',
         body: JSON.stringify({
           eventId: id,
-          title: taskTitle,
+          title: serializedTitle,
           deadline: taskDeadline,
-          status: 'pending'
+          status: dbStatus
         })
       });
       if (res.ok) {
         showToast('Task assigned successfully', 'success');
         setTaskTitle('');
         setTaskDeadline('');
+        setTaskAssignee('Self');
+        setTaskPriority('Medium');
+        setTaskStatus('To Do');
         fetchTaskDetails();
       }
     } catch (err) {
@@ -428,6 +861,7 @@ export default function EventDetailHub() {
       if (res.ok) {
         showToast(newStatus === 'completed' ? 'Task marked completed! 🎉' : 'Task pending', 'success');
         fetchTaskDetails();
+        fetchNotifications();
       }
     } catch (err) {
       showToast(err.message, 'error');
@@ -449,7 +883,19 @@ export default function EventDetailHub() {
   // Vendor Suppliers
   const handleAddVendor = async (e) => {
     e.preventDefault();
-    if (!vendorName || !vendorContact) return;
+    if (!vendorName) return;
+    if (!vendorOwner && !vendorPhone && !vendorEmail) {
+      showToast('Please provide at least one contact detail (Owner, Phone, or Email)', 'error');
+      return;
+    }
+    
+    // Combine fields for database contact field
+    const contactParts = [];
+    if (vendorOwner) contactParts.push(`Owner: ${vendorOwner}`);
+    if (vendorPhone) contactParts.push(`Phone: ${vendorPhone}`);
+    if (vendorEmail) contactParts.push(`Email: ${vendorEmail}`);
+    const combinedContact = contactParts.join(' | ') || 'N/A';
+
     try {
       const res = await authFetch('/vendor/add', {
         method: 'POST',
@@ -457,7 +903,7 @@ export default function EventDetailHub() {
           eventId: id,
           vendor_name: vendorName,
           category: vendorCategory,
-          contact: vendorContact,
+          contact: combinedContact,
           cost: parseFloat(vendorCost) || 0,
           status: vendorStatus
         })
@@ -465,8 +911,11 @@ export default function EventDetailHub() {
       if (res.ok) {
         showToast('Supplier hired', 'success');
         setVendorName('');
-        setVendorContact('');
+        setVendorOwner('');
+        setVendorPhone('');
+        setVendorEmail('');
         setVendorCost('');
+        setSelectedGlobalVendorId('');
         fetchVendorDetails();
       }
     } catch (err) {
@@ -483,6 +932,7 @@ export default function EventDetailHub() {
       if (res.ok) {
         showToast('Supplier status updated', 'success');
         fetchVendorDetails();
+        fetchNotifications();
       }
     } catch (err) {
       showToast(err.message, 'error');
@@ -501,20 +951,21 @@ export default function EventDetailHub() {
     }
   };
 
-  // Simulated Cover photo trigger
-  const handleCoverPhotoChange = () => {
-    const urls = [
-      '/udaipur_palace.png',
-      '/udaipur_palace_light.png',
-      '/services_venues.png',
-      '/services_unforgettable.png',
-      '/services_scenarios.png',
-      '/landing_wedding.png'
-    ];
-    const currentIndex = urls.indexOf(coverPhoto);
-    const nextIndex = (currentIndex + 1) % urls.length;
-    setCoverPhoto(urls[nextIndex]);
-    showToast('Changed cover background image!', 'info');
+  // Real Cover photo upload trigger
+  const handleCoverPhotoUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64Data = reader.result;
+        setCoverPhoto(base64Data);
+        if (id) {
+          localStorage.setItem(`event_cover_${id}`, base64Data);
+        }
+        showToast('Cover photo updated successfully!', 'success');
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   // Simulated PDF Downloader
@@ -545,21 +996,49 @@ export default function EventDetailHub() {
   }
 
   // Values calculation
-  const totalBudget = event ? parseFloat(event.budget) : 1560000;
-  const totalSpent = budget ? parseFloat(budget.expenses) : 785000;
-  const remainingBudget = budget ? parseFloat(budget.remaining_budget) : 775000;
+  const totalBudget = event ? parseFloat(event.budget) : 0;
+  const totalSpent = budget ? parseFloat(budget.expenses) : 0;
+  const remainingBudget = budget ? parseFloat(budget.remaining_budget) : totalBudget;
+  const checklistTasks = tasks.filter(t => !isTimelineTask(t.title));
+  const totalTasks = checklistTasks.length;
+  const completedTasks = checklistTasks.filter(t => t.status === 'completed').length;
+  const taskPct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-  const totalTasks = tasks.length || 62;
-  const completedTasks = tasks.filter(t => t.status === 'completed').length || 45;
-  const taskPct = Math.round((completedTasks / totalTasks) * 100) || 73;
+  // Dynamic task status calculations for Overview
+  const pendingTasksCount = checklistTasks.filter(t => t.status === 'pending' && !(t.deadline && new Date(t.deadline) < new Date())).length;
+  const overdueTasksCount = checklistTasks.filter(t => t.status === 'pending' && t.deadline && new Date(t.deadline) < new Date()).length;
+  const inProgressTasksCount = checklistTasks.filter(t => t.status === 'in_progress' || t.status === 'ongoing').length;
 
-  const spentPct = totalBudget > 0 ? ((totalSpent / totalBudget) * 100).toFixed(2) : '50.32';
-  const budgetProgress = totalBudget > 0 ? Math.min(100, Math.round((totalSpent / totalBudget) * 100)) : 50;
+  // Extract category specific vendors dynamically
+  const venueVendor = vendors.find(v => v.category.toLowerCase() === 'venue');
+  const cateringVendor = vendors.find(v => v.category.toLowerCase() === 'caterer' || v.category.toLowerCase() === 'catering');
+  const decorVendor = vendors.find(v => v.category.toLowerCase() === 'decorator' || v.category.toLowerCase() === 'decor' || v.category.toLowerCase() === 'decoration');
+
+  // Dynamic timeline milestones
+  const timelineTasks = tasks
+    .filter(t => isTimelineTask(t.title))
+    .sort((a, b) => getTimelineMinutes(a.title) - getTimelineMinutes(b.title));
+
+  const timelineMilestones = timelineTasks.map(t => {
+    const deadlineDate = t.deadline ? new Date(t.deadline) : null;
+    const formattedDeadline = deadlineDate 
+      ? deadlineDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+      : 'No deadline';
+    return {
+      id: t.id,
+      title: t.title,
+      time: formattedDeadline,
+      completed: t.status === 'completed'
+    };
+  });
+
+  const spentPct = totalBudget > 0 ? ((totalSpent / totalBudget) * 100).toFixed(2) : '0.00';
+  const budgetProgress = totalBudget > 0 ? Math.min(100, Math.round((totalSpent / totalBudget) * 100)) : 0;
 
   // RSVP counters
-  const yesRSVP = guests.filter(g => g.status === 'confirmed').length || 180;
-  const maybeRSVP = guests.filter(g => g.status === 'pending').length || 85;
-  const noRSVP = guests.filter(g => g.status === 'declined').length || 35;
+  const yesRSVP = guests.filter(g => g.status === 'confirmed').length;
+  const maybeRSVP = guests.filter(g => g.status === 'pending').length;
+  const noRSVP = guests.filter(g => g.status === 'declined').length;
 
   // Donut SVG segments calculations (Circumference radius 45 ~ 282.74)
   const radius = 45;
@@ -577,34 +1056,22 @@ export default function EventDetailHub() {
   // RSVP Ring SVG segments calculations (Circumference radius 35 ~ 219.91)
   const rsvpRadius = 35;
   const rsvpCircumference = 2 * Math.PI * rsvpRadius;
-  const totalGuestsSum = yesRSVP + maybeRSVP + noRSVP || 300;
-  const yesPct = Math.round((yesRSVP / totalGuestsSum) * 100) || 60;
-  const maybePct = Math.round((maybeRSVP / totalGuestsSum) * 100) || 28;
-  const noPct = Math.round((noRSVP / totalGuestsSum) * 100) || 12;
+  const totalGuestsSum = yesRSVP + maybeRSVP + noRSVP;
+  const yesPct = totalGuestsSum > 0 ? Math.round((yesRSVP / totalGuestsSum) * 100) : 0;
+  const maybePct = totalGuestsSum > 0 ? Math.round((maybeRSVP / totalGuestsSum) * 100) : 0;
+  const noPct = totalGuestsSum > 0 ? Math.round((noRSVP / totalGuestsSum) * 100) : 0;
 
   // Recent Payments Table mapping
-  const paymentRows = expenses.length > 0
-    ? expenses.slice(0, 4).map((exp, idx) => ({
-        id: `INV-00${idx + 1}`,
-        description: exp.title,
-        amount: parseFloat(exp.amount),
-        date: exp.date ? exp.date.split('T')[0] : '2024-05-20',
-        status: 'Paid'
-      }))
-    : [
-        { id: 'INV-001', description: 'Venue Booking Advance', amount: 300000, date: '2024-04-10', status: 'Paid' },
-        { id: 'INV-002', description: 'Catering Advance', amount: 150000, date: '2024-04-20', status: 'Paid' },
-        { id: 'INV-003', description: 'Decoration Advance', amount: 80000, date: '2024-05-05', status: 'Paid' },
-        { id: 'INV-004', description: 'Entertainment Advance', amount: 75000, date: '2024-05-12', status: 'Pending' }
-      ];
+  const paymentRows = expenses.map((exp, idx) => ({
+    id: `INV-00${idx + 1}`,
+    description: exp.title,
+    amount: parseFloat(exp.amount),
+    date: exp.date ? exp.date.split('T')[0] : '2024-05-20',
+    status: 'Paid'
+  }));
 
   // Document attachments
-  const documentFiles = [
-    { name: 'Event Proposal.pdf', size: '1.2 MB' },
-    { name: 'Venue Contract.pdf', size: '2.4 MB' },
-    { name: 'Catering Menu.pdf', size: '1.8 MB' },
-    { name: 'Decoration Plan.pdf', size: '2.1 MB' }
-  ];
+  const documentFiles = [];
 
   return (
     <div className="max-w-6xl mx-auto flex flex-col gap-6 font-sans">
@@ -612,12 +1079,7 @@ export default function EventDetailHub() {
       {/* 1. Header Segment with Navigation & Top Controls */}
       <div className="flex flex-col gap-4">
         
-        {/* Breadcrumb row */}
-        <div className="flex items-center gap-1.5 text-[10px] text-gray-500 font-bold uppercase tracking-wider">
-          <Link href="/events" className="hover:text-indigo-400">My Events</Link>
-          <ChevronRight className="w-3 h-3 text-gray-600" />
-          <span className="text-[#5a2bd4] dark:text-indigo-400">{event.title}</span>
-        </div>
+
 
         {/* Header Action controls */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -641,20 +1103,6 @@ export default function EventDetailHub() {
             >
               <Edit className="w-3.5 h-3.5" />
               Edit Event
-            </button>
-            <button
-              onClick={handleDownloadReport}
-              className="px-3.5 py-2 border border-white/5 hover:border-[#5a2bd4]/20 bg-white/3 hover:bg-white/5 text-gray-200 font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Download Report
-            </button>
-            <button
-              onClick={handleShareEvent}
-              className="px-3.5 py-2 border border-white/5 hover:border-[#5a2bd4]/20 bg-white/3 hover:bg-white/5 text-gray-200 font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors"
-            >
-              <Share2 className="w-3.5 h-3.5" />
-              Share Event
             </button>
             <button
               onClick={() => setShowDeleteConfirm(true)}
@@ -681,8 +1129,15 @@ export default function EventDetailHub() {
               alt="Event Cover"
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             />
+            <input
+              type="file"
+              id="event-cover-upload"
+              accept="image/*"
+              className="hidden"
+              onChange={handleCoverPhotoUpload}
+            />
             <button
-              onClick={handleCoverPhotoChange}
+              onClick={() => document.getElementById('event-cover-upload').click()}
               className="absolute bottom-3 left-3 bg-black/60 hover:bg-black/85 text-white text-[9px] font-black uppercase tracking-wider px-2.5 py-1.5 rounded-lg border border-white/10 transition-colors cursor-pointer"
             >
               Change Photo
@@ -764,7 +1219,7 @@ export default function EventDetailHub() {
           { id: 'overview', name: 'Overview' },
           { id: 'budget', name: 'Budget' },
           { id: 'guests', name: 'Guests' },
-          { id: 'tasks', name: 'Tasks & Timeline' },
+          { id: 'tasks', name: 'Tasks' },
           { id: 'vendors', name: 'Vendors' },
           { id: 'payments', name: 'Payments' },
           { id: 'notes_docs', name: 'Notes & Documents' }
@@ -799,37 +1254,51 @@ export default function EventDetailHub() {
                   <h3 className="text-xs font-black uppercase tracking-wider text-white">Event Timeline</h3>
                   <button
                     onClick={() => setActiveTab('tasks')}
-                    className="text-[9px] font-bold text-indigo-400 hover:text-indigo-300 cursor-pointer"
+                    className="text-[9px] font-bold text-indigo-400 hover:text-indigo-300 cursor-pointer animate-pulse-subtle"
                   >
-                    View Full Timeline
+                    Manage Tasks
                   </button>
                 </div>
                 
-                <div className="flex flex-col gap-3 pl-4 border-l border-indigo-500/20 relative my-2">
-                  {[
-                    { title: 'Event Setup', time: '10:00 AM', completed: true },
-                    { title: 'Guest Arrival', time: '6:00 PM', completed: false },
-                    { title: 'Wedding Ceremony', time: '7:00 PM', completed: false },
-                    { title: 'Dinner & Reception', time: '8:00 PM', completed: false },
-                    { title: 'Entertainment', time: '9:30 PM', completed: false },
-                    { title: 'Event Ends', time: '11:00 PM', completed: false }
-                  ].map((milestone, idx) => (
-                    <div key={idx} className="relative flex justify-between items-center text-xs">
-                      <span className={`absolute left-[-21px] w-2.5 h-2.5 rounded-full border border-[#0d0f14] ${
-                        milestone.completed ? 'bg-emerald-500' : 'bg-gray-600'
-                      }`}></span>
-                      <div className="flex flex-col gap-0.5">
-                        <span className={`font-bold ${milestone.completed ? 'text-gray-400 line-through' : 'text-gray-200'}`}>{milestone.title}</span>
-                        <span className="text-[9px] text-gray-500 font-semibold">{new Date(event.date).toLocaleDateString()} at {milestone.time}</span>
+                {timelineMilestones.length > 0 ? (
+                  <div className="flex flex-col gap-3 pl-4 border-l border-indigo-500/20 relative my-2 max-h-60 overflow-y-auto pr-1 scrollbar-thin">
+                    {timelineMilestones.map((milestone) => (
+                      <div key={milestone.id} className="relative flex justify-between items-center text-xs py-1">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleTaskStatus(milestone.id, milestone.completed ? 'completed' : 'pending')}
+                          className={`absolute left-[-22px] w-3 h-3 rounded-full border border-[#0d0f14] flex items-center justify-center cursor-pointer transition-colors z-10 ${
+                            milestone.completed ? 'bg-emerald-500 border-emerald-400 text-[#0d0f14]' : 'bg-gray-700 hover:bg-gray-600 border-gray-600'
+                          }`}
+                          title={milestone.completed ? 'Mark pending' : 'Mark completed'}
+                        >
+                          {milestone.completed && <Check className="w-2 h-2 text-[#0d0f14] stroke-[3px]" />}
+                        </button>
+                        <div className="flex flex-col gap-0.5 pl-1.5 text-left">
+                          <span className={`font-bold ${milestone.completed ? 'text-gray-400 line-through' : 'text-gray-200'}`}>{milestone.title}</span>
+                          <span className="text-[9px] text-gray-500 font-semibold">{milestone.time}</span>
+                        </div>
+                        <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0 ml-2 ${
+                          milestone.completed ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
+                        }`}>
+                          {milestone.completed ? 'Completed' : 'Upcoming'}
+                        </span>
                       </div>
-                      <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                        milestone.completed ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
-                      }`}>
-                        {milestone.completed ? 'Completed' : 'Upcoming'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center p-6 text-center border border-white/5 bg-white/2 rounded-xl h-full min-h-[140px] my-2">
+                    <p className="text-[10px] text-gray-500 max-w-[200px] leading-relaxed">
+                      No timeline milestones or tasks created yet. Click below to add tasks.
+                    </p>
+                    <button
+                      onClick={() => setActiveTab('tasks')}
+                      className="mt-2.5 py-1.5 px-3 bg-indigo-600/15 border border-indigo-500/25 hover:bg-indigo-600/25 text-indigo-300 font-bold text-[9px] rounded-lg cursor-pointer transition-colors"
+                    >
+                      Go to Tasks
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Budget Overview donut chart card */}
@@ -915,8 +1384,8 @@ export default function EventDetailHub() {
 
             </div>
 
-            {/* Row 2: Venue, Catering, and Decor Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {/* Row 2: Venue, Tasks, Notes, and Status Cards (Combined 2x2 Grid) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               
               {/* Venue details */}
               <div className="glass-panel p-5 rounded-2xl border border-white/5 flex flex-col justify-between gap-4 shadow-xl">
@@ -926,107 +1395,61 @@ export default function EventDetailHub() {
                     Venue Details
                   </h3>
                   <div className="h-24 rounded-lg overflow-hidden border border-white/5">
-                    <img src={coverPhoto} alt="Venue" className="w-full h-full object-cover" />
+                    <img 
+                      src={venueVendor ? getVenueImage(venueVendor.vendor_name) : coverPhoto} 
+                      alt="Venue" 
+                      className="w-full h-full object-cover" 
+                    />
                   </div>
-                  <div>
-                    <h4 className="text-xs font-extrabold text-white">The Leela Palace Udaipur</h4>
-                    <span className="text-[9px] text-gray-500 flex items-center gap-1.5 mt-1 font-medium">
-                      <MapPin className="w-3 h-3" /> Lake Pichola, Udaipur, Rajasthan
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-1 text-[9px] text-gray-400 font-semibold mt-1">
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Venue Capacity:</span>
-                      <span className="text-gray-300">300 - 500 Guests</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Hall Type:</span>
-                      <span className="text-gray-300">Banquet Hall | Lawn</span>
-                    </div>
-                  </div>
+                  {venueVendor ? (
+                    <>
+                      <div>
+                        <h4 className="text-xs font-extrabold text-white">{venueVendor.vendor_name}</h4>
+                        <span className="text-[9px] text-gray-500 flex items-center gap-1.5 mt-1 font-medium">
+                          <MapPin className="w-3 h-3" /> {venueVendor.contact || 'Udaipur, Rajasthan'}
+                        </span>
+                      </div>
+                      <div className="flex flex-col gap-1 text-[9px] text-gray-400 font-semibold mt-1">
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Estimated Cost:</span>
+                          <span className="text-amber-400 font-bold">{formatRupee(venueVendor.cost)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Status:</span>
+                          <span className="text-emerald-400 font-bold uppercase">{venueVendor.status}</span>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <h4 className="text-xs font-extrabold text-gray-500">No Venue Assigned</h4>
+                        <span className="text-[9px] text-gray-600 flex items-center gap-1.5 mt-1 font-medium">
+                          <MapPin className="w-3 h-3" /> Not specified
+                        </span>
+                      </div>
+                      <div className="flex flex-col gap-1 text-[9px] text-gray-500 font-semibold mt-1">
+                        <p className="text-[9px] text-gray-500 font-medium">Explore or assign a venue to see details.</p>
+                      </div>
+                    </>
+                  )}
                 </div>
-                <button
-                  onClick={() => router.push('/venues')}
-                  className="w-full py-2 border border-white/5 hover:border-[#5a2bd4]/20 bg-white/3 hover:bg-white/5 text-gray-300 font-bold text-[10px] rounded-xl cursor-pointer transition-colors"
-                >
-                  View Venue
-                </button>
+                {venueVendor ? (
+                  <button
+                    onClick={() => setActiveTab('vendors')}
+                    className="w-full py-2 border border-white/5 hover:border-[#5a2bd4]/20 bg-white/3 hover:bg-white/5 text-gray-300 font-bold text-[10px] rounded-xl cursor-pointer transition-colors"
+                  >
+                    Manage Vendors
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => router.push('/venues')}
+                    className="w-full py-2 border border-white/5 hover:border-[#5a2bd4]/20 bg-white/3 hover:bg-white/5 text-gray-300 font-bold text-[10px] rounded-xl cursor-pointer transition-colors"
+                  >
+                    Explore Venue
+                  </button>
+                )}
               </div>
-
-              {/* Catering details */}
-              <div className="glass-panel p-5 rounded-2xl border border-white/5 flex flex-col justify-between gap-4 shadow-xl">
-                <div className="flex flex-col gap-3">
-                  <h3 className="text-xs font-black uppercase tracking-wider text-[#10b981] flex items-center gap-2 border-b border-white/5 pb-2">
-                    <ChefHat className="w-4 h-4" />
-                    Catering Details
-                  </h3>
-                  <div className="h-24 bg-white/2 rounded-xl border border-white/5 flex items-center justify-center text-emerald-400">
-                    <Utensils className="w-10 h-10 animate-pulse" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-extrabold text-white">Tasty Bites Catering</h4>
-                    <span className="text-[9px] text-gray-500 flex items-center gap-1.5 mt-1 font-medium">
-                      <Clock className="w-3 h-3" /> Menu Tasting: <span className="text-emerald-400 font-bold uppercase">Completed</span>
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-1 text-[9px] text-gray-400 font-semibold mt-1">
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Cuisine Style:</span>
-                      <span className="text-gray-300 truncate max-w-[120px]" title="Rajasthani, North Indian, Continental">Rajasthani, North Indian, Continental</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Service:</span>
-                      <span className="text-gray-300">Buffet style dining</span>
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setActiveTab('vendors')}
-                  className="w-full py-2 border border-white/5 hover:border-emerald-500/20 bg-white/3 hover:bg-white/5 text-gray-300 font-bold text-[10px] rounded-xl cursor-pointer transition-colors"
-                >
-                  View Menu
-                </button>
-              </div>
-
-              {/* Decoration details */}
-              <div className="glass-panel p-5 rounded-2xl border border-white/5 flex flex-col justify-between gap-4 shadow-xl">
-                <div className="flex flex-col gap-3">
-                  <h3 className="text-xs font-black uppercase tracking-wider text-purple-400 flex items-center gap-2 border-b border-white/5 pb-2">
-                    <Palette className="w-4 h-4" />
-                    Decoration Details
-                  </h3>
-                  <div className="h-24 bg-white/2 rounded-xl border border-white/5 flex items-center justify-center text-purple-400">
-                    <Sparkles className="w-10 h-10 animate-pulse" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-extrabold text-white">Royal Decor Studio</h4>
-                    <span className="text-[9px] text-gray-500 flex items-center gap-1.5 mt-1 font-medium">
-                      <Palette className="w-3 h-3" /> Theme Vibe: <span className="text-purple-400 font-bold uppercase">{editTheme.split(' ')[0]}</span>
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-1 text-[9px] text-gray-400 font-semibold mt-1">
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Flowers Choice:</span>
-                      <span className="text-gray-300">Marigold, Roses, Orchids</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Stage Setup:</span>
-                      <span className="text-gray-300">Royal Palace Mandap</span>
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setActiveTab('vendors')}
-                  className="w-full py-2 border border-white/5 hover:border-purple-500/20 bg-white/3 hover:bg-white/5 text-gray-300 font-bold text-[10px] rounded-xl cursor-pointer transition-colors"
-                >
-                  View Details
-                </button>
-              </div>
-
-            </div>
-
-            {/* Row 3: Tasks Overview + Notes + Event Status */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               
               {/* Tasks overview */}
               <div className="glass-panel p-5 rounded-2xl border border-white/5 flex flex-col justify-between gap-4 shadow-xl">
@@ -1040,52 +1463,54 @@ export default function EventDetailHub() {
                   </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 items-center">
-                  
-                  {/* Task completion SVG circle */}
-                  <div className="flex justify-center relative w-24 h-24 mx-auto">
-                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                      <circle cx="50" cy="50" r="40" fill="transparent" stroke="rgba(255,255,255,0.03)" strokeWidth="8" />
-                      <circle
-                        cx="50"
-                        cy="50"
-                        r="40"
-                        fill="transparent"
-                        stroke="#10b981"
-                        strokeWidth="8"
-                        strokeDasharray={`${(taskPct / 100) * 251.33} 251.33`}
-                        className="transition-all duration-300"
-                      />
-                    </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                      <span className="text-sm font-black text-white">{taskPct}%</span>
-                      <span className="text-[7px] text-gray-500 uppercase tracking-widest leading-none mt-0.5">Completed</span>
+                <div className="flex-1 flex items-center justify-center py-2">
+                  <div className="grid grid-cols-2 gap-6 items-center w-full max-w-[290px] mx-auto">
+                    
+                    {/* Task completion SVG circle */}
+                    <div className="flex justify-center relative w-24 h-24 mx-auto">
+                      <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="40" fill="transparent" stroke="rgba(255,255,255,0.03)" strokeWidth="8" />
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="40"
+                          fill="transparent"
+                          stroke="#10b981"
+                          strokeWidth="8"
+                          strokeDasharray={`${(taskPct / 100) * 251.33} 251.33`}
+                          className="transition-all duration-300"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                        <span className="text-base font-black text-white">{taskPct}%</span>
+                        <span className="text-[9px] text-gray-500 uppercase tracking-widest leading-none mt-1 font-bold">Completed</span>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="flex flex-col gap-1 text-[9px] text-gray-400 font-semibold">
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Total Tasks:</span>
-                      <span className="text-white font-bold">{totalTasks}</span>
+                    <div className="flex flex-col gap-2.5 text-[11px] text-gray-400 font-bold">
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Total Tasks:</span>
+                        <span className="text-white font-black">{totalTasks}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Completed:</span>
+                        <span className="text-emerald-400 font-black">{completedTasks}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">In Progress:</span>
+                        <span className="text-amber-400 font-black">{inProgressTasksCount}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Pending:</span>
+                        <span className="text-gray-300 font-black">{pendingTasksCount}</span>
+                      </div>
+                      <div className="flex justify-between text-rose-400">
+                        <span>Overdue:</span>
+                        <span className="font-black text-rose-400">{overdueTasksCount}</span>
+                      </div>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Completed:</span>
-                      <span className="text-emerald-400 font-bold">{completedTasks}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">In Progress:</span>
-                      <span className="text-amber-400 font-bold">10</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Pending:</span>
-                      <span className="text-gray-300 font-bold">5</span>
-                    </div>
-                    <div className="flex justify-between text-rose-400">
-                      <span>Overdue:</span>
-                      <span className="font-bold">2</span>
-                    </div>
-                  </div>
 
+                  </div>
                 </div>
               </div>
 
@@ -1169,11 +1594,11 @@ export default function EventDetailHub() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">Created On</span>
-                      <span className="text-white">10 Apr 2024</span>
+                      <span className="text-white">{createdDateText || '-'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">Last Updated</span>
-                      <span className="text-white">18 May 2024, 11:30 AM</span>
+                      <span className="text-white">{lastUpdatedText || '-'}</span>
                     </div>
                   </div>
                 </div>
@@ -1192,11 +1617,11 @@ export default function EventDetailHub() {
 
             </div>
 
-            {/* Row 4: Recent Payments + Documents Checklist */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+            {/* Row 4: Recent Payments Table (Full Width) */}
+            <div className="w-full">
               
               {/* Recent Payments table */}
-              <div className="lg:col-span-8 glass-panel p-5 rounded-2xl border border-white/5 flex flex-col gap-4 shadow-xl">
+              <div className="w-full glass-panel p-5 rounded-2xl border border-white/5 flex flex-col gap-4 shadow-xl">
                 <div className="flex justify-between items-center border-b border-white/5 pb-2.5">
                   <h3 className="text-xs font-black uppercase tracking-wider text-white">Recent Payments</h3>
                   <button
@@ -1239,53 +1664,25 @@ export default function EventDetailHub() {
                 </div>
               </div>
 
-              {/* Documents checklist */}
-              <div className="lg:col-span-4 glass-panel p-5 rounded-2xl border border-white/5 flex flex-col justify-between gap-4 shadow-xl">
-                <div className="flex flex-col gap-3">
-                  <div className="flex justify-between items-center border-b border-white/5 pb-2.5">
-                    <h3 className="text-xs font-black uppercase tracking-wider text-white">Documents</h3>
-                    <button
-                      onClick={() => setActiveTab('notes_docs')}
-                      className="text-[9px] font-bold text-indigo-400 hover:text-indigo-300 cursor-pointer"
-                    >
-                      View All
-                    </button>
-                  </div>
-                  
-                  <div className="flex flex-col gap-2 my-1">
-                    {documentFiles.map((doc, idx) => (
-                      <div key={idx} className="flex justify-between items-center p-2.5 bg-white/2 border border-white/5 rounded-xl hover:border-indigo-500/15 transition-all">
-                        <div className="flex items-center gap-2 text-[10px] text-gray-300 font-semibold truncate">
-                          <File className="w-3.5 h-3.5 text-gray-500 shrink-0" />
-                          <span className="truncate">{doc.name}</span>
-                        </div>
-                        <span className="text-[8px] text-gray-500 shrink-0 font-bold">{doc.size}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1.5 bg-indigo-500/5 border border-indigo-500/10 rounded-xl p-2.5 text-[9px] text-gray-400">
-                  <Info className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                  <span>PDF, DOCX and contract layouts upload supported under Note settings.</span>
-                </div>
-              </div>
-
             </div>
 
             {/* Bottom Support Banner */}
-            <div className="glass-panel p-4 rounded-2xl border border-[#5a2bd4]/20 flex flex-col sm:flex-row justify-between items-center gap-4 bg-gradient-to-r from-indigo-950/15 to-purple-950/15 mt-2">
+            <div className={`glass-panel p-4 rounded-2xl border border-[#5a2bd4]/20 flex flex-col sm:flex-row justify-between items-center gap-4 mt-2 ${
+              theme === 'light'
+                ? 'bg-indigo-50/40'
+                : 'bg-gradient-to-r from-indigo-950/15 to-purple-950/15'
+            }`}>
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-[#5a2bd4]/10 border border-[#5a2bd4]/20 text-[#5a2bd4] dark:text-indigo-400 flex items-center justify-center shrink-0">
                   <Sparkles className="w-5 h-5 animate-pulse" />
                 </div>
                 <div className="text-left">
-                  <h4 className="text-xs font-bold text-white leading-tight">Need help with your event?</h4>
-                  <p className="text-[10px] text-gray-500 mt-0.5 font-medium">Ask our AI Assistant for suggestions and recommendations.</p>
+                  <h4 className="text-xs font-bold text-gray-900 dark:text-white leading-tight">Need help with your event?</h4>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 font-medium">Ask our AI Assistant for suggestions and recommendations.</p>
                 </div>
               </div>
               <button
-                onClick={() => setActiveTab('notes_docs')}
+                onClick={handleTriggerAISuggestions}
                 className="px-4 py-2.5 bg-[#5a2bd4] hover:bg-[#6b3ce2] text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-lg shadow-indigo-600/10 transition-colors cursor-pointer"
               >
                 <Sparkles className="w-3.5 h-3.5" />
@@ -1620,7 +2017,7 @@ export default function EventDetailHub() {
           </div>
         )}
 
-        {/* ================= TASKS & TIMELINE TAB ================= */}
+        {/* ================= TASKS TAB ================= */}
         {activeTab === 'tasks' && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start animate-fade-in">
             
@@ -1629,91 +2026,182 @@ export default function EventDetailHub() {
               <h3 className="text-xs font-black uppercase tracking-wider text-white border-b border-white/5 pb-2.5 flex justify-between items-center">
                 <span>Task Checklist</span>
                 <span className="text-[10px] text-gray-500 font-semibold">
-                  {tasks.filter(t => t.status === 'completed').length}/{tasks.length} Completed
+                  {checklistTasks.filter(t => t.status === 'completed').length}/{checklistTasks.length} Completed
                 </span>
               </h3>
 
-              {tasks.length === 0 ? (
+              {checklistTasks.length === 0 ? (
                 <p className="text-xs text-gray-500 text-center py-12">All clear. No tasks added yet.</p>
               ) : (
                 <div className="flex flex-col gap-2.5 max-h-96 overflow-y-auto pr-1">
-                  {tasks.map((task) => (
-                    <div
-                      key={task.id}
-                      className={`p-3 rounded-xl border flex justify-between items-center gap-4 transition-all ${
-                        task.status === 'completed'
-                          ? 'bg-[#0f1d1a]/25 border-emerald-500/10 text-gray-400'
-                          : 'bg-white/2 border-white/5 text-gray-200'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 truncate">
-                        <button
-                          onClick={() => handleToggleTaskStatus(task.id, task.status)}
-                          className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
-                            task.status === 'completed'
-                              ? 'bg-emerald-500 border-emerald-400 text-[#0d0f14]'
-                              : 'border-gray-600 hover:border-indigo-400'
-                          }`}
-                        >
-                          {task.status === 'completed' && <Check className="w-3.5 h-3.5 stroke-[3px]" />}
-                        </button>
-                        
-                        <div className="flex flex-col truncate">
-                          <span className={`text-xs font-bold leading-normal truncate ${task.status === 'completed' ? 'line-through text-gray-500' : ''}`}>
-                            {task.title}
-                          </span>
-                          <span className="text-[9px] text-gray-500 mt-0.5 font-semibold">
-                            Deadline: {new Date(task.deadline).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => handleDeleteTask(task.id)}
-                        className="p-1.5 rounded-md hover:bg-rose-500/10 text-gray-500 hover:text-rose-400 transition-colors shrink-0 cursor-pointer"
+                  {checklistTasks.map((rawTask) => {
+                    const task = parseTask(rawTask);
+                    return (
+                      <div
+                        key={task.id}
+                        className={`p-3 rounded-xl border flex justify-between items-center gap-4 transition-all ${
+                          task.status === 'completed'
+                            ? 'bg-[#0f1d1a]/25 border-emerald-500/10 text-gray-400'
+                            : 'bg-white/2 border-white/5 text-gray-200'
+                        }`}
                       >
-                        <Trash className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
+                        <div className="flex items-center gap-3 truncate">
+                          <button
+                            onClick={() => handleToggleTaskStatus(task.id, task.status)}
+                            className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
+                              task.status === 'completed'
+                                ? 'bg-emerald-500 border-emerald-400 text-[#0d0f14]'
+                                : 'border-gray-600 hover:border-indigo-400'
+                            }`}
+                          >
+                            {task.status === 'completed' && <Check className="w-3.5 h-3.5 stroke-[3px]" />}
+                          </button>
+                          
+                          <div className="flex items-center gap-3 truncate">
+                            <img
+                              src={
+                                task.assigneeName === 'Self' && user?.avatar
+                                  ? user.avatar
+                                  : assigneeAvatars[task.assigneeName] || `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assigneeName)}&background=random`
+                              }
+                              alt={task.assigneeName}
+                              className="w-7 h-7 rounded-full border border-white/10 shrink-0 object-cover"
+                            />
+                            <div className="flex flex-col truncate">
+                              <span className={`text-xs font-bold leading-normal truncate ${task.status === 'completed' ? 'line-through text-gray-500' : ''}`}>
+                                {task.displayName}
+                              </span>
+                              <div className="flex items-center gap-2 text-[9px] text-gray-500 mt-0.5 font-semibold">
+                                <span>Deadline: {new Date(task.deadline).toLocaleDateString()}</span>
+
+                                <span>•</span>
+                                <span className="text-gray-400">
+                                  {task.assigneeName === 'Self' && user?.name ? `${user.name} (Self)` : task.assigneeName}
+                                </span>
+                                <span>•</span>
+                                <span className={`px-1 rounded text-[8px] uppercase font-bold border ${
+                                  task.priority === 'High'
+                                    ? 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+                                    : task.priority === 'Medium'
+                                    ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                                    : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                                }`}>
+                                  {task.priority}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => handleDeleteTask(task.id)}
+                          className="p-1.5 rounded-md hover:bg-rose-500/10 text-gray-500 hover:text-rose-400 transition-colors shrink-0 cursor-pointer"
+                        >
+                          <Trash className="w-4 h-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
 
             {/* Right side form */}
-            <div className="glass-panel p-6 rounded-2xl border border-white/5 md:col-span-1 flex flex-col gap-4 shadow-xl">
-              <h4 className="text-xs font-bold text-gray-200 pb-2 border-b border-white/5 uppercase tracking-wider">Assign Task</h4>
+            <div className="glass-panel p-6 rounded-2xl border border-white/5 md:col-span-1 flex flex-col gap-4 shadow-xl text-left">
+              <div className="flex items-center justify-between pb-3 border-b border-white/5">
+                <div className="flex items-center gap-2">
+                  <CheckSquare className="w-5 h-5 text-indigo-500" />
+                  <span className="text-sm font-bold text-gray-200 tracking-tight">Add New Task</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTaskTitle('');
+                    setTaskDeadline('');
+                    setTaskAssignee('Self');
+                    setTaskPriority('Medium');
+                    setTaskStatus('To Do');
+                  }}
+                  className="text-gray-400 hover:text-gray-200 transition-colors cursor-pointer"
+                  aria-label="Clear Form"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
               
               <form onSubmit={handleAddTask} className="flex flex-col gap-4">
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] text-gray-500 font-semibold uppercase">Task Title</label>
+                {/* Task Name */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] text-gray-400 font-bold uppercase">TASK NAME</label>
                   <input
                     type="text"
                     value={taskTitle}
                     onChange={(e) => setTaskTitle(e.target.value)}
-                    placeholder="e.g. Finalize catering invoice"
-                    className="w-full bg-white/3 border border-white/5 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500/50 transition-all font-semibold"
+                    placeholder="e.g. Booking the venue stage decorator"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 font-bold"
                     required
                   />
                 </div>
 
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] text-gray-500 font-semibold uppercase">Deadline Date</label>
+                {/* Assigned To */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] text-gray-400 font-bold uppercase">ASSIGNED TO</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Self, Rahul Sharma, etc."
+                    value={taskAssignee}
+                    onChange={(e) => setTaskAssignee(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 font-bold"
+                    required
+                  />
+                </div>
+
+                {/* Due Date */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] text-gray-400 font-bold uppercase">DUE DATE</label>
                   <input
                     type="date"
                     value={taskDeadline}
                     onChange={(e) => setTaskDeadline(e.target.value)}
-                    className="w-full bg-white/3 border border-white/5 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500/50 transition-all cursor-pointer font-semibold"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 cursor-pointer font-bold"
+                    style={{ colorScheme: theme === 'light' ? 'light' : 'dark' }}
                     required
                   />
                 </div>
 
+                {/* Priority & Status in a Grid */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] text-gray-400 font-bold uppercase">PRIORITY</label>
+                    <select
+                      value={taskPriority}
+                      onChange={(e) => setTaskPriority(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500 cursor-pointer font-bold"
+                    >
+                      <option value="High" className="bg-[#151c2c] text-white">High</option>
+                      <option value="Medium" className="bg-[#151c2c] text-white">Medium</option>
+                      <option value="Low" className="bg-[#151c2c] text-white">Low</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] text-gray-400 font-bold uppercase">STATUS</label>
+                    <select
+                      value={taskStatus}
+                      onChange={(e) => setTaskStatus(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500 cursor-pointer font-bold"
+                    >
+                      <option value="To Do" className="bg-[#151c2c] text-white">To Do</option>
+                      <option value="In Progress" className="bg-[#151c2c] text-white">In Progress</option>
+                      <option value="Completed" className="bg-[#151c2c] text-white">Completed</option>
+                    </select>
+                  </div>
+                </div>
+
                 <button
                   type="submit"
-                  className="w-full py-2.5 bg-[#5a2bd4] hover:bg-[#6b3ce2] text-white font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/10 cursor-pointer transition-colors"
+                  className="w-full py-3 bg-[#5a2bd4] hover:bg-[#6b3ce2] text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/10 cursor-pointer transition-colors uppercase tracking-wider mt-2"
                 >
-                  <Plus className="w-4 h-4" />
-                  Save Task
+                  ADD TASK
                 </button>
               </form>
             </div>
@@ -1790,6 +2278,68 @@ export default function EventDetailHub() {
               
               <form onSubmit={handleAddVendor} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1">
+                  <label className="text-[10px] text-gray-500 font-semibold uppercase">Choose Vendor Profile</label>
+                  <select
+                    value={selectedGlobalVendorId}
+                    onChange={(e) => handleSelectGlobalVendor(e.target.value)}
+                    className="w-full bg-[#1e293b]/50 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500/50 cursor-pointer font-semibold"
+                  >
+                    <option value="" className="bg-[#151c2c] text-gray-400">-- Custom / Manual Entry --</option>
+                    {globalVendors.map((v) => (
+                      <option key={v.id} value={v.id} className="bg-[#151c2c] text-white">
+                        {v.name} ({v.category})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {selectedGlobalVendorId && (
+                  (() => {
+                    const selected = globalVendors.find(v => String(v.id) === String(selectedGlobalVendorId));
+                    if (!selected) return null;
+                    return (
+                      <div className="p-4 rounded-xl bg-white/5 border border-white/10 flex flex-col gap-3 animate-fade-in shadow-inner">
+                        <div className="flex justify-between items-start border-b border-white/5 pb-2">
+                          <div>
+                            <h5 className="text-xs font-bold text-white uppercase tracking-wider">{selected.name}</h5>
+                            <span className="text-[9px] font-semibold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full mt-1 inline-block">
+                              {selected.category}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2.5 text-[10px] text-gray-400 font-semibold leading-relaxed">
+                          <div className="flex flex-col">
+                            <span className="text-[8px] uppercase tracking-wider text-gray-500">Owner Name</span>
+                            <span className="text-gray-250 font-bold">{selected.contact_person || 'N/A'}</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[8px] uppercase tracking-wider text-gray-500">Phone Number</span>
+                            <span className="text-gray-250 font-bold">{selected.phone || 'N/A'}</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[8px] uppercase tracking-wider text-gray-500">Email Address</span>
+                            <span className="text-gray-250 font-bold truncate">{selected.email || 'N/A'}</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[8px] uppercase tracking-wider text-gray-500">Location / Address</span>
+                            <span className="text-gray-250 font-bold">Udaipur, Rajasthan</span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleAutoFillVendor}
+                          className="w-full py-2 bg-[#5a2bd4]/20 hover:bg-[#5a2bd4]/40 border border-[#5a2bd4]/40 text-white font-extrabold text-[10px] rounded-lg tracking-wider transition-all cursor-pointer uppercase flex items-center justify-center gap-1 mt-1"
+                        >
+                          Select & Auto-Fill Form
+                        </button>
+                      </div>
+                    );
+                  })()
+                )}
+
+                <div className="flex flex-col gap-1">
                   <label className="text-[10px] text-gray-500 font-semibold uppercase">Supplier Name</label>
                   <input
                     type="text"
@@ -1831,15 +2381,38 @@ export default function EventDetailHub() {
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] text-gray-500 font-semibold uppercase">Contact Info</label>
+                  <label className="text-[10px] text-gray-500 font-semibold uppercase">Owner Name / Contact Person</label>
                   <input
                     type="text"
-                    value={vendorContact}
-                    onChange={(e) => setVendorContact(e.target.value)}
-                    placeholder="Email or phone number"
+                    value={vendorOwner}
+                    onChange={(e) => setVendorOwner(e.target.value)}
+                    placeholder="e.g. Harish Vyas"
                     className="w-full bg-white/3 border border-white/5 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500/50 transition-all font-semibold"
-                    required
                   />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] text-gray-500 font-semibold uppercase">Phone Number</label>
+                    <input
+                      type="text"
+                      value={vendorPhone}
+                      onChange={(e) => setVendorPhone(e.target.value)}
+                      placeholder="e.g. +91 94140 12345"
+                      className="w-full bg-white/3 border border-white/5 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500/50 transition-all font-semibold"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] text-gray-500 font-semibold uppercase">Email Address</label>
+                    <input
+                      type="email"
+                      value={vendorEmail}
+                      onChange={(e) => setVendorEmail(e.target.value)}
+                      placeholder="e.g. name@domain.com"
+                      className="w-full bg-white/3 border border-white/5 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500/50 transition-all font-semibold"
+                    />
+                  </div>
                 </div>
 
                 <button
@@ -1858,11 +2431,20 @@ export default function EventDetailHub() {
         {/* ================= PAYMENTS TAB ================= */}
         {activeTab === 'payments' && (
           <div className="glass-panel p-6 rounded-2xl border border-white/5 shadow-xl flex flex-col gap-4 animate-fade-in max-w-4xl mx-auto">
-            <div className="flex justify-between items-center border-b border-white/5 pb-3">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-white/5 pb-3">
               <h3 className="text-xs font-black uppercase tracking-wider text-white">Full Transaction Payments Ledger</h3>
-              <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded border border-emerald-500/25">
-                Total Spent: {formatRupee(totalSpent)}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded border border-emerald-500/25">
+                  Total Spent: {formatRupee(totalSpent)}
+                </span>
+                <button
+                  onClick={() => setShowAddPaymentModal(true)}
+                  className="px-3 py-1.5 bg-[#5a2bd4] hover:bg-[#6b3ce2] text-white text-[10px] font-bold rounded-lg flex items-center gap-1 cursor-pointer transition-colors shadow-md shadow-indigo-600/10"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Add Payment Transaction
+                </button>
+              </div>
             </div>
 
             <div className="overflow-x-auto mt-2">
@@ -1878,35 +2460,34 @@ export default function EventDetailHub() {
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {expenses.length > 0 ? (
-                    expenses.map((exp, idx) => (
-                      <tr key={exp.id} className="hover:bg-white/1 transition-colors">
-                        <td className="py-3 px-2 font-bold text-indigo-400">INV-00{idx + 1}</td>
-                        <td className="py-3 px-2 text-white">{exp.title}</td>
-                        <td className="py-3 px-2 font-bold text-emerald-400">{formatRupee(parseFloat(exp.amount))}</td>
-                        <td className="py-3 px-2 text-gray-400">{exp.date ? exp.date.split('T')[0] : 'N/A'}</td>
-                        <td className="py-3 px-2">
-                          <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/10 px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase">
-                            Paid
-                          </span>
-                        </td>
-                      </tr>
-                    ))
+                    expenses.map((exp, idx) => {
+                      const pay = parsePayment(exp, idx);
+                      return (
+                        <tr key={pay.id} className="hover:bg-white/1 transition-colors">
+                          <td className="py-3 px-2 font-bold text-indigo-400">{pay.invoiceId}</td>
+                          <td className="py-3 px-2 text-white">{pay.description}</td>
+                          <td className="py-3 px-2 font-bold text-emerald-400">{formatRupee(parseFloat(pay.amount))}</td>
+                          <td className="py-3 px-2 text-gray-400">{pay.date}</td>
+                          <td className="py-3 px-2">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase border ${
+                              pay.status === 'Paid'
+                                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                                : pay.status === 'Pending'
+                                ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                                : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+                            }`}>
+                              {pay.status}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
                   ) : (
-                    paymentRows.map((pay) => (
-                      <tr key={pay.id} className="hover:bg-white/1 transition-colors">
-                        <td className="py-3 px-2 font-bold text-indigo-400">{pay.id}</td>
-                        <td className="py-3 px-2 text-white">{pay.description}</td>
-                        <td className="py-3 px-2 font-bold text-emerald-400">{formatRupee(pay.amount)}</td>
-                        <td className="py-3 px-2 text-gray-400">{pay.date}</td>
-                        <td className="py-3 px-2">
-                          <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase border ${
-                            pay.status === 'Paid' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-amber-500/10 border-amber-500/20 text-amber-400'
-                          }`}>
-                            {pay.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
+                    <tr className="text-center">
+                      <td colSpan="5" className="py-8 text-xs text-gray-500 font-bold">
+                        No transactions recorded yet. Click "Add Payment Transaction" to record one.
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>
@@ -1916,7 +2497,7 @@ export default function EventDetailHub() {
 
         {/* ================= NOTES & DOCUMENTS TAB ================= */}
         {activeTab === 'notes_docs' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start animate-fade-in max-w-4xl mx-auto">
+          <div className="max-w-xl mx-auto animate-fade-in w-full">
             
             {/* Notes checklist card */}
             <div className="glass-panel p-6 rounded-2xl border border-white/5 shadow-xl flex flex-col gap-4">
@@ -1963,40 +2544,6 @@ export default function EventDetailHub() {
                       </button>
                     </div>
                   ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Documents list */}
-            <div className="glass-panel p-6 rounded-2xl border border-white/5 shadow-xl flex flex-col gap-4">
-              <div className="flex justify-between items-center border-b border-white/5 pb-2.5">
-                <h3 className="text-xs font-black uppercase tracking-wider text-white">Event Documents Checklist</h3>
-                <span className="text-[9px] text-gray-500 bg-white/5 border border-white/10 px-2 py-0.5 rounded">PDF ONLY</span>
-              </div>
-
-              <div className="flex flex-col gap-3">
-                {documentFiles.map((doc, idx) => (
-                  <div key={idx} className="flex justify-between items-center p-3 bg-white/2 border border-white/5 rounded-xl hover:border-indigo-500/20 transition-all">
-                    <div className="flex items-center gap-2.5 text-xs text-gray-300 font-semibold truncate">
-                      <FileText className="w-4 h-4 text-indigo-400 shrink-0" />
-                      <span className="truncate">{doc.name}</span>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="text-[9px] text-gray-500 font-bold">{doc.size}</span>
-                      <button
-                        onClick={() => showToast(`Opening document ${doc.name} file details...`, 'info')}
-                        className="text-[9px] text-indigo-400 hover:text-indigo-300 font-bold cursor-pointer"
-                      >
-                        Download
-                      </button>
-                    </div>
-                  </div>
-                ))}
-
-                {/* Upload simulated button */}
-                <div className="border-2 border-dashed border-white/5 hover:border-indigo-500/35 rounded-xl p-6 text-center cursor-pointer transition-colors mt-2" onClick={() => showToast('Simulating document uploader trigger...', 'info')}>
-                  <span className="text-xs font-bold text-gray-400 block mb-1">Click to Upload New Document</span>
-                  <span className="text-[9px] text-gray-500 block">Supports PDF, DOCX, or Excel up to 5MB</span>
                 </div>
               </div>
             </div>
@@ -2173,6 +2720,211 @@ export default function EventDetailHub() {
                 Delete Permanently
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Payment Transaction Modal */}
+      {showAddPaymentModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="glass-panel w-full max-w-md rounded-2xl border border-white/10 overflow-hidden shadow-2xl flex flex-col animate-scale-in">
+            <div className="p-4 border-b border-white/5 bg-white/1 flex justify-between items-center">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                <Plus className="w-4 h-4 text-indigo-400" /> Add Payment Transaction
+              </h3>
+              <button
+                onClick={() => setShowAddPaymentModal(false)}
+                className="text-gray-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddPayment} className="p-5 flex flex-col gap-4 text-left">
+              {/* Invoice ID */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Invoice ID</label>
+                <input
+                  type="text"
+                  value={payInvoiceId}
+                  onChange={(e) => setPayInvoiceId(e.target.value)}
+                  placeholder="e.g. INV-001"
+                  className="w-full bg-white/3 border border-white/5 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500/50 transition-all font-semibold"
+                  required
+                />
+              </div>
+
+              {/* Expense / Description */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Expense / Description</label>
+                <input
+                  type="text"
+                  value={payDescription}
+                  onChange={(e) => setPayDescription(e.target.value)}
+                  placeholder="e.g. Catering Deposit, Florist Settlement"
+                  className="w-full bg-white/3 border border-white/5 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500/50 transition-all font-semibold"
+                  required
+                />
+              </div>
+
+              {/* Amount Paid */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Amount Paid (₹)</label>
+                <input
+                  type="number"
+                  value={payAmount}
+                  onChange={(e) => setPayAmount(e.target.value)}
+                  placeholder="e.g. 15000"
+                  className="w-full bg-white/3 border border-white/5 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500/50 transition-all font-semibold"
+                  min="1"
+                  required
+                />
+              </div>
+
+              {/* Payment Date */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Payment Date</label>
+                <input
+                  type="date"
+                  value={payDate}
+                  onChange={(e) => setPayDate(e.target.value)}
+                  className="w-full bg-white/3 border border-white/5 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500/50 transition-all cursor-pointer font-semibold"
+                  style={{ colorScheme: theme === 'light' ? 'light' : 'dark' }}
+                  required
+                />
+              </div>
+
+              {/* Status */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Status</label>
+                <select
+                  value={payStatus}
+                  onChange={(e) => setPayStatus(e.target.value)}
+                  className="w-full bg-white/3 border border-white/5 rounded-xl px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-indigo-500/50 transition-all cursor-pointer font-semibold"
+                >
+                  <option value="Paid" className="bg-[#151c2c]">Paid</option>
+                  <option value="Pending" className="bg-[#151c2c]">Pending</option>
+                  <option value="Failed" className="bg-[#151c2c]">Failed</option>
+                </select>
+              </div>
+
+              <div className="p-4 border-t border-white/5 bg-white/1 flex gap-3 justify-end mt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddPaymentModal(false)}
+                  className="px-4 py-2 border border-white/5 hover:border-white/10 bg-white/3 hover:bg-white/5 text-gray-300 font-bold text-[10px] rounded-xl cursor-pointer transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-[#5a2bd4] hover:bg-[#6b3ce2] text-white font-bold text-[10px] rounded-xl shadow-lg cursor-pointer transition-colors"
+                >
+                  Add Transaction
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* AI Suggestions Overlay Modal */}
+      {showAISuggestionsModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="glass-panel w-full max-w-lg rounded-2xl border border-white/10 overflow-hidden shadow-2xl flex flex-col animate-scale-in max-h-[90vh]">
+            
+            <div className="p-4 border-b border-white/5 bg-white/1 flex justify-between items-center">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-purple-400 animate-pulse" />
+                AI Planner Assistant Recommendations
+              </h3>
+              <button
+                onClick={() => setShowAISuggestionsModal(false)}
+                className="text-gray-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex flex-col gap-5 text-left text-xs">
+              {aiLoading ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                  <div className="w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin"></div>
+                  <span className="text-gray-400 font-semibold animate-pulse">Analyzing event details & generating custom blueprint...</span>
+                </div>
+              ) : (
+                aiSuggestions && (
+                  <>
+                    {/* Event summary snippet */}
+                    <div className="bg-white/3 border border-white/5 rounded-xl p-3.5 flex flex-col gap-1.5">
+                      <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Target Event Profile</span>
+                      <h4 className="text-sm font-extrabold text-white">{event?.title || 'Your Event'}</h4>
+                      <div className="grid grid-cols-2 gap-2 text-[10px] text-gray-400 font-semibold mt-1">
+                        <div>Type: <span className="text-gray-200">{event?.event_type || 'Event'}</span></div>
+                        <div>Guests: <span className="text-gray-200">{event?.guest_count || 0}</span></div>
+                        <div>Budget: <span className="text-amber-400 font-bold">{formatRupee(event?.budget || 0)}</span></div>
+                        <div>Theme: <span className="text-gray-200">{event?.theme || 'Standard'}</span></div>
+                      </div>
+                    </div>
+
+                    {/* AI Suggestions checklist */}
+                    <div className="flex flex-col gap-2.5">
+                      <h4 className="font-bold text-white flex items-center gap-1.5 border-b border-white/5 pb-1">
+                        <CheckSquare className="w-4 h-4 text-[#10b981]" /> Generated Planning Checklist
+                      </h4>
+                      <ul className="flex flex-col gap-2 text-gray-300 font-medium">
+                        {aiSuggestions.checklist && aiSuggestions.checklist.map((item, idx) => (
+                          <li key={idx} className="flex items-start gap-2 bg-white/1 px-3 py-2 border border-white/5 rounded-lg leading-relaxed">
+                            <span className="text-[#10b981] font-black">•</span>
+                            <span>{renderItemSafely(item)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* AI Theme & Decor suggestions */}
+                    <div className="flex flex-col gap-2.5">
+                      <h4 className="font-bold text-white flex items-center gap-1.5 border-b border-white/5 pb-1">
+                        <Palette className="w-4 h-4 text-purple-400" /> Decorative & Theme Concept
+                      </h4>
+                      <p className="text-gray-300 bg-white/1 p-3 border border-white/5 rounded-lg leading-relaxed font-medium">
+                        {renderItemSafely(aiSuggestions.decor)}
+                      </p>
+                    </div>
+
+                    {/* AI Udaipur Vendor matches */}
+                    <div className="flex flex-col gap-2.5">
+                      <h4 className="font-bold text-white flex items-center gap-1.5 border-b border-white/5 pb-1">
+                        <Users className="w-4 h-4 text-indigo-400" /> Local Udaipur Vendor Recommendations
+                      </h4>
+                      <p className="text-gray-300 bg-white/1 p-3 border border-white/5 rounded-lg leading-relaxed font-medium">
+                        {renderItemSafely(aiSuggestions.vendors)}
+                      </p>
+                    </div>
+
+                    {/* AI Budget optimization tips */}
+                    <div className="flex flex-col gap-2.5">
+                      <h4 className="font-bold text-white flex items-center gap-1.5 border-b border-white/5 pb-1">
+                        <Receipt className="w-4 h-4 text-amber-400" /> Budget Allocation Advice
+                      </h4>
+                      <div className="text-gray-300 bg-amber-500/5 border border-amber-500/10 p-3 rounded-lg leading-relaxed font-semibold">
+                        {renderItemSafely(aiSuggestions.budgetTip)}
+                      </div>
+                    </div>
+                  </>
+                )
+              )}
+            </div>
+
+            <div className="p-4 border-t border-white/5 bg-white/1 flex justify-end gap-2 shrink-0">
+              <button
+                onClick={() => setShowAISuggestionsModal(false)}
+                className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white text-xs font-bold rounded-xl cursor-pointer transition-colors"
+              >
+                Close Suggestions
+              </button>
+            </div>
+
           </div>
         </div>
       )}

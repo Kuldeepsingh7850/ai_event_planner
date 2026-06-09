@@ -39,7 +39,7 @@ export default function FavoritesPage() {
       category: 'Venue',
       subCategory: 'Venue',
       location: 'Udaipur, Rajasthan',
-      image: '/udaipur_palace.png',
+      image: '/leela_palace.jpg',
       metadataType: 'location'
     },
     {
@@ -48,7 +48,7 @@ export default function FavoritesPage() {
       category: 'Venue',
       subCategory: 'Venue',
       location: 'Udaipur, Rajasthan',
-      image: '/udaipur_palace_light.png',
+      image: '/monsoon_palace.jpg',
       metadataType: 'location'
     },
     {
@@ -57,7 +57,7 @@ export default function FavoritesPage() {
       category: 'Vendor',
       subCategory: 'Vendor - Catering',
       location: 'Udaipur, Rajasthan',
-      image: '/services_unforgettable.png',
+      image: '/hero_udaipur_2.jpg',
       metadataType: 'location'
     },
     {
@@ -66,7 +66,7 @@ export default function FavoritesPage() {
       category: 'Vendor',
       subCategory: 'Vendor - Decoration',
       location: 'Udaipur, Rajasthan',
-      image: '/services_scenarios.png',
+      image: '/shiv_niwas.jpg',
       metadataType: 'location'
     },
     {
@@ -75,7 +75,7 @@ export default function FavoritesPage() {
       category: 'Vendor',
       subCategory: 'Vendor - Entertainment',
       location: 'Udaipur, Rajasthan',
-      image: '/celebrate_collage1.png',
+      image: '/hero_udaipur_3.jpg',
       metadataType: 'location'
     },
     {
@@ -84,7 +84,7 @@ export default function FavoritesPage() {
       category: 'Vendor',
       subCategory: 'Vendor - Photography',
       location: 'Udaipur, Rajasthan',
-      image: '/celebrate_collage2.png',
+      image: '/jag_mandir.jpg',
       metadataType: 'location'
     },
     {
@@ -93,7 +93,7 @@ export default function FavoritesPage() {
       category: 'Task',
       subCategory: 'Task',
       metaLabel: 'Due: 22 May 2024',
-      image: '/landing_wedding.png',
+      image: '/hero_udaipur_1.jpg',
       metadataType: 'due_date'
     },
     {
@@ -102,34 +102,43 @@ export default function FavoritesPage() {
       category: 'Idea',
       subCategory: 'Idea',
       metaLabel: 'Added on: 20 May 2024',
-      image: '/landing_custom.png',
+      image: '/oberoi_udaivilas.jpg',
       metadataType: 'added_date'
     }
   ];
 
   // Initialize and read favorites from LocalStorage
   useEffect(() => {
+    setLoading(true);
     try {
-      const stored = localStorage.getItem('event_planner_favorites');
+      const localKey = user ? `event_planner_favorites_${user.id}` : 'event_planner_favorites';
+      const stored = localStorage.getItem(localKey);
+      let parsed = null;
       if (stored) {
-        setFavorites(JSON.parse(stored));
+        try { parsed = JSON.parse(stored); } catch (e) {}
+      }
+      const hasAIPlaceholder = parsed && parsed.some(f => f.image && f.image.endsWith('.png') && !f.image.includes('logo.png'));
+
+      if (!parsed || hasAIPlaceholder) {
+        localStorage.setItem(localKey, JSON.stringify([]));
+        setFavorites([]);
       } else {
-        localStorage.setItem('event_planner_favorites', JSON.stringify(fallbackFavorites));
-        setFavorites(fallbackFavorites);
+        setFavorites(parsed);
       }
     } catch (e) {
       console.error('LocalStorage not supported or failed to parse:', e);
-      setFavorites(fallbackFavorites);
+      setFavorites([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   // Sync back to local storage
   const saveFavorites = (newFavorites) => {
     setFavorites(newFavorites);
     try {
-      localStorage.setItem('event_planner_favorites', JSON.stringify(newFavorites));
+      const localKey = user ? `event_planner_favorites_${user.id}` : 'event_planner_favorites';
+      localStorage.setItem(localKey, JSON.stringify(newFavorites));
     } catch (e) {
       console.error('Failed to write to localStorage:', e);
     }
@@ -245,15 +254,6 @@ export default function FavoritesPage() {
         <div className="glass-panel text-center py-24 rounded-2xl border border-white/5 flex flex-col items-center justify-center gap-3">
           <Star className="w-12 h-12 text-gray-600 animate-pulse" />
           <p className="text-xs text-gray-500 font-bold">You have no items saved in this category.</p>
-          <button
-            onClick={() => {
-              saveFavorites(fallbackFavorites);
-              showToast('Restored mockup defaults!', 'success');
-            }}
-            className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-bold text-gray-300 transition-colors"
-          >
-            Restore Default Mockups
-          </button>
         </div>
       ) : (
         /* GRID VIEW LAYOUT (4 columns on wide viewports) */

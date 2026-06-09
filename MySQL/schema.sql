@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS `guests` (
   `event_id` INT NOT NULL,
   `guest_name` VARCHAR(255) NOT NULL,
   `email` VARCHAR(255) NOT NULL,
+  `phone` VARCHAR(50) DEFAULT NULL,
   `status` VARCHAR(50) DEFAULT 'pending', -- 'pending', 'confirmed', 'declined'
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (`event_id`) REFERENCES `events`(`id`) ON DELETE CASCADE

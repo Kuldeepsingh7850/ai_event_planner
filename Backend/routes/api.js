@@ -7,20 +7,27 @@ const {
   registerUser,
   loginUser,
   forgotPassword,
+  resetPassword,
   getUserProfile,
   getAllUsers,
   updateUserRole,
   updateUserStatus,
   deleteUser,
-  updateProfileAvatar
+  updateProfileAvatar,
+  createUserAdmin,
+  googleLoginUser,
+  updateUserProfile,
+  updatePassword
 } = require('../controllers/authController');
 
 const {
   getEvents,
+  getAdminEvents,
   getEventById,
   createEvent,
   updateEvent,
-  deleteEvent
+  deleteEvent,
+  getPublicStats
 } = require('../controllers/eventController');
 
 const {
@@ -67,12 +74,17 @@ const {
 // --- AUTHENTICATION MODULE ---
 router.post('/register', registerUser);
 router.post('/login', loginUser);
+router.post('/login/google', googleLoginUser);
 router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
 router.get('/profile', protect, getUserProfile);
 router.get('/auth/sync', protect, getUserProfile);
 router.put('/profile/avatar', protect, updateProfileAvatar);
+router.put('/profile', protect, updateUserProfile);
+router.put('/profile/password', protect, updatePassword);
 
 // --- EVENT MODULE ---
+router.get('/public-stats', getPublicStats);
 router.get('/events', protect, getEvents);
 router.get('/events/:id', protect, getEventById);
 router.post('/create-event', protect, createEvent);
@@ -115,8 +127,10 @@ router.post('/ai/suggestions', protect, getAISuggestions);
 
 // --- ADMIN MODULE ---
 router.get('/admin/users', protect, admin, getAllUsers);
+router.post('/admin/users', protect, admin, createUserAdmin);
 router.put('/admin/users/:id/role', protect, admin, updateUserRole);
 router.put('/admin/users/:id/status', protect, admin, updateUserStatus);
 router.delete('/admin/users/:id', protect, admin, deleteUser);
+router.get('/admin/events', protect, admin, getAdminEvents);
 
 module.exports = router;

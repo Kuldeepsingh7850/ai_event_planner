@@ -72,7 +72,6 @@ export function AuthProvider({ children }) {
 
   // Login handler
   const login = async (email, password) => {
-    setLoading(true);
     try {
       const res = await fetch(`${API_BASE_URL}/login`, {
         method: 'POST',
@@ -97,17 +96,46 @@ export function AuthProvider({ children }) {
         role: data.role,
         avatar: data.avatar
       });
-      setLoading(false);
       return data;
     } catch (err) {
-      setLoading(false);
+      throw err;
+    }
+  };
+
+  // Login with Google handler
+  const loginWithGoogle = async (idToken) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/login/google`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ idToken })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || 'Google login failed');
+      }
+
+      // Save token & user in local storage
+      localStorage.setItem('token', data.token);
+      setUser({
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        role: data.role,
+        avatar: data.avatar
+      });
+      return data;
+    } catch (err) {
       throw err;
     }
   };
 
   // Register handler
   const register = async (name, email, password) => {
-    setLoading(true);
     try {
       const res = await fetch(`${API_BASE_URL}/register`, {
         method: 'POST',
@@ -132,10 +160,8 @@ export function AuthProvider({ children }) {
         role: data.role,
         avatar: data.avatar || null
       });
-      setLoading(false);
       return data;
     } catch (err) {
-      setLoading(false);
       throw err;
     }
   };
@@ -144,7 +170,7 @@ export function AuthProvider({ children }) {
   const logout = () => {
     localStorage.removeItem('token');
     setUser(null);
-    router.push('/login');
+    router.push('/');
   };
 
   const requestPasswordReset = async (email) => {
@@ -166,9 +192,34 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const resetPassword = async (token, password) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ token, password })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to reset password');
+      }
+      return data;
+    } catch (err) {
+      throw err;
+    }
+  };
+
   const updateUserAvatar = (avatar) => {
     if (user) {
       setUser(prev => prev ? { ...prev, avatar } : null);
+    }
+  };
+
+  const updateUserName = (name) => {
+    if (user) {
+      setUser(prev => prev ? { ...prev, name } : null);
     }
   };
 
@@ -176,11 +227,14 @@ export function AuthProvider({ children }) {
     user,
     loading,
     login,
+    loginWithGoogle,
     register,
     requestPasswordReset,
+    resetPassword,
     logout,
     authFetch,
     updateUserAvatar,
+    updateUserName,
     isAuthenticated: !!user,
     isAdmin: user?.role === 'admin'
   };

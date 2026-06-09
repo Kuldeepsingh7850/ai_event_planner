@@ -29,7 +29,7 @@ export default function NotificationsPage() {
   } = useNotifications();
 
   // Tab Filtering & Local States
-  const [activeTab, setActiveTab] = useState('All'); // 'All', 'Unread', 'Updates', 'Reminders', 'Messages', 'System'
+  const [activeTab, setActiveTab] = useState('All'); // 'All', 'Unread'
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(8);
@@ -195,10 +195,6 @@ export default function NotificationsPage() {
   // Tabs Filter Logic
   const filteredNotifications = allNotifications.filter(n => {
     if (activeTab === 'Unread') return n.status === 'unread';
-    if (activeTab === 'Updates') return n.type === 'updates';
-    if (activeTab === 'Reminders') return n.type === 'reminders';
-    if (activeTab === 'Messages') return n.type === 'messages';
-    if (activeTab === 'System') return n.type === 'system';
     return true; // All
   });
 
@@ -265,11 +261,7 @@ export default function NotificationsPage() {
       <div className="flex gap-6 overflow-x-auto text-[13px] font-bold text-gray-500 border-b border-white/5 pb-2 scrollbar-none">
         {[
           { id: 'All', label: 'All' },
-          { id: 'Unread', label: `Unread${unreadCount > 0 ? ` (${unreadCount})` : ''}` },
-          { id: 'Updates', label: 'Updates' },
-          { id: 'Reminders', label: 'Reminders' },
-          { id: 'Messages', label: 'Messages' },
-          { id: 'System', label: 'System' }
+          { id: 'Unread', label: `Unread${unreadCount > 0 ? ` (${unreadCount})` : ''}` }
         ].map(tab => {
           const isActive = activeTab === tab.id;
           return (

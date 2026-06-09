@@ -1,0 +1,881 @@
+Scanning 27 JSX files...
+
+Match: {children} in file: Layout.jsx Line: 55
+  Context: <div className="min-h-screen bg-[#0d0f14] overflow-x-hidden">{children}</div>;   }    // Private Layout   const isAdminV
+-------------------------------------------
+Match: {children} in file: Layout.jsx Line: 68
+  Context: isSidebarOpen ? 'md:pl-72' : 'md:pl-8'         }`}>           {children}         </main>       </div>     </di
+-------------------------------------------
+Match: {unreadCount} in file: Navbar.jsx Line: 115
+  Context: ont-extrabold flex items-center justify-center rounded-full">                   {unreadCount}                 </span>
+-------------------------------------------
+Match: {notif.message} in file: Navbar.jsx Line: 135
+  Context: border-indigo-500/10 text-indigo-200"                       >                         {notif.message}
+-------------------------------------------
+Match: {item.name} in file: Sidebar.jsx Line: 127
+  Context: Icon className="w-4 h-4 shrink-0" />                   <span>{item.name}</span>                 </Link>               );
+-------------------------------------------
+Match: {user.name} in file: Sidebar.jsx Line: 153
+  Context: bold text-gray-800 dark:text-gray-200 truncate leading-snug">                 {user.name}               </span>
+-------------------------------------------
+Match: {user.email} in file: Sidebar.jsx Line: 156
+  Context: -gray-500 dark:text-gray-400 truncate leading-normal mt-0.5">                 {user.email}               </span>
+-------------------------------------------
+Match: {children} in file: AuthContext.jsx Line: 242
+  Context: = 'admin'   };    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>; }  export function useAu
+-------------------------------------------
+Match: {toast.message} in file: NotificationContext.jsx Line: 104
+  Context: </span>               <p className="text-sm font-medium">{toast.message}</p>             </div>             <button
+-------------------------------------------
+Match: {children} in file: ThemeContext.jsx Line: 29
+  Context: (     <ThemeContext.Provider value={{ theme, toggleTheme }}>       {children}     </ThemeContext.Provider>   ); }  expo
+-------------------------------------------
+Match: {displayEvents} in file: index.jsx Line: 2435
+  Context: <span className="text-2xl font-extrabold tracking-tight">{displayEvents}</span>                 <span className="tex
+-------------------------------------------
+Match: {displayVenues} in file: index.jsx Line: 2467
+  Context: <span className="text-2xl font-extrabold tracking-tight">{displayVenues}</span>                 <span className="tex
+-------------------------------------------
+Match: {displayVendors} in file: index.jsx Line: 2483
+  Context: <span className="text-2xl font-extrabold tracking-tight">{displayVendors}</span>                 <span className="te
+-------------------------------------------
+Match: {displayRevenue} in file: index.jsx Line: 2499
+  Context: king-tight text-indigo-600 dark:text-indigo-400 font-outfit">{displayRevenue}</span>                 <span className="te
+-------------------------------------------
+Match: {eventsChartRangeLabel} in file: index.jsx Line: 2528
+  Context: }`}                   >                     <span>{eventsChartRangeLabel}</span>                     <Chevron
+-------------------------------------------
+Match: {c.count} in file: index.jsx Line: 2637
+  Context: 'fill-gray-700' : 'fill-gray-300'}`}                       >                         {c.count}                       </
+-------------------------------------------
+Match: {c.label} in file: index.jsx Line: 2648
+  Context: rtCoords.map((c, idx) => (                   <span key={idx}>{c.label}</span>                 ))}               </div>
+-------------------------------------------
+Match: {b.name} in file: index.jsx Line: 2683
+  Context: -bold truncate ${isLight ? 'text-gray-900' : 'text-white'}`}>{b.name}</span>                         <span className={`t
+-------------------------------------------
+Match: {b.amount} in file: index.jsx Line: 2684
+  Context: ght ? 'text-gray-900' : 'text-white'} font-outfit shrink-0`}>{b.amount}</span>                       </div>
+-------------------------------------------
+Match: {b.type} in file: index.jsx Line: 2690
+  Context: : 'bg-blue-500/10 text-blue-500'                         }`}>{b.type}</span>                         <span className={`t
+-------------------------------------------
+Match: {b.status} in file: index.jsx Line: 2698
+  Context: 500/20 text-amber-500 animate-pulse'                     }`}>                       {b.status}                     </spa
+-------------------------------------------
+Match: {revenueChartRangeLabel} in file: index.jsx Line: 2720
+  Context: }`}                   >                     <span>{revenueChartRangeLabel}</span>                     <Chevro
+-------------------------------------------
+Match: {u.initial} in file: index.jsx Line: 2882
+  Context: items-center justify-center font-bold shrink-0 ${u.color}`}>                         {u.initial}
+-------------------------------------------
+Match: {u.name} in file: index.jsx Line: 2886
+  Context: -bold truncate ${isLight ? 'text-gray-800' : 'text-white'}`}>{u.name}</span>                         <span className={`t
+-------------------------------------------
+Match: {u.email} in file: index.jsx Line: 2887
+  Context: x] truncate ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>{u.email}</span>                       </div>
+-------------------------------------------
+Match: {u.date} in file: index.jsx Line: 2890
+  Context: ld shrink-0 ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>{u.date}</span>                   </div>                 ))
+-------------------------------------------
+Match: {v.name} in file: index.jsx Line: 2919
+  Context: cate text-left ${isLight ? 'text-gray-800' : 'text-white'}`}>{v.name}</span>                     </div>
+-------------------------------------------
+Match: {act.text} in file: index.jsx Line: 2947
+  Context: -bold truncate ${isLight ? 'text-gray-800' : 'text-white'}`}>{act.text}</span>                         <span className={
+-------------------------------------------
+Match: {act.time} in file: index.jsx Line: 2948
+  Context: 9px] ${isLight ? 'text-gray-400' : 'text-gray-500'} mt-0.5`}>{act.time}</span>                       </div>
+-------------------------------------------
+Match: {displayTotalEvents} in file: index.jsx Line: 2997
+  Context: <h4 className="text-xl font-extrabold tracking-tight">{displayTotalEvents}</h4>                 <span className="
+-------------------------------------------
+Match: {displayPublishedEvents} in file: index.jsx Line: 3011
+  Context: <h4 className="text-xl font-extrabold tracking-tight">{displayPublishedEvents}</h4>                 <span classNa
+-------------------------------------------
+Match: {displayUpcomingEvents} in file: index.jsx Line: 3025
+  Context: <h4 className="text-xl font-extrabold tracking-tight">{displayUpcomingEvents}</h4>                 <span classNam
+-------------------------------------------
+Match: {displayCancelledEvents} in file: index.jsx Line: 3039
+  Context: <h4 className="text-xl font-extrabold tracking-tight">{displayCancelledEvents}</h4>                 <span classNa
+-------------------------------------------
+Match: {e.title} in file: index.jsx Line: 3311
+  Context: cate text-left ${isLight ? 'text-gray-900' : 'text-white'}`}>{e.title}</span>                           </div>
+-------------------------------------------
+Match: {e.location} in file: index.jsx Line: 3323
+  Context: 4 text-left ${isLight ? 'text-gray-600' : 'text-gray-400'}`}>{e.location}</td>                          {/* Date and Tim
+-------------------------------------------
+Match: {formattedDate} in file: index.jsx Line: 3328
+  Context: {`font-bold ${isLight ? 'text-gray-800' : 'text-gray-200'}`}>{formattedDate}</span>                             <span cl
+-------------------------------------------
+Match: {formattedTime} in file: index.jsx Line: 3329
+  Context: text-[10px] ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>{formattedTime}</span>                           </div>
+-------------------------------------------
+Match: {e.guest_count} in file: index.jsx Line: 3334
+  Context: d text-left ${isLight ? 'text-gray-600' : 'text-gray-400'}`}>{e.guest_count}</td>                          {/* Status Ba
+-------------------------------------------
+Match: {statusText} in file: index.jsx Line: 3338
+  Context: ext-[11px] font-bold px-3 py-1 rounded-full ${statusColor}`}>                             {statusText}
+-------------------------------------------
+Match: {pg} in file: index.jsx Line: 3487
+  Context: gray-400'                         }`}                       >                         {pg}                       </butto
+-------------------------------------------
+Match: {initials} in file: index.jsx Line: 3855
+  Context: fy-center font-bold text-xs shrink-0 ${initialsColorClass}`}>                                 {initials}
+-------------------------------------------
+Match: {u.name} in file: index.jsx Line: 3859
+  Context: cate text-left ${isLight ? 'text-gray-900' : 'text-white'}`}>                               {u.name}
+-------------------------------------------
+Match: {u.email} in file: index.jsx Line: 3866
+  Context: <td className="py-4 px-4 font-medium text-left">{u.email}</td>                          {/* Role Tag */}
+-------------------------------------------
+Match: {u.role} in file: index.jsx Line: 3870
+  Context: font-bold px-2.5 py-0.5 rounded-lg capitalize ${roleColor}`}>                             {u.role}
+-------------------------------------------
+Match: {mappedStatus} in file: index.jsx Line: 3880
+  Context: [11px] font-bold px-2.5 py-0.5 rounded-full ${statusColor}`}>                             {mappedStatus}
+-------------------------------------------
+Match: {formattedJoinedDate} in file: index.jsx Line: 3886
+  Context: font-medium ${isLight ? 'text-gray-500' : 'text-gray-400'}`}>                           {formattedJoinedDate}
+-------------------------------------------
+Match: {pg} in file: index.jsx Line: 4041
+  Context: gray-400'                         }`}                       >                         {pg}                       </butto
+-------------------------------------------
+Match: {v.name} in file: index.jsx Line: 4420
+  Context: cate text-left ${isLight ? 'text-gray-900' : 'text-white'}`}>                               {v.name}
+-------------------------------------------
+Match: {v.location} in file: index.jsx Line: 4427
+  Context: <td className="py-4 px-4 font-medium text-left">{v.location}</td>                          {/* Venue Type T
+-------------------------------------------
+Match: {v.event_type} in file: index.jsx Line: 4431
+  Context: font-bold px-2.5 py-0.5 rounded-lg capitalize ${typeColor}`}>                             {v.event_type}
+-------------------------------------------
+Match: {mappedStatus} in file: index.jsx Line: 4441
+  Context: [11px] font-bold px-2.5 py-0.5 rounded-full ${statusColor}`}>                             {mappedStatus}
+-------------------------------------------
+Match: {formattedAddedDate} in file: index.jsx Line: 4447
+  Context: font-medium ${isLight ? 'text-gray-500' : 'text-gray-400'}`}>                           {formattedAddedDate}
+-------------------------------------------
+Match: {pg} in file: index.jsx Line: 4569
+  Context: gray-400'                         }`}                       >                         {pg}                       </butto
+-------------------------------------------
+Match: {v.name} in file: index.jsx Line: 4957
+  Context: cate text-left ${isLight ? 'text-gray-900' : 'text-white'}`}>                               {v.name}
+-------------------------------------------
+Match: {v.category} in file: index.jsx Line: 4965
+  Context: -bold px-2.5 py-0.5 rounded-lg capitalize ${categoryColor}`}>                             {v.category}
+-------------------------------------------
+Match: {v.contact_person} in file: index.jsx Line: 4971
+  Context: <td className="py-4 px-4 font-medium text-left">{v.contact_person}</td>                          {/* Phone
+-------------------------------------------
+Match: {v.phone} in file: index.jsx Line: 4974
+  Context: <td className="py-4 px-4 text-left font-medium">{v.phone}</td>                          {/* Email */}
+-------------------------------------------
+Match: {v.email} in file: index.jsx Line: 4977
+  Context: <td className="py-4 px-4 text-left font-medium">{v.email}</td>                          {/* Status Badge */
+-------------------------------------------
+Match: {mappedStatus} in file: index.jsx Line: 4981
+  Context: [11px] font-bold px-2.5 py-0.5 rounded-full ${statusColor}`}>                             {mappedStatus}
+-------------------------------------------
+Match: {formattedAddedDate} in file: index.jsx Line: 4987
+  Context: font-medium ${isLight ? 'text-gray-500' : 'text-gray-400'}`}>                           {formattedAddedDate}
+-------------------------------------------
+Match: {pg} in file: index.jsx Line: 5109
+  Context: gray-400'                         }`}                       >                         {pg}                       </butto
+-------------------------------------------
+Match: {bookingId} in file: index.jsx Line: 5485
+  Context: px-4 font-bold ${isLight ? 'text-gray-900' : 'text-white'}`}>                           {bookingId}
+-------------------------------------------
+Match: {b.title} in file: index.jsx Line: 5495
+  Context: cate text-left ${isLight ? 'text-gray-900' : 'text-white'}`}>                               {b.title}
+-------------------------------------------
+Match: {clientName} in file: index.jsx Line: 5502
+  Context: <td className="py-4 px-4 font-semibold text-left">{clientName}</td>                          {/* Event Date *
+-------------------------------------------
+Match: {formattedEventDate} in file: index.jsx Line: 5505
+  Context: <td className="py-4 px-4 font-semibold text-left">{formattedEventDate}</td>                          {/* Venu
+-------------------------------------------
+Match: {b.location} in file: index.jsx Line: 5508
+  Context: ame="py-4 px-4 font-medium text-left truncate max-w-[150px]">{b.location}</td>                          {/* Amount */}
+-------------------------------------------
+Match: {mappedStatus} in file: index.jsx Line: 5517
+  Context: [11px] font-bold px-2.5 py-0.5 rounded-full ${statusColor}`}>                             {mappedStatus}
+-------------------------------------------
+Match: {formattedBookingDate} in file: index.jsx Line: 5523
+  Context: font-medium ${isLight ? 'text-gray-500' : 'text-gray-400'}`}>                           {formattedBookingDate}
+-------------------------------------------
+Match: {pg} in file: index.jsx Line: 5648
+  Context: gray-400'                         }`}                       >                         {pg}                       </butto
+-------------------------------------------
+Match: {reportsTotalBookings} in file: index.jsx Line: 5797
+  Context: <span className="text-2xl font-extrabold tracking-tight">{reportsTotalBookings}</span>                 <span classNa
+-------------------------------------------
+Match: {displayTotalUsersCount} in file: index.jsx Line: 5845
+  Context: <span className="text-2xl font-extrabold tracking-tight">{displayTotalUsersCount}</span>                 <span class
+-------------------------------------------
+Match: {displayTotalVendorsCount} in file: index.jsx Line: 5861
+  Context: <span className="text-2xl font-extrabold tracking-tight">{displayTotalVendorsCount}</span>                 <span cla
+-------------------------------------------
+Match: {p.label} in file: index.jsx Line: 5911
+  Context: {chartPoints.map((p, i) => (                   <span key={i}>{p.label}</span>                 ))}               </div>
+-------------------------------------------
+Match: {p.label} in file: index.jsx Line: 5951
+  Context: {chartPoints.map((p, i) => (                   <span key={i}>{p.label}</span>                 ))}               </div>
+-------------------------------------------
+Match: {reportsTotalBookings} in file: index.jsx Line: 5998
+  Context: font-extrabold ${isLight ? 'text-gray-900' : 'text-white'}`}>{reportsTotalBookings}</span>                     <span cla
+-------------------------------------------
+Match: {item.name} in file: index.jsx Line: 6054
+  Context: cate font-bold ${isLight ? 'text-gray-905' : 'text-white'}`}>{item.name}</span>                       </div>
+-------------------------------------------
+Match: {item.bookingsCount} in file: index.jsx Line: 6056
+  Context: me="text-indigo-650 dark:text-indigo-400 font-bold shrink-0">{item.bookingsCount}</span>                     </div>
+-------------------------------------------
+Match: {item.name} in file: index.jsx Line: 6082
+  Context: cate font-bold ${isLight ? 'text-gray-905' : 'text-white'}`}>{item.name}</span>                       </div>
+-------------------------------------------
+Match: {item.bookingsCount} in file: index.jsx Line: 6084
+  Context: me="text-indigo-650 dark:text-indigo-400 font-bold shrink-0">{item.bookingsCount}</span>                     </div>
+-------------------------------------------
+Match: {item.name} in file: index.jsx Line: 6110
+  Context: cate font-bold ${isLight ? 'text-gray-905' : 'text-white'}`}>{item.name}</span>                       </div>
+-------------------------------------------
+Match: {item.bookingsCount} in file: index.jsx Line: 6112
+  Context: me="text-indigo-650 dark:text-indigo-400 font-bold shrink-0">{item.bookingsCount}</span>                     </div>
+-------------------------------------------
+Match: {totalFeedbackCount} in file: index.jsx Line: 6148
+  Context: g-tight mt-0.5 ${isLight ? 'text-gray-900' : 'text-white'}`}>{totalFeedbackCount}</span>                 <span className
+-------------------------------------------
+Match: {positiveFeedbackCount} in file: index.jsx Line: 6162
+  Context: g-tight mt-0.5 ${isLight ? 'text-gray-900' : 'text-white'}`}>{positiveFeedbackCount}</span>                 <span classN
+-------------------------------------------
+Match: {neutralFeedbackCount} in file: index.jsx Line: 6176
+  Context: g-tight mt-0.5 ${isLight ? 'text-gray-900' : 'text-white'}`}>{neutralFeedbackCount}</span>                 <span classNa
+-------------------------------------------
+Match: {negativeFeedbackCount} in file: index.jsx Line: 6190
+  Context: g-tight mt-0.5 ${isLight ? 'text-gray-900' : 'text-white'}`}>{negativeFeedbackCount}</span>                 <span classN
+-------------------------------------------
+Match: {index} in file: index.jsx Line: 6375
+  Context: <td className="py-4 px-4 font-bold text-gray-400">{index}</td>
+-------------------------------------------
+Match: {initials} in file: index.jsx Line: 6382
+  Context: digo-500/10 text-indigo-400'                             }`}>                               {initials}
+-------------------------------------------
+Match: {feedbackType} in file: index.jsx Line: 6394
+  Context: text-[9px] font-bold uppercase tracking-wider ${typeColor}`}>                             {feedbackType}
+-------------------------------------------
+Match: {feedbackStatus} in file: index.jsx Line: 6425
+  Context: xt-[9px] font-bold uppercase tracking-wider ${statusColor}`}>                             {feedbackStatus}
+-------------------------------------------
+Match: {pg} in file: index.jsx Line: 6516
+  Context: gray-400'                         }`}                       >                         {pg}                       </butto
+-------------------------------------------
+Match: {viewingUserProfile.role} in file: index.jsx Line: 7563
+  Context: xt-indigo-500 border border-indigo-500/20'               }`}>                 {viewingUserProfile.role}               </
+-------------------------------------------
+Match: {viewingUserProfile.name} in file: index.jsx Line: 7583
+  Context: <h4 className="text-base font-extrabold truncate">{viewingUserProfile.name}</h4>                 <p className
+-------------------------------------------
+Match: {viewingUserProfile.email} in file: index.jsx Line: 7584
+  Context: xs ${isLight ? 'text-gray-500' : 'text-gray-400'} truncate`}>{viewingUserProfile.email}</p>                 <p className
+-------------------------------------------
+Match: {viewingEventDetails.status} in file: index.jsx Line: 7640
+  Context: 0 text-rose-500 border border-rose-500/20'               }`}>                 {viewingEventDetails.status}
+-------------------------------------------
+Match: {viewingEventDetails.title} in file: index.jsx Line: 7646
+  Context: col">               <h4 className="text-base font-extrabold">{viewingEventDetails.title}</h4>               <p className
+-------------------------------------------
+Match: {viewingEventDetails.event_type} in file: index.jsx Line: 7661
+  Context: >                 <span className="font-semibold capitalize">{viewingEventDetails.event_type}</span>               </div
+-------------------------------------------
+Match: {viewingEventDetails.location} in file: index.jsx Line: 7669
+  Context: <span className="font-semibold truncate max-w-[200px]">{viewingEventDetails.location}</span>               </div>
+-------------------------------------------
+Match: {viewingVenueDetails.status} in file: index.jsx Line: 7716
+  Context: 0 text-rose-500 border border-rose-500/20'               }`}>                 {viewingVenueDetails.status}
+-------------------------------------------
+Match: {viewingVenueDetails.name} in file: index.jsx Line: 7735
+  Context: col">               <h4 className="text-base font-extrabold">{viewingVenueDetails.name}</h4>               <p className=
+-------------------------------------------
+Match: {a} in file: index.jsx Line: 7761
+  Context: border border-indigo-500/20 font-bold uppercase text-[9px]">{a}</span>                       ))                     : '
+-------------------------------------------
+Match: {viewingVendorDetails.status} in file: index.jsx Line: 7795
+  Context: 0 text-rose-500 border border-rose-500/20'               }`}>                 {viewingVendorDetails.status}
+-------------------------------------------
+Match: {viewingVendorDetails.name} in file: index.jsx Line: 7814
+  Context: col">               <h4 className="text-base font-extrabold">{viewingVendorDetails.name}</h4>               <p className
+-------------------------------------------
+Match: {viewingVendorDetails.category} in file: index.jsx Line: 7825
+  Context: rvice</span>                 <span className="font-semibold">{viewingVendorDetails.category}</span>               </div>
+-------------------------------------------
+Match: {cat} in file: index.jsx Line: 326
+  Context: on key={cat} value={cat} className="bg-[#151c2c] text-white">{cat}</option>                   ))}                 </sele
+-------------------------------------------
+Match: {venue.rating} in file: index.jsx Line: 496
+  Context: 500/10 text-emerald-400 px-1 py-0.5 rounded w-fit font-bold">                           {venue.rating}
+-------------------------------------------
+Match: {venue.name} in file: index.jsx Line: 499
+  Context: e="text-[10px] font-black text-white leading-tight truncate">{venue.name}</h4>                         <span className="
+-------------------------------------------
+Match: {venue.location} in file: index.jsx Line: 500
+  Context: <span className="text-[8px] text-gray-500 truncate">{venue.location}</span>                         <div classN
+-------------------------------------------
+Match: {t} in file: index.jsx Line: 546
+  Context: d px-2 py-0.5 rounded-lg text-[9px] uppercase tracking-wide">                         {t}                       </span>
+-------------------------------------------
+Match: {decor} in file: index.jsx Line: 555
+  Context: className="text-purple-400 font-extrabold shrink-0">•</span>                         {decor}                       </li
+-------------------------------------------
+Match: {food} in file: index.jsx Line: 571
+  Context: className="text-emerald-400 font-extrabold shrink-0">•</span>                         {food}                       </li>
+-------------------------------------------
+Match: {item.description} in file: index.jsx Line: 608
+  Context: <span className="text-[8px] text-gray-500">{item.description}</span>                       </div>
+-------------------------------------------
+Match: {timeRow} in file: index.jsx Line: 626
+  Context: <p className="text-[10px] text-gray-300 font-medium">{timeRow}</p>                     </div>
+-------------------------------------------
+Match: {tip} in file: index.jsx Line: 641
+  Context: me="text-emerald-400 font-extrabold shrink-0 mt-0.5">✓</span>                       {tip}                     </li>
+-------------------------------------------
+Match: {selectedVenue.name} in file: index.jsx Line: 694
+  Context: lassName="text-base font-extrabold text-white leading-tight">{selectedVenue.name}</h3>                 <span className="
+-------------------------------------------
+Match: {selectedVenue.location} in file: index.jsx Line: 696
+  Context: <MapPin className="w-3.5 h-3.5 text-gray-400" />                   {selectedVenue.location}
+-------------------------------------------
+Match: {selectedVenue.desc} in file: index.jsx Line: 707
+  Context: lassName="text-xs text-gray-300 leading-relaxed font-medium">                   {selectedVenue.desc}                 </p
+-------------------------------------------
+Match: {selectedVenue.capacity} in file: index.jsx Line: 716
+  Context: an>                   <span className="text-white font-bold">{selectedVenue.capacity}</span>                 </div>
+-------------------------------------------
+Match: {selectedVenue.type} in file: index.jsx Line: 720
+  Context: an>                   <span className="text-white font-bold">{selectedVenue.type}</span>                 </div>
+-------------------------------------------
+Match: {selectedVenue.availability} in file: index.jsx Line: 729
+  Context: unded-full bg-emerald-400 inline-block animate-pulse"></span>                     {selectedVenue.availability}
+-------------------------------------------
+Match: {selectedEvent.title} in file: budget.jsx Line: 492
+  Context: font-bold text-white dark:text-white truncate leading-tight">                       {selectedEvent.title}
+-------------------------------------------
+Match: {ev.title} in file: budget.jsx Line: 525
+  Context: <span className="text-gray-900 dark:text-white font-bold">{ev.title}</span>                       <span className="te
+-------------------------------------------
+Match: {overBudgetCount} in file: budget.jsx Line: 685
+  Context: n>               <p className="text-sm text-rose-400 mt-0.5">{overBudgetCount}</p>             </div>             <div c
+-------------------------------------------
+Match: {underBudgetCount} in file: budget.jsx Line: 689
+  Context: <p className="text-sm text-emerald-400 mt-0.5">{underBudgetCount}</p>             </div>             <div
+-------------------------------------------
+Match: {underBudgetCount} in file: budget.jsx Line: 693
+  Context: <p className="text-sm text-indigo-400 mt-0.5">{underBudgetCount}</p>             </div>           </div>
+-------------------------------------------
+Match: {cat.name} in file: budget.jsx Line: 724
+  Context: me="w-24 text-gray-300 dark:text-gray-200 truncate shrink-0">{cat.name}</span>                     <div className="flex-
+-------------------------------------------
+Match: {cat.name} in file: budget.jsx Line: 786
+  Context: lassName="font-sans font-bold text-gray-200 dark:text-white">{cat.name}</span>                       </div>
+-------------------------------------------
+Match: {exp.title} in file: budget.jsx Line: 922
+  Context: ray-200 dark:text-white leading-snug truncate max-w-[130px]">{exp.title}</span>                         <span className=
+-------------------------------------------
+Match: {totalUsersCount} in file: index.jsx Line: 515
+  Context: <span className="text-2xl font-extrabold text-white">{totalUsersCount}</span>                   </div>
+-------------------------------------------
+Match: {totalEventsCount} in file: index.jsx Line: 525
+  Context: <span className="text-2xl font-extrabold text-purple-400">{totalEventsCount}</span>                   </div>
+-------------------------------------------
+Match: {upcomingEventsCount} in file: index.jsx Line: 535
+  Context: <span className="text-2xl font-extrabold text-amber-400">{upcomingEventsCount}</span>                   </div>
+-------------------------------------------
+Match: {completedEventsCount} in file: index.jsx Line: 545
+  Context: <span className="text-2xl font-extrabold text-emerald-400">{completedEventsCount}</span>                   </div>
+-------------------------------------------
+Match: {totalEventsCount} in file: index.jsx Line: 594
+  Context: <span>Total platform events: <strong>{totalEventsCount}</strong></span>
+-------------------------------------------
+Match: {act.message} in file: index.jsx Line: 620
+  Context: <span className="font-semibold text-gray-200 truncate">{act.message}</span>                             {act.sub &
+-------------------------------------------
+Match: {act.sub} in file: index.jsx Line: 621
+  Context: .sub && <span className="text-[10px] text-gray-500 truncate">{act.sub}</span>}                           </div>
+-------------------------------------------
+Match: {cat} in file: index.jsx Line: 648
+  Context: <span className="font-semibold text-gray-300 capitalize">{cat}</span>                               <span className=
+-------------------------------------------
+Match: {e.title} in file: index.jsx Line: 696
+  Context: ="py-3 px-4 font-semibold text-white truncate max-w-[150px]">{e.title}</td>                         <td className="py-3
+-------------------------------------------
+Match: {e.event_type} in file: index.jsx Line: 697
+  Context: <td className="py-3 px-4 text-gray-400 capitalize">{e.event_type}</td>                         <td className="
+-------------------------------------------
+Match: {u.name} in file: index.jsx Line: 784
+  Context: <td className="py-3 px-4 font-semibold text-white">{u.name}</td>                         <td className="py-3 p
+-------------------------------------------
+Match: {u.email} in file: index.jsx Line: 787
+  Context: <Mail className="w-3.5 h-3.5 text-gray-500" />                             {u.email}
+-------------------------------------------
+Match: {e.title} in file: index.jsx Line: 903
+  Context: ssName="text-xs font-bold text-white leading-tight truncate">{e.title}</span>                             <span classNam
+-------------------------------------------
+Match: {e.title} in file: index.jsx Line: 944
+  Context: ="py-3 px-4 font-semibold text-white truncate max-w-[180px]">{e.title}</td>                             <td className="p
+-------------------------------------------
+Match: {e.title} in file: index.jsx Line: 981
+  Context: <option key={e.id} value={e.id} className="bg-[#0d0f14]">{e.title}</option>                     ))}
+-------------------------------------------
+Match: {exp.title} in file: index.jsx Line: 1010
+  Context: <td className="py-2 px-4 font-semibold text-white">{exp.title}</td>                             <td className=
+-------------------------------------------
+Match: {exp.category} in file: index.jsx Line: 1011
+  Context: <td className="py-2 px-4 text-gray-400 capitalize">{exp.category}</td>                             <td classNa
+-------------------------------------------
+Match: {displayUpcomingCount} in file: index.jsx Line: 1399
+  Context: assName="text-2xl font-extrabold text-white dark:text-white">{displayUpcomingCount}</span>             <Link href="/even
+-------------------------------------------
+Match: {displayGuests} in file: index.jsx Line: 1427
+  Context: assName="text-2xl font-extrabold text-white dark:text-white">{displayGuests}</span>             <Link href="/guests" cla
+-------------------------------------------
+Match: {event.title} in file: index.jsx Line: 1497
+  Context: className="text-xs font-bold text-gray-200 dark:text-white">{event.title}</h4>                           <span classNam
+-------------------------------------------
+Match: {event.event_type} in file: index.jsx Line: 1498
+  Context: ld uppercase bg-white/5 text-gray-400 border border-white/5">                             {event.event_type}
+-------------------------------------------
+Match: {event.location} in file: index.jsx Line: 1504
+  Context: <MapPin className="w-3 h-3 text-indigo-400 shrink-0" />                             {event.location}
+-------------------------------------------
+Match: {tasksCompletedCount} in file: index.jsx Line: 1567
+  Context: <span className="text-sm text-white dark:text-white">{tasksCompletedCount}</span>                 </div>
+-------------------------------------------
+Match: {tasksInProgressCount} in file: index.jsx Line: 1577
+  Context: <span className="text-sm text-white dark:text-white">{tasksInProgressCount}</span>                 </div>
+-------------------------------------------
+Match: {tasksPendingCount} in file: index.jsx Line: 1587
+  Context: <span className="text-sm text-white dark:text-white">{tasksPendingCount}</span>                 </div>
+-------------------------------------------
+Match: {tasksOverdueCount} in file: index.jsx Line: 1597
+  Context: <span className="text-sm text-white dark:text-white">{tasksOverdueCount}</span>                 </div>
+-------------------------------------------
+Match: {notif.message} in file: index.jsx Line: 1757
+  Context: ame="text-gray-200 dark:text-white leading-snug break-words">                         {notif.message}
+-------------------------------------------
+Match: {tab.label} in file: index.jsx Line: 225
+  Context: ay-800 dark:hover:text-white'               }`}             >               {tab.label}             </button>
+-------------------------------------------
+Match: {stats.total} in file: index.jsx Line: 264
+  Context: lassName="text-lg font-extrabold text-white dark:text-white">{stats.total}</span>           </div>         </div>
+-------------------------------------------
+Match: {stats.upcoming} in file: index.jsx Line: 280
+  Context: lassName="text-lg font-extrabold text-white dark:text-white">{stats.upcoming}</span>           </div>         </div>
+-------------------------------------------
+Match: {stats.inProgress} in file: index.jsx Line: 296
+  Context: lassName="text-lg font-extrabold text-white dark:text-white">{stats.inProgress}</span>           </div>         </div>
+-------------------------------------------
+Match: {stats.completed} in file: index.jsx Line: 312
+  Context: lassName="text-lg font-extrabold text-white dark:text-white">{stats.completed}</span>           </div>         </div>
+-------------------------------------------
+Match: {stats.cancelled} in file: index.jsx Line: 328
+  Context: lassName="text-lg font-extrabold text-white dark:text-white">{stats.cancelled}</span>           </div>         </div>
+-------------------------------------------
+Match: {event.title} in file: index.jsx Line: 367
+  Context: ay-100 dark:text-white truncate max-w-[180px] leading-tight">                             {event.title}
+-------------------------------------------
+Match: {event.location} in file: index.jsx Line: 371
+  Context: <MapPin className="w-3 h-3 text-indigo-400 shrink-0" />                             {event.location}
+-------------------------------------------
+Match: {event.event_type} in file: index.jsx Line: 380
+  Context: old uppercase border ${getCategoryColor(event.event_type)}`}>                         {event.event_type}
+-------------------------------------------
+Match: {event.guest_count} in file: index.jsx Line: 401
+  Context: 3.5 text-gray-500 shrink-0" />                         <span>{event.guest_count}</span>                       </div>
+-------------------------------------------
+Match: {pNum} in file: index.jsx Line: 492
+  Context: r:bg-white/5'                       }`}                     >                       {pNum}                     </button>
+-------------------------------------------
+Match: {event.title} in file: [id].jsx Line: 1067
+  Context: ext-xl md:text-2xl font-extrabold tracking-tight text-white">{event.title}</h1>             <span className={`px-2.5 py-
+-------------------------------------------
+Match: {event.title} in file: [id].jsx Line: 1131
+  Context: lassName="text-base font-extrabold text-white leading-tight">{event.title}</h2>                 <Edit className="w-3.5 h
+-------------------------------------------
+Match: {formattedDateText} in file: [id].jsx Line: 1140
+  Context: s className="w-4 h-4 text-gray-500" />                 <span>{formattedDateText}</span>               </div>
+-------------------------------------------
+Match: {event.location} in file: [id].jsx Line: 1144
+  Context: n className="w-4 h-4 text-gray-500" />                 <span>{event.location}</span>               </div>
+-------------------------------------------
+Match: {editTheme} in file: [id].jsx Line: 1152
+  Context: <span>Theme: <span className="text-indigo-300">{editTheme}</span></span>               </div>
+-------------------------------------------
+Match: {tab.name} in file: [id].jsx Line: 1215
+  Context: 'text-gray-400 hover:text-white'             }`}           >             {tab.name}           </button>         ))}
+-------------------------------------------
+Match: {milestone.title} in file: [id].jsx Line: 1258
+  Context: ompleted ? 'text-gray-400 line-through' : 'text-gray-200'}`}>{milestone.title}</span>                           <span cl
+-------------------------------------------
+Match: {milestone.time} in file: [id].jsx Line: 1259
+  Context: <span className="text-[9px] text-gray-500 font-semibold">{milestone.time}</span>                         </div>
+-------------------------------------------
+Match: {seg.label} in file: [id].jsx Line: 1334
+  Context: n>                           <span className="text-gray-300">{seg.label}</span>                           <span classNam
+-------------------------------------------
+Match: {venueVendor.vendor_name} in file: [id].jsx Line: 1387
+  Context: <h4 className="text-xs font-extrabold text-white">{venueVendor.vendor_name}</h4>                         <spa
+-------------------------------------------
+Match: {venueVendor.status} in file: [id].jsx Line: 1399
+  Context: <span className="text-emerald-400 font-bold uppercase">{venueVendor.status}</span>                         </div>
+-------------------------------------------
+Match: {totalTasks} in file: [id].jsx Line: 1473
+  Context: <span className="text-white font-black">{totalTasks}</span>                       </div>
+-------------------------------------------
+Match: {completedTasks} in file: [id].jsx Line: 1477
+  Context: <span className="text-emerald-400 font-black">{completedTasks}</span>                       </div>
+-------------------------------------------
+Match: {inProgressTasksCount} in file: [id].jsx Line: 1481
+  Context: <span className="text-amber-400 font-black">{inProgressTasksCount}</span>                       </div>
+-------------------------------------------
+Match: {pendingTasksCount} in file: [id].jsx Line: 1485
+  Context: <span className="text-gray-300 font-black">{pendingTasksCount}</span>                       </div>
+-------------------------------------------
+Match: {overdueTasksCount} in file: [id].jsx Line: 1489
+  Context: <span className="font-black text-rose-400">{overdueTasksCount}</span>                       </div>
+-------------------------------------------
+Match: {note} in file: [id].jsx Line: 1544
+  Context: <span className="text-indigo-400 font-black">•</span>                           {note}                         <
+-------------------------------------------
+Match: {pay.id} in file: [id].jsx Line: 1629
+  Context: <td className="py-2.5 font-bold text-indigo-400">{pay.id}</td>                           <td className="py-2
+-------------------------------------------
+Match: {pay.description} in file: [id].jsx Line: 1630
+  Context: <td className="py-2.5 text-white">{pay.description}</td>                           <td classN
+-------------------------------------------
+Match: {pay.date} in file: [id].jsx Line: 1632
+  Context: <td className="py-2.5 text-gray-400">{pay.date}</td>                           <td className="py
+-------------------------------------------
+Match: {pay.status} in file: [id].jsx Line: 1636
+  Context: amber-500/10 text-amber-400'                             }`}>                               {pay.status}
+-------------------------------------------
+Match: {exp.title} in file: [id].jsx Line: 1697
+  Context: <span className="text-xs font-bold text-gray-200">{exp.title}</span>                         <div className="
+-------------------------------------------
+Match: {exp.category} in file: [id].jsx Line: 1699
+  Context: pan className="bg-white/5 px-2 py-0.5 rounded text-gray-400">{exp.category}</span>                           <span>•</sp
+-------------------------------------------
+Match: {g.guest_name} in file: [id].jsx Line: 1853
+  Context: <span className="text-xs font-bold text-gray-200">{g.guest_name}</span>                         <span classNa
+-------------------------------------------
+Match: {g.email} in file: [id].jsx Line: 1854
+  Context: <span className="text-[10px] text-gray-500 truncate">{g.email}</span>                       </div>
+-------------------------------------------
+Match: {totalGuestsSum} in file: [id].jsx Line: 1923
+  Context: <span className="text-xs font-black text-white">{totalGuestsSum}</span>                     <span className
+-------------------------------------------
+Match: {yesRSVP} in file: [id].jsx Line: 1931
+  Context: <span className="text-white text-xs block mt-0.5">{yesRSVP}</span>                   </div>
+-------------------------------------------
+Match: {maybeRSVP} in file: [id].jsx Line: 1935
+  Context: <span className="text-white text-xs block mt-0.5">{maybeRSVP}</span>                   </div>
+-------------------------------------------
+Match: {noRSVP} in file: [id].jsx Line: 1939
+  Context: <span className="text-white text-xs block mt-0.5">{noRSVP}</span>                   </div>                 </
+-------------------------------------------
+Match: {task.displayName} in file: [id].jsx Line: 2051
+  Context: tatus === 'completed' ? 'line-through text-gray-500' : ''}`}>                                 {task.displayName}
+-------------------------------------------
+Match: {task.priority} in file: [id].jsx Line: 2068
+  Context: 500/20 text-emerald-400'                                 }`}>                                   {task.priority}
+-------------------------------------------
+Match: {v.vendor_name} in file: [id].jsx Line: 2213
+  Context: <span className="text-xs font-bold text-gray-200">{v.vendor_name}</span>                         <div classNa
+-------------------------------------------
+Match: {v.category} in file: [id].jsx Line: 2215
+  Context: pan className="bg-white/5 px-2 py-0.5 rounded text-gray-400">{v.category}</span>                           <span>•</span
+-------------------------------------------
+Match: {v.contact} in file: [id].jsx Line: 2217
+  Context: </span>                           <span className="truncate">{v.contact}</span>                         </div>
+-------------------------------------------
+Match: {selected.name} in file: [id].jsx Line: 2284
+  Context: Name="text-xs font-bold text-white uppercase tracking-wider">{selected.name}</h5>                             <span clas
+-------------------------------------------
+Match: {selected.category} in file: [id].jsx Line: 2285
+  Context: bg-indigo-500/10 px-2 py-0.5 rounded-full mt-1 inline-block">                               {selected.category}
+-------------------------------------------
+Match: {pay.invoiceId} in file: [id].jsx Line: 2447
+  Context: <td className="py-3 px-2 font-bold text-indigo-400">{pay.invoiceId}</td>                           <td classNam
+-------------------------------------------
+Match: {pay.description} in file: [id].jsx Line: 2448
+  Context: <td className="py-3 px-2 text-white">{pay.description}</td>                           <td classN
+-------------------------------------------
+Match: {pay.date} in file: [id].jsx Line: 2450
+  Context: <td className="py-3 px-2 text-gray-400">{pay.date}</td>                           <td className="py
+-------------------------------------------
+Match: {pay.status} in file: [id].jsx Line: 2458
+  Context: r-rose-500/20 text-rose-400'                             }`}>                               {pay.status}
+-------------------------------------------
+Match: {note} in file: [id].jsx Line: 2515
+  Context: ame="text-xs text-gray-300 font-medium leading-relaxed pr-2">{note}</p>                       <button
+-------------------------------------------
+Match: {c} in file: [id].jsx Line: 2633
+  Context: <option key={c} value={c} className="bg-[#151c2c]">{c}</option>                     ))}                   </se
+-------------------------------------------
+Match: {item} in file: [id].jsx Line: 2859
+  Context: b981] font-black">•</span>                             <span>{item}</span>                           </li>
+-------------------------------------------
+Match: {aiSuggestions.decor} in file: [id].jsx Line: 2870
+  Context: order border-white/5 rounded-lg leading-relaxed font-medium">                         {aiSuggestions.decor}
+-------------------------------------------
+Match: {aiSuggestions.vendors} in file: [id].jsx Line: 2880
+  Context: order border-white/5 rounded-lg leading-relaxed font-medium">                         {aiSuggestions.vendors}
+-------------------------------------------
+Match: {aiSuggestions.budgetTip} in file: [id].jsx Line: 2890
+  Context: r-amber-500/10 p-3 rounded-lg leading-relaxed font-semibold">                         {aiSuggestions.budgetTip}
+-------------------------------------------
+Match: {tab.label} in file: favorites.jsx Line: 224
+  Context: 00 dark:hover:text-white'                 }`}               >                 {tab.label}               </button>
+-------------------------------------------
+Match: {item.subCategory} in file: favorites.jsx Line: 287
+  Context: assName="text-[10px] text-gray-500 font-extrabold uppercase">{item.subCategory}</span>                   <h4 className="
+-------------------------------------------
+Match: {item.title} in file: favorites.jsx Line: 288
+  Context: #5a2bd4] dark:group-hover:text-indigo-400 transition-colors">                     {item.title}                   </h4>
+-------------------------------------------
+Match: {item.location} in file: favorites.jsx Line: 298
+  Context: h-3.5 text-gray-500 shrink-0" />                       <span>{item.location}</span>                     </>
+-------------------------------------------
+Match: {item.metaLabel} in file: favorites.jsx Line: 303
+  Context: nk-0" />                       <span className="font-outfit">{item.metaLabel}</span>                     </>
+-------------------------------------------
+Match: {pNum} in file: favorites.jsx Line: 347
+  Context: ite hover:bg-white/5'                   }`}                 >                   {pNum}                 </button>
+-------------------------------------------
+Match: {g.guest_name} in file: guests.jsx Line: 322
+  Context: = (           <>             <strong className="text-white">{g.guest_name}</strong> responded <strong className="text-e
+-------------------------------------------
+Match: {g.guest_name} in file: guests.jsx Line: 329
+  Context: = (           <>             <strong className="text-white">{g.guest_name}</strong> responded <strong className="text-r
+-------------------------------------------
+Match: {g.guest_name} in file: guests.jsx Line: 336
+  Context: <>             New guest <strong className="text-white">{g.guest_name}</strong> added to list           </>
+-------------------------------------------
+Match: {selectedEvent.title} in file: guests.jsx Line: 730
+  Context: font-bold text-white dark:text-white truncate leading-tight">                     {selectedEvent.title}
+-------------------------------------------
+Match: {ev.title} in file: guests.jsx Line: 762
+  Context: <span className="text-gray-900 dark:text-white font-bold">{ev.title}</span>                       <span className="te
+-------------------------------------------
+Match: {ev.location} in file: guests.jsx Line: 763
+  Context: span className="text-[9px] text-gray-500 dark:text-gray-400">{ev.location}</span>                     </button>
+-------------------------------------------
+Match: {totalCount} in file: guests.jsx Line: 778
+  Context: lassName="text-xl font-extrabold text-white dark:text-white">{totalCount}</span>               <button onClick={() => se
+-------------------------------------------
+Match: {goingCount} in file: guests.jsx Line: 792
+  Context: lassName="text-xl font-extrabold text-white dark:text-white">{goingCount}</span>               <span className="text-[9p
+-------------------------------------------
+Match: {pendingCount} in file: guests.jsx Line: 806
+  Context: lassName="text-xl font-extrabold text-white dark:text-white">{pendingCount}</span>               <span className="text-[
+-------------------------------------------
+Match: {declinedCount} in file: guests.jsx Line: 820
+  Context: lassName="text-xl font-extrabold text-white dark:text-white">{declinedCount}</span>               <span className="text-
+-------------------------------------------
+Match: {totalCount} in file: guests.jsx Line: 852
+  Context: t-xs font-extrabold text-white dark:text-white leading-none">                   {totalCount}                 </span>
+-------------------------------------------
+Match: {goingCount} in file: guests.jsx Line: 866
+  Context: </div>                 <span className="text-gray-500">{goingCount}</span>               </div>               <div
+-------------------------------------------
+Match: {pendingCount} in file: guests.jsx Line: 873
+  Context: </div>                 <span className="text-gray-500">{pendingCount}</span>               </div>               <d
+-------------------------------------------
+Match: {declinedCount} in file: guests.jsx Line: 880
+  Context: </div>                 <span className="text-gray-500">{declinedCount}</span>               </div>               <
+-------------------------------------------
+Match: {noResponseCount} in file: guests.jsx Line: 887
+  Context: </div>                 <span className="text-gray-500">{noResponseCount}</span>               </div>             <
+-------------------------------------------
+Match: {lbl} in file: guests.jsx Line: 1009
+  Context: ls.map((lbl, idx) => (                       <span key={idx}>{lbl}</span>                     ))}                   </di
+-------------------------------------------
+Match: {tab.label} in file: guests.jsx Line: 1040
+  Context: ark:hover:text-white'                   }`}                 >                   {tab.label}                 </button>
+-------------------------------------------
+Match: {guest.guest_name} in file: guests.jsx Line: 1095
+  Context: ay-200 dark:text-white truncate max-w-[130px] leading-tight">{guest.guest_name}</span>                             <span
+-------------------------------------------
+Match: {guest.email} in file: guests.jsx Line: 1096
+  Context: <span className="text-[9px] text-gray-500 truncate mt-0.5">{guest.email}</span>                           </div>
+-------------------------------------------
+Match: {guest.phone} in file: guests.jsx Line: 1102
+  Context: <Phone className="w-3 h-3 text-gray-500 shrink-0" />                           {guest.phone}
+-------------------------------------------
+Match: {pNum} in file: guests.jsx Line: 1181
+  Context: -white/5'                         }`}                       >                         {pNum}                       </but
+-------------------------------------------
+Match: {act.message} in file: guests.jsx Line: 1234
+  Context: an className="text-gray-200 dark:text-gray-200 leading-snug">{act.message}</span>                       <span className=
+-------------------------------------------
+Match: {act.time} in file: guests.jsx Line: 1235
+  Context: <span className="text-[9px] text-gray-500">{act.time}</span>                     </div>
+-------------------------------------------
+Match: {item.name} in file: index.jsx Line: 181
+  Context: over:opacity-80 transition-all relative`}                   >                     {item.name}                   </Link>
+-------------------------------------------
+Match: {item.name} in file: index.jsx Line: 196
+  Context: }}                   className={colorClass}                 >                   {item.name}                 </a>
+-------------------------------------------
+Match: {user.name} in file: index.jsx Line: 207
+  Context: ome, <strong className="text-[#5a2bd4] dark:text-indigo-400">{user.name}</strong></span>                 <Link
+-------------------------------------------
+Match: {item.title} in file: index.jsx Line: 425
+  Context: ] font-black uppercase tracking-wider mb-1.5 ${brandColor}`}>{item.title}</h4>                     <p className={`text-[
+-------------------------------------------
+Match: {item.desc} in file: index.jsx Line: 426
+  Context: ing-relaxed ${isLight ? 'text-gray-600' : 'text-gray-400'}`}>{item.desc}</p>                   </div>                 </
+-------------------------------------------
+Match: {srv.title} in file: index.jsx Line: 474
+  Context: ase tracking-wider mb-2 text-[#5a2bd4] dark:text-indigo-400">{srv.title}</h3>                   <p className={`text-[11p
+-------------------------------------------
+Match: {srv.desc} in file: index.jsx Line: 475
+  Context: ing-relaxed ${isLight ? 'text-gray-500' : 'text-gray-400'}`}>                     {srv.desc}                   </p>
+-------------------------------------------
+Match: {category} in file: index.jsx Line: 515
+  Context: ay-300 hover:bg-white/10'                 }`}               >                 {category}               </button>
+-------------------------------------------
+Match: {venue.rating} in file: index.jsx Line: 539
+  Context: <Star className="w-3 h-3 fill-amber-400 stroke-none" />                     {venue.rating}                   </div
+-------------------------------------------
+Match: {venue.name} in file: index.jsx Line: 546
+  Context: -extrabold leading-tight mb-1 text-gray-800 dark:text-white">{venue.name}</h3>                     <span className="text
+-------------------------------------------
+Match: {venue.type} in file: index.jsx Line: 547
+  Context: ext-indigo-400 font-bold uppercase tracking-wide block mb-3">{venue.type}</span>
+-------------------------------------------
+Match: {venue.location} in file: index.jsx Line: 550
+  Context: 5"><MapPin className="w-3.5 h-3.5 text-[#5a2bd4] shrink-0" /> {venue.location}</span>                       <span classN
+-------------------------------------------
+Match: {cat.title} in file: index.jsx Line: 618
+  Context: text-gray-800 dark:text-white leading-tight mb-1.5 truncate">                         {cat.title}
+-------------------------------------------
+Match: {cat.desc} in file: index.jsx Line: 621
+  Context: t-gray-500 dark:text-gray-400 font-semibold leading-relaxed">                         {cat.desc}                       <
+-------------------------------------------
+Match: {stat.value} in file: index.jsx Line: 653
+  Context: tight leading-none mb-1 text-[#5a2bd4] dark:text-indigo-300">                   {stat.value}                 </span>
+-------------------------------------------
+Match: {stat.label} in file: index.jsx Line: 656
+  Context: cking-wider ${isLight ? 'text-gray-500' : 'text-gray-400'}`}>                   {stat.label}                 </span>
+-------------------------------------------
+Match: {error} in file: login.jsx Line: 257
+  Context: sName="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>                     {error}                   </div>
+-------------------------------------------
+Match: {resetSuccess} in file: login.jsx Line: 264
+  Context: me="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>                     {resetSuccess}                   </div
+-------------------------------------------
+Match: {error} in file: login.jsx Line: 376
+  Context: sName="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>                       {error}                     </div>
+-------------------------------------------
+Match: {tab.label} in file: notifications.jsx Line: 276
+  Context: ay-800 dark:hover:text-white'               }`}             >               {tab.label}             </button>
+-------------------------------------------
+Match: {notif.title} in file: notifications.jsx Line: 305
+  Context: xt-sm font-bold text-gray-200 dark:text-white leading-tight">                     {notif.title}                   </h4>
+-------------------------------------------
+Match: {notif.text} in file: notifications.jsx Line: 308
+  Context: edium leading-normal mt-0.5 line-clamp-1 sm:line-clamp-none">                     {notif.text}                   </p>
+-------------------------------------------
+Match: {pNum} in file: notifications.jsx Line: 357
+  Context: ite hover:bg-white/5'                   }`}                 >                   {pNum}                 </button>
+-------------------------------------------
+Match: {error} in file: register.jsx Line: 195
+  Context: sName="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>                   {error}                 </div>
+-------------------------------------------
+Match: {error} in file: reset-password.jsx Line: 152
+  Context: sName="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>                   {error}                 </div>
+-------------------------------------------
+Match: {success} in file: reset-password.jsx Line: 159
+  Context: me="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>                   {success}                 </div>
+-------------------------------------------
+Match: {tab.label} in file: tasks.jsx Line: 471
+  Context: 00 dark:hover:text-white'                 }`}               >                 {tab.label}               </button>
+-------------------------------------------
+Match: {ev.title} in file: tasks.jsx Line: 556
+  Context: <span className="text-gray-900 dark:text-white font-bold">{ev.title}</span>                       <span className="te
+-------------------------------------------
+Match: {ev.location} in file: tasks.jsx Line: 557
+  Context: span className="text-[9px] text-gray-500 dark:text-gray-400">{ev.location}</span>                     </button>
+-------------------------------------------
+Match: {task.displayName} in file: tasks.jsx Line: 615
+  Context: ' ? 'line-through opacity-50' : ''                       }`}>                         {task.displayName}
+-------------------------------------------
+Match: {task.visualStatus} in file: tasks.jsx Line: 652
+  Context: -slate-500/10 dark:text-slate-300'                       }`}>                         {task.visualStatus}
+-------------------------------------------
+Match: {task.priority} in file: tasks.jsx Line: 663
+  Context: r-emerald-500/20 text-emerald-500'                       }`}>                         {task.priority}
+-------------------------------------------
+Match: {pNum} in file: tasks.jsx Line: 721
+  Context: hover:bg-white/5'                     }`}                   >                     {pNum}                   </button>
+-------------------------------------------
+Match: {venue.type} in file: venues.jsx Line: 806
+  Context: assName="text-[10px] text-gray-500 font-extrabold uppercase">{venue.type}</span>                       <h4 className="te
+-------------------------------------------
+Match: {venue.name} in file: venues.jsx Line: 807
+  Context: #5a2bd4] dark:group-hover:text-indigo-400 transition-colors">                         {venue.name}
+-------------------------------------------
+Match: {venue.priceTier} in file: venues.jsx Line: 819
+  Context: nt-black text-xs font-outfit">                         <span>{venue.priceTier}</span>                         <span clas
+-------------------------------------------
+Match: {venue.location} in file: venues.jsx Line: 822
+  Context: <MapPin className="w-3 h-3 shrink-0" />                           {venue.location}
+-------------------------------------------
+Match: {venue.rating} in file: venues.jsx Line: 827
+  Context: xtrabold text-xs font-outfit">                         <span>{venue.rating}</span>                         <Star classNa
+-------------------------------------------
+Match: {venue.type} in file: venues.jsx Line: 855
+  Context: lassName="text-[9px] text-gray-500 font-extrabold uppercase">{venue.type}</span>                         <h4 className="
+-------------------------------------------
+Match: {venue.name} in file: venues.jsx Line: 856
+  Context: #5a2bd4] dark:group-hover:text-indigo-400 transition-colors">                           {venue.name}
+-------------------------------------------
+Match: {venue.description} in file: venues.jsx Line: 859
+  Context: ext-gray-500 line-clamp-1 leading-normal font-semibold mt-1">                           {venue.description}
+-------------------------------------------
+Match: {venue.priceTier} in file: venues.jsx Line: 882
+  Context: x items-center gap-1 font-outfit text-indigo-400 font-black">                         {venue.priceTier}
+-------------------------------------------
+Match: {venue.rating} in file: venues.jsx Line: 885
+  Context: items-center gap-1 font-outfit text-emerald-500 font-black">                         {venue.rating} <Star className="w-
+-------------------------------------------
+Match: {venue.location} in file: venues.jsx Line: 889
+  Context: ">                         <MapPin className="w-3.5 h-3.5" /> {venue.location}                       </span>
+-------------------------------------------
+Match: {amenity} in file: venues.jsx Line: 1047
+  Context: r:text-white'                       }`}                     >                       {amenity}                     </butt
+-------------------------------------------
+Match: {selectedVenueDetail.type} in file: venues.jsx Line: 1127
+  Context: sName="text-[10px] text-indigo-400 font-extrabold uppercase">{selectedVenueDetail.type}</span>                 <h3 class
+-------------------------------------------
+Match: {selectedVenueDetail.name} in file: venues.jsx Line: 1128
+  Context: <h3 className="text-base font-bold text-white leading-tight">                   {selectedVenueDetail.name}
+-------------------------------------------
+Match: {selectedVenueDetail.description} in file: venues.jsx Line: 1132
+  Context: gray-400 leading-relaxed font-semibold h-20 overflow-y-auto">                 {selectedVenueDetail.description}
+-------------------------------------------
+Match: {amenity} in file: venues.jsx Line: 1145
+  Context: <Check className="w-3 h-3 text-emerald-500 shrink-0" />                       {amenity}                     </span
+-------------------------------------------
+Match: {selectedVenueDetail.location} in file: venues.jsx Line: 1178
+  Context: e="text-gray-500">Location:</span>                     <span>{selectedVenueDetail.location}</span>                   </d
+-------------------------------------------
+Match: {selectedVenueDetail.priceTier} in file: venues.jsx Line: 1186
+  Context: <span className="text-indigo-400 font-black font-outfit">{selectedVenueDetail.priceTier}</span>                   </
+-------------------------------------------
+Match: {selectedVenueDetail.rating} in file: venues.jsx Line: 1190
+  Context: <span className="text-emerald-500 flex items-center gap-0.5">                       {selectedVenueDetail.rating} <Star c
+-------------------------------------------
+Match: {ev.title} in file: venues.jsx Line: 1224
+  Context: ey={ev.id} value={ev.id} className="bg-[#151c2c] text-white">                               {ev.title}
+-------------------------------------------

@@ -9,7 +9,7 @@ export default function Layout({ children }) {
   const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-  const publicPaths = ['/', '/login', '/register'];
+  const publicPaths = ['/', '/login', '/register', '/logout', '/reset-password'];
   const isPublicPath = publicPaths.includes(router.pathname);
 
   // Check window size on mount
@@ -60,12 +60,10 @@ export default function Layout({ children }) {
 
   return (
     <div className="min-h-screen bg-[#0d0f14] text-gray-100 flex flex-col">
-      <Navbar onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
-      <div className={`flex flex-1 ${isAdminView ? 'pt-16' : 'pt-24'}`}>
+      <Navbar isSidebarOpen={isSidebarOpen} onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
+      <div className="flex flex-1 pt-16">
         <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
-        <main className={`flex-1 p-4 md:p-8 overflow-y-auto transition-all duration-300 ${
-          isAdminView ? 'min-h-[calc(100vh-4rem)]' : 'min-h-[calc(100vh-6rem)]'
-        } ${
+        <main className={`flex-1 p-4 md:p-8 overflow-y-auto transition-all duration-300 min-h-[calc(100vh-4rem)] ${
           isSidebarOpen ? 'md:pl-72' : 'md:pl-8'
         }`}>
           {children}

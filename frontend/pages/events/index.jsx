@@ -129,12 +129,12 @@ export default function EventsCatalog() {
   // Cover image mapping helper
   const getEventCover = (category) => {
     const cat = (category || '').toLowerCase();
-    if (cat.includes('wed')) return '/landing_wedding.png';
-    if (cat.includes('birth')) return '/landing_birthday.png';
-    if (cat.includes('corp') || cat.includes('conf')) return '/landing_corporate.png';
-    if (cat.includes('coll') || cat.includes('fest')) return '/landing_college.png';
-    if (cat.includes('priv') || cat.includes('party')) return '/landing_private.png';
-    return '/landing_custom.png';
+    if (cat.includes('wed')) return '/leela_palace.jpg';
+    if (cat.includes('birth')) return '/hero_udaipur_3.jpg';
+    if (cat.includes('corp') || cat.includes('conf')) return '/oberoi_udaivilas.jpg';
+    if (cat.includes('coll') || cat.includes('fest')) return '/monsoon_palace.jpg';
+    if (cat.includes('priv') || cat.includes('party')) return '/jag_mandir.jpg';
+    return '/hero_udaipur_1.jpg';
   };
 
   // Indian Currency formatter

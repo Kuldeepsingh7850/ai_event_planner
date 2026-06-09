@@ -6,7 +6,7 @@ const db = require('../config/db');
 const getFeedbacks = async (req, res) => {
   try {
     const feedbacks = await db.query(
-      'SELECT f.*, u.name, u.email FROM feedback f JOIN users u ON f.user_id = u.id ORDER BY f.created_at DESC'
+      'SELECT f.*, u.name, u.email FROM feedback f LEFT JOIN users u ON f.user_id = u.id ORDER BY f.created_at DESC'
     );
     res.json(feedbacks);
   } catch (error) {

@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { useTheme } from '../../context/ThemeContext';
+import { LogoIcon } from '../../components/Logo';
 import {
   Calendar,
   Users,
@@ -41,7 +42,12 @@ import {
   Download,
   Smile,
   Meh,
-  Frown
+  Frown,
+  Camera,
+  Loader2,
+  Lock,
+  User,
+  RotateCcw
 } from 'lucide-react';
 
 const formatEventDate = (dateStr) => {
@@ -55,9 +61,23 @@ const formatEventDate = (dateStr) => {
   return `${day} ${month} ${year}`;
 };
 
-const formatEventTime = (dateStr) => {
-  if (!dateStr) return '';
-  const date = new Date(dateStr);
+const formatEventTime = (timeVal) => {
+  if (!timeVal) return '';
+  
+  // Handle TIME strings from MySQL (e.g. "12:00:00", "16:00:00")
+  if (typeof timeVal === 'string' && timeVal.includes(':')) {
+    const parts = timeVal.split(':');
+    let hours = parseInt(parts[0], 10);
+    const minutes = parts[1] ? parts[1].padStart(2, '0') : '00';
+    if (!isNaN(hours)) {
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      return `${hours}:${minutes} ${ampm}`;
+    }
+  }
+  
+  const date = new Date(timeVal);
   if (isNaN(date.getTime())) return '';
   let hours = date.getHours();
   const minutes = String(date.getMinutes()).padStart(2, '0');
@@ -84,9 +104,476 @@ const formatFeedbackDate = (dateStr) => {
   return `${day} ${month} ${year}, ${hours}:${minutes} ${ampm}`;
 };
 
+const getRealEventCover = (category) => {
+  const cat = (category || '').toLowerCase();
+  if (cat.includes('wedding') || cat.includes('marriage')) return '/leela_palace.jpg';
+  if (cat.includes('birthday') || cat.includes('anniversary')) return '/hero_udaipur_3.jpg';
+  if (cat.includes('corporate') || cat.includes('seminar') || cat.includes('conference')) return '/oberoi_udaivilas.jpg';
+  if (cat.includes('college') || cat.includes('festival') || cat.includes('fest')) return '/monsoon_palace.jpg';
+  if (cat.includes('private') || cat.includes('party')) return '/jag_mandir.jpg';
+  return '/hero_udaipur_1.jpg';
+};
+
+const getRealVendorCover = (category) => {
+  const cat = (category || '').toLowerCase();
+  if (cat.includes('catering') || cat.includes('food') || cat.includes('bakery') || cat.includes('sweet')) return '/hero_udaipur_2.jpg';
+  if (cat.includes('decor') || cat.includes('flower') || cat.includes('stage') || cat.includes('tent')) return '/shiv_niwas.jpg';
+  if (cat.includes('entertainment') || cat.includes('music') || cat.includes('sound') || cat.includes('light') || cat.includes('dj')) return '/hero_udaipur_3.jpg';
+  if (cat.includes('photo') || cat.includes('video') || cat.includes('camera')) return '/jag_mandir.jpg';
+  if (cat.includes('planner') || cat.includes('organizer')) return '/leela_palace.jpg';
+  return '/hero_udaipur_1.jpg';
+};
+
+const getRealVenueCover = (nameOrType) => {
+  const nt = (nameOrType || '').toLowerCase();
+  if (nt.includes('leela')) return '/leela_palace.jpg';
+  if (nt.includes('lake palace') || nt.includes('taj')) return '/taj_lake_palace.jpg';
+  if (nt.includes('udaivilas') || nt.includes('oberoi')) return '/oberoi_udaivilas.jpg';
+  if (nt.includes('fateh garh') || nt.includes('resort')) return '/monsoon_palace.jpg';
+  if (nt.includes('shiv niwas') || nt.includes('ramada')) return '/shiv_niwas.jpg';
+  if (nt.includes('jag mandir') || nt.includes('bijolai') || nt.includes('fort')) return '/jag_mandir.jpg';
+  if (nt.includes('radisson') || nt.includes('hilltop')) return '/hero_udaipur_3.jpg';
+  return '/leela_palace.jpg';
+};
+
+const resolveImage = (imgSrc, type, categoryOrName) => {
+  const isMock = !imgSrc || 
+                 imgSrc.includes('udaipur_palace') || 
+                 imgSrc.includes('celebrate_collage') || 
+                 imgSrc.includes('services_') || 
+                 imgSrc.includes('landing_') ||
+                 imgSrc.endsWith('.png');
+  
+  if (imgSrc && imgSrc.includes('logo.png')) {
+    return imgSrc;
+  }
+  
+  if (!isMock) return imgSrc;
+  
+  if (type === 'event') {
+    return getRealEventCover(categoryOrName);
+  } else if (type === 'vendor') {
+    return getRealVendorCover(categoryOrName);
+  } else {
+    return getRealVenueCover(categoryOrName);
+  }
+};
+
+
+const defaultVenuesList = [
+  {
+    id: 1,
+    name: 'The Leela Palace Udaipur',
+    type: 'Luxury Hotel',
+    event_type: 'hotel',
+    location: 'Lake Pichola, Udaipur',
+    minCapacity: 200,
+    maxCapacity: 500,
+    guest_count: 500,
+    priceTier: '₹₹₹₹',
+    priceNum: 4,
+    rating: 4.8,
+    image: '/leela_palace.jpg',
+    amenities: ['Pool', 'AC Hall', 'Parking', 'Bar', 'Stage'],
+    description: 'A majestic palace hotel located on the banks of Lake Pichola, offering signature luxury services and exquisite dining setups for royal weddings.',
+    status: 'active',
+    created_at: '2024-04-10T10:00:00.000Z',
+    gallery: [
+      '/leela_palace.jpg',
+      'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1582719508461-905c673771fd?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80'
+    ]
+  },
+  {
+    id: 2,
+    name: 'Fateh Garh Resort',
+    type: 'Heritage Resort',
+    event_type: 'resort',
+    location: 'Sajjangarh, Udaipur',
+    minCapacity: 100,
+    maxCapacity: 300,
+    guest_count: 300,
+    priceTier: '₹₹₹',
+    priceNum: 3,
+    rating: 4.6,
+    image: '/monsoon_palace.jpg',
+    amenities: ['AC Hall', 'Parking', 'Stage', 'Sound System'],
+    description: 'Perched on a hill offering panoramic views of the Aravalli ranges, Fateh Garh is a heritage resort perfect for authentic cultural themes and grand receptions.',
+    status: 'active',
+    created_at: '2024-04-12T10:00:00.000Z',
+    gallery: [
+      '/monsoon_palace.jpg',
+      'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=600&q=80'
+    ]
+  },
+  {
+    id: 3,
+    name: 'Radisson Blu Udaipur',
+    type: 'Hotel',
+    event_type: 'hotel',
+    location: 'Rani Road, Udaipur',
+    minCapacity: 100,
+    maxCapacity: 600,
+    guest_count: 600,
+    priceTier: '₹₹₹',
+    priceNum: 3,
+    rating: 4.4,
+    image: '/hero_udaipur_3.jpg',
+    amenities: ['Pool', 'AC Hall', 'Parking', 'Bar'],
+    description: 'Overlooking Lake Fateh Sagar, this resort features spacious indoor halls and a grand pool deck suitable for corporate fests and engagement parties.',
+    status: 'active',
+    created_at: '2024-04-15T10:00:00.000Z',
+    gallery: [
+      '/hero_udaipur_3.jpg',
+      'https://images.unsplash.com/photo-1445019980597-93fa8acb246c?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1564507592333-c60657eea523?auto=format&fit=crop&w=600&q=80'
+    ]
+  },
+  {
+    id: 4,
+    name: 'Bhanwar Singh Palace Udaipur',
+    type: 'Palace',
+    event_type: 'palace',
+    location: 'Udaipur',
+    minCapacity: 250,
+    maxCapacity: 800,
+    guest_count: 800,
+    priceTier: '₹₹₹₹',
+    priceNum: 4,
+    rating: 4.7,
+    image: '/hero_udaipur_1.jpg',
+    amenities: ['Pool', 'AC Hall', 'Parking', 'Stage', 'Sound System'],
+    description: 'A luxurious palace resort featuring expansive lawns and royal architecture, offering an ideal setting for destination weddings in Udaipur.',
+    status: 'active',
+    created_at: '2024-04-18T10:00:00.000Z',
+    gallery: [
+      '/hero_udaipur_1.jpg',
+      'https://images.unsplash.com/photo-1605538032432-a9f0c8d9ba5e?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1613553507747-5f8d62ad5904?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=600&q=80'
+    ]
+  },
+  {
+    id: 5,
+    name: 'Ramada Resort Udaipur',
+    type: 'Resort',
+    event_type: 'resort',
+    location: 'Rampura, Udaipur',
+    minCapacity: 100,
+    maxCapacity: 300,
+    guest_count: 300,
+    priceTier: '₹₹',
+    priceNum: 2,
+    rating: 4.5,
+    image: '/shiv_niwas.jpg',
+    amenities: ['Pool', 'AC Hall', 'Parking', 'Bar'],
+    description: 'Ramada Resort & Spa features stone walls and traditional architecture, offering multi-tiered lawns and modern banquet halls.',
+    status: 'active',
+    created_at: '2024-04-20T10:00:00.000Z',
+    gallery: [
+      '/shiv_niwas.jpg',
+      'https://images.unsplash.com/photo-1596394516093-501ba68a0ba6?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1498503182468-3b51cbb6cb24?auto=format&fit=crop&w=600&q=80'
+    ]
+  },
+  {
+    id: 6,
+    name: 'Bijolai Fort Udaipur',
+    type: 'Heritage Venue',
+    event_type: 'resort',
+    location: 'Udaipur',
+    minCapacity: 50,
+    maxCapacity: 200,
+    guest_count: 200,
+    priceTier: '₹₹',
+    priceNum: 2,
+    rating: 4.4,
+    image: '/jag_mandir.jpg',
+    amenities: ['AC Hall', 'Parking', 'Stage'],
+    description: 'Constructed in the 19th century beside a lake, this fort features heritage courtyards perfect for close-knit traditional functions in Udaipur.',
+    status: 'active',
+    created_at: '2024-04-22T10:00:00.000Z',
+    gallery: [
+      '/jag_mandir.jpg',
+      'https://images.unsplash.com/photo-1585983224974-084a8e065e76?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1590001155093-a3c66ab0c3ff?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=600&q=80'
+    ]
+  },
+  {
+    id: 7,
+    name: 'Hotel Hilltop Palace',
+    type: 'Hotel',
+    event_type: 'hotel',
+    location: 'Ambavgarh, Udaipur',
+    minCapacity: 100,
+    maxCapacity: 400,
+    guest_count: 400,
+    priceTier: '₹₹',
+    priceNum: 2,
+    rating: 4.3,
+    image: '/hero_udaipur_2.jpg',
+    amenities: ['AC Hall', 'Parking', 'Bar'],
+    description: 'Located atop the highest point in Udaipur, this hotel offers stunning lake views and classical Rajasthani hospitality packages.',
+    status: 'active',
+    created_at: '2024-04-25T10:00:00.000Z',
+    gallery: [
+      '/hero_udaipur_2.jpg',
+      'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1598977123418-45f04b01f4ac?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1568495248636-6432b97bd949?auto=format&fit=crop&w=600&q=80'
+    ]
+  },
+  {
+    id: 8,
+    name: 'Aravali Lawn',
+    type: 'Lawn',
+    event_type: 'banquet',
+    location: 'Udaipur',
+    minCapacity: 150,
+    maxCapacity: 600,
+    guest_count: 600,
+    priceTier: '₹₹',
+    priceNum: 2,
+    rating: 4.2,
+    image: 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=600&q=80',
+    amenities: ['Parking', 'Stage', 'Sound System'],
+    description: 'A spacious lush green open lawn nestled near the foothills, offering an open-air starlight dining experience for massive gatherings.',
+    status: 'active',
+    created_at: '2024-04-28T10:00:00.000Z',
+    gallery: [
+      'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1533105079780-92b9be482077?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1473163928189-364b2c4e1135?auto=format&fit=crop&w=600&q=80'
+    ]
+  },
+  {
+    id: 9,
+    name: 'The Oberoi Udaivilas',
+    type: 'Luxury Hotel',
+    event_type: 'hotel',
+    location: 'Haridasji Ki Magri, Udaipur',
+    minCapacity: 150,
+    maxCapacity: 450,
+    guest_count: 450,
+    priceTier: '₹₹₹₹',
+    priceNum: 4,
+    rating: 4.9,
+    image: '/oberoi_udaivilas.jpg',
+    amenities: ['Pool', 'AC Hall', 'Parking', 'Bar', 'Stage', 'Sound System'],
+    description: 'Famed for its grand architecture and lake-front pools, Udaivilas offers a royal fairytale wedding experience with flawless service standards.',
+    status: 'active',
+    created_at: '2024-05-01T10:00:00.000Z',
+    gallery: [
+      '/oberoi_udaivilas.jpg',
+      'https://images.unsplash.com/photo-1549294413-26f195afcbce?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1621293954908-907141447fc9?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=600&q=80'
+    ]
+  },
+  {
+    id: 10,
+    name: 'Taj Lake Palace',
+    type: 'Luxury Hotel',
+    event_type: 'hotel',
+    location: 'Lake Pichola, Udaipur',
+    minCapacity: 80,
+    maxCapacity: 250,
+    guest_count: 250,
+    priceTier: '₹₹₹₹',
+    priceNum: 4,
+    rating: 4.9,
+    image: '/taj_lake_palace.jpg',
+    amenities: ['Pool', 'AC Hall', 'Parking', 'Bar', 'Stage'],
+    description: 'An iconic white marble floating palace on Lake Pichola, Taj Lake Palace offers complete island isolation for high-profile celebrations.',
+    status: 'active',
+    created_at: '2024-05-03T10:00:00.000Z',
+    gallery: [
+      '/taj_lake_palace.jpg',
+      'https://images.unsplash.com/photo-1504609773096-104ff2c73ba4?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=600&q=80'
+    ]
+  }
+];
+
+const defaultVendorsList = [
+  {
+    id: 1,
+    name: 'Apex Sound & Lights',
+    category: 'Entertainment',
+    contact_person: 'Harish Vyas',
+    phone: '+91 94140 12345',
+    email: 'contact@apexsound.com',
+    status: 'active',
+    created_at: '2024-04-11T10:00:00.000Z',
+    image: '/hero_udaipur_3.jpg'
+  },
+  {
+    id: 2,
+    name: 'Royal Decorators',
+    category: 'Decoration',
+    contact_person: 'Vikram Singh',
+    phone: '+91 82900 67890',
+    email: 'vikram@royaldecor.com',
+    status: 'active',
+    created_at: '2024-04-13T10:00:00.000Z',
+    image: '/shiv_niwas.jpg'
+  },
+  {
+    id: 3,
+    name: 'Marwar Catering Services',
+    category: 'Catering',
+    contact_person: 'Ramesh Patel',
+    phone: '+91 98290 11223',
+    email: 'info@marwarcatering.com',
+    status: 'active',
+    created_at: '2024-04-16T10:00:00.000Z',
+    image: '/hero_udaipur_2.jpg'
+  },
+  {
+    id: 4,
+    name: 'Lakeside Photography',
+    category: 'Photography',
+    contact_person: 'Priya Sharma',
+    phone: '+91 99280 44556',
+    email: 'priya@lakesidephoto.com',
+    status: 'active',
+    created_at: '2024-04-17T10:00:00.000Z',
+    image: '/jag_mandir.jpg'
+  },
+  {
+    id: 5,
+    name: 'Udaipur Event Management',
+    category: 'Event Planner',
+    contact_person: 'Amit Mehta',
+    phone: '+91 70140 77889',
+    email: 'info@udaipurevents.com',
+    status: 'active',
+    created_at: '2024-04-19T10:00:00.000Z',
+    image: '/leela_palace.jpg'
+  },
+  {
+    id: 6,
+    name: 'Heritage Travels',
+    category: 'Transport',
+    contact_person: 'Sanjay Jain',
+    phone: '+91 94600 33445',
+    email: 'bookings@heritagetravels.com',
+    status: 'active',
+    created_at: '2024-04-21T10:00:00.000Z',
+    image: '/hero_udaipur_1.jpg'
+  },
+  {
+    id: 7,
+    name: 'Sweet Delights Bakery',
+    category: 'Catering',
+    contact_person: 'Divya Joshi',
+    phone: '+91 94130 99887',
+    email: 'orders@sweetdelights.com',
+    status: 'active',
+    created_at: '2024-04-23T10:00:00.000Z',
+    image: '/hero_udaipur_2.jpg'
+  },
+  {
+    id: 8,
+    name: 'Udaipur Tent & Stage',
+    category: 'Equipment',
+    contact_person: 'Suresh Sen',
+    phone: '+91 98870 55667',
+    email: 'contact@udaipurtent.com',
+    status: 'active',
+    created_at: '2024-04-26T10:00:00.000Z',
+    image: '/shiv_niwas.jpg'
+  },
+  {
+    id: 9,
+    name: 'Mewar Sound & DJ Udaipur',
+    category: 'Entertainment',
+    contact_person: 'Rajesh Menaria',
+    phone: '+91 94141 66778',
+    email: 'dj@mewarsound.com',
+    status: 'active',
+    created_at: '2024-04-28T10:00:00.000Z',
+    image: '/hero_udaipur_3.jpg'
+  },
+  {
+    id: 10,
+    name: 'The Wedding Filmer Udaipur',
+    category: 'Photography',
+    contact_person: 'Rohan Kothari',
+    phone: '+91 98280 55443',
+    email: 'rohan@weddingfilmer.com',
+    status: 'active',
+    created_at: '2024-05-01T10:00:00.000Z',
+    image: '/jag_mandir.jpg'
+  },
+  {
+    id: 11,
+    name: 'Lake City Flowers & Decor',
+    category: 'Decoration',
+    contact_person: 'Manish Sharma',
+    phone: '+91 94611 22334',
+    email: 'manish@lakecityflowers.com',
+    status: 'active',
+    created_at: '2024-05-03T10:00:00.000Z',
+    image: '/shiv_niwas.jpg'
+  },
+  {
+    id: 12,
+    name: 'Shreeji Catering & Sweets',
+    category: 'Catering',
+    contact_person: 'Kailash Chandra',
+    phone: '+91 99291 88990',
+    email: 'kailash@shreejicaterers.com',
+    status: 'active',
+    created_at: '2024-05-05T10:00:00.000Z',
+    image: '/hero_udaipur_2.jpg'
+  },
+  {
+    id: 13,
+    name: 'Aravali Wedding Planners',
+    category: 'Event Planner',
+    contact_person: 'Shruti Paliwal',
+    phone: '+91 77270 44556',
+    email: 'shruti@aravaliwedding.com',
+    status: 'active',
+    created_at: '2024-05-08T10:00:00.000Z',
+    image: '/oberoi_udaivilas.jpg'
+  },
+  {
+    id: 14,
+    name: 'Rajasthan Royal Tents',
+    category: 'Equipment',
+    contact_person: 'Gurnam Singh',
+    phone: '+91 98299 11223',
+    email: 'tents@rajroyal.com',
+    status: 'active',
+    created_at: '2024-05-10T10:00:00.000Z',
+    image: '/shiv_niwas.jpg'
+  },
+  {
+    id: 15,
+    name: 'Udaipur Luxury Cabs & Travels',
+    category: 'Transport',
+    contact_person: 'Yashwant Singh',
+    phone: '+91 94142 88990',
+    email: 'luxurycabs@udaipurtravels.com',
+    status: 'active',
+    created_at: '2024-05-12T10:00:00.000Z',
+    image: '/hero_udaipur_1.jpg'
+  }
+];
+
 export default function AdminDashboard() {
   const router = useRouter();
-  const { user, authFetch, loading: authLoading } = useAuth();
+  const { user, authFetch, loading: authLoading, updateUserAvatar, updateUserName } = useAuth();
   const { showToast } = useNotifications();
   const { theme } = useTheme();
   const isLight = theme === 'light';
@@ -106,6 +593,10 @@ export default function AdminDashboard() {
   const [eventTypeFilter, setEventTypeFilter] = useState('All');
   const [eventCurrentPage, setEventCurrentPage] = useState(1);
   const [eventPageSize, setEventPageSize] = useState(10);
+  const [eventStartDate, setEventStartDate] = useState('');
+  const [eventEndDate, setEventEndDate] = useState('');
+  const [isEventDatePickerOpen, setIsEventDatePickerOpen] = useState(false);
+  const eventDatePickerRef = useRef(null);
 
   // Filter States for Users Tab
   const [userSearchQuery, setUserSearchQuery] = useState('');
@@ -117,6 +608,7 @@ export default function AdminDashboard() {
   // Edit Event State
   const [editingEvent, setEditingEvent] = useState(null);
   const [activeUserMenuId, setActiveUserMenuId] = useState(null);
+  const [activeEventMenuId, setActiveEventMenuId] = useState(null);
 
   // Filter States for Venues Tab
   const [venueSearchQuery, setVenueSearchQuery] = useState('');
@@ -135,92 +627,11 @@ export default function AdminDashboard() {
     event_type: 'hotel',
     guest_count: 200,
     status: 'active',
-    image: '/udaipur_palace.png'
+    image: '/leela_palace.jpg'
   });
 
-  // Seeded list of 8 mockup venues matching the mockup image exactly
-  const [venuesList, setVenuesList] = useState([
-    {
-      id: 1,
-      name: 'The Leela Palace',
-      location: 'Lake Pichola, Udaipur',
-      event_type: 'hotel',
-      guest_count: 500,
-      status: 'active',
-      created_at: '2024-04-10T10:00:00.000Z',
-      image: '/udaipur_palace.png'
-    },
-    {
-      id: 2,
-      name: 'Radisson Blu',
-      location: 'Rajasthani Street, Udaipur',
-      event_type: 'hotel',
-      guest_count: 350,
-      status: 'active',
-      created_at: '2024-04-12T10:00:00.000Z',
-      image: '/services_venues.png'
-    },
-    {
-      id: 3,
-      name: 'Fateh Garh Resort',
-      location: 'Sukher, Udaipur',
-      event_type: 'resort',
-      guest_count: 300,
-      status: 'active',
-      created_at: '2024-04-15T10:00:00.000Z',
-      image: '/udaipur_palace_light.png'
-    },
-    {
-      id: 4,
-      name: 'Hotel Lakend',
-      location: 'Fateh Sagar Lake, Udaipur',
-      event_type: 'hotel',
-      guest_count: 250,
-      status: 'inactive',
-      created_at: '2024-04-18T10:00:00.000Z',
-      image: '/celebrate_collage1.png'
-    },
-    {
-      id: 5,
-      name: 'Shiv Niwas Palace',
-      location: 'The City Palace, Udaipur',
-      event_type: 'palace',
-      guest_count: 200,
-      status: 'active',
-      created_at: '2024-04-20T10:00:00.000Z',
-      image: '/celebrate_collage2.png'
-    },
-    {
-      id: 6,
-      name: 'The Grand Royal Palace',
-      location: 'Delhi Road, Udaipur',
-      event_type: 'banquet',
-      guest_count: 600,
-      status: 'active',
-      created_at: '2024-04-22T10:00:00.000Z',
-      image: '/landing_wedding.png'
-    },
-    {
-      id: 7,
-      name: 'Royal Retreat Resort',
-      location: 'Kodiyat, Udaipur',
-      event_type: 'resort',
-      guest_count: 400,
-      status: 'active',
-      created_at: '2024-04-25T10:00:00.000Z',
-      image: '/services_scenarios.png'
-    },
-    {
-      id: 8,
-      name: 'Jagmandir Island Palace',
-      location: 'Lake Pichola, Udaipur',
-      event_type: 'palace',
-      guest_count: 150,
-      status: 'inactive',
-      created_at: '2024-04-28T10:00:00.000Z',
-      image: '/landing_custom.png'
-    }
-  ]);
+  // Seeded list of default Udaipur venues
+  const [venuesList, setVenuesList] = useState(defaultVenuesList);
 
   // Filter States for Reports Tab
   const [reportEventFilter, setReportEventFilter] = useState('All');
@@ -228,6 +639,93 @@ export default function AdminDashboard() {
   const [reportVendorFilter, setReportVendorFilter] = useState('All');
   const [reportStartDate, setReportStartDate] = useState('2026-05-01');
   const [reportEndDate, setReportEndDate] = useState('2026-05-31');
+
+  // Filter States for Dashboard Tab
+  const [dashboardStartDate, setDashboardStartDate] = useState('');
+  const [dashboardEndDate, setDashboardEndDate] = useState('');
+  const [isDashboardDatePickerOpen, setIsDashboardDatePickerOpen] = useState(false);
+
+  // States for Users Tab
+  const [userStartDate, setUserStartDate] = useState('');
+  const [userEndDate, setUserEndDate] = useState('');
+  const [isUserDatePickerOpen, setIsUserDatePickerOpen] = useState(false);
+
+  // States for Events Overview & Revenue Overview Dropdowns
+  const [eventsChartRangeLabel, setEventsChartRangeLabel] = useState('All Time');
+  const [isEventsChartDropdownOpen, setIsEventsChartDropdownOpen] = useState(false);
+  const [revenueChartRangeLabel, setRevenueChartRangeLabel] = useState('All Time');
+  const [isRevenueChartDropdownOpen, setIsRevenueChartDropdownOpen] = useState(false);
+  const [eventsChartStartDate, setEventsChartStartDate] = useState('');
+  const [eventsChartEndDate, setEventsChartEndDate] = useState('');
+  const [revenueChartStartDate, setRevenueChartStartDate] = useState('');
+  const [revenueChartEndDate, setRevenueChartEndDate] = useState('');
+
+  // States for Venues, Vendors, and Bookings date range pickers
+  const [venueStartDate, setVenueStartDate] = useState('');
+  const [venueEndDate, setVenueEndDate] = useState('');
+  const [isVenueDatePickerOpen, setIsVenueDatePickerOpen] = useState(false);
+  const venueDatePickerRef = useRef(null);
+
+  const [vendorStartDate, setVendorStartDate] = useState('');
+  const [vendorEndDate, setVendorEndDate] = useState('');
+  const [isVendorDatePickerOpen, setIsVendorDatePickerOpen] = useState(false);
+  const vendorDatePickerRef = useRef(null);
+
+  const [bookingStartDate, setBookingStartDate] = useState('');
+  const [bookingEndDate, setBookingEndDate] = useState('');
+  const [isBookingDatePickerOpen, setIsBookingDatePickerOpen] = useState(false);
+  const bookingDatePickerRef = useRef(null);
+
+  const dashboardDatePickerRef = useRef(null);
+  const userDataPickerRef = useRef(null);
+  const eventsChartDropdownRef = useRef(null);
+  const revenueChartDropdownRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dashboardDatePickerRef.current && !dashboardDatePickerRef.current.contains(event.target)) {
+        setIsDashboardDatePickerOpen(false);
+      }
+      if (userDataPickerRef.current && !userDataPickerRef.current.contains(event.target)) {
+        setIsUserDatePickerOpen(false);
+      }
+      if (eventsChartDropdownRef.current && !eventsChartDropdownRef.current.contains(event.target)) {
+        setIsEventsChartDropdownOpen(false);
+      }
+      if (revenueChartDropdownRef.current && !revenueChartDropdownRef.current.contains(event.target)) {
+        setIsRevenueChartDropdownOpen(false);
+      }
+      if (venueDatePickerRef.current && !venueDatePickerRef.current.contains(event.target)) {
+        setIsVenueDatePickerOpen(false);
+      }
+      if (vendorDatePickerRef.current && !vendorDatePickerRef.current.contains(event.target)) {
+        setIsVendorDatePickerOpen(false);
+      }
+      if (bookingDatePickerRef.current && !bookingDatePickerRef.current.contains(event.target)) {
+        setIsBookingDatePickerOpen(false);
+      }
+      if (eventDatePickerRef.current && !eventDatePickerRef.current.contains(event.target)) {
+        setIsEventDatePickerOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
+  const [viewingUserProfile, setViewingUserProfile] = useState(null);
+  const [viewingVenueDetails, setViewingVenueDetails] = useState(null);
+  const [viewingVendorDetails, setViewingVendorDetails] = useState(null);
+  const [viewingFeedbackDetails, setViewingFeedbackDetails] = useState(null);
+  const [viewingEventDetails, setViewingEventDetails] = useState(null);
+  const [newUserData, setNewUserData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    role: 'user'
+  });
 
   // Filter States for Feedback Tab
   const [feedbackSearchQuery, setFeedbackSearchQuery] = useState('');
@@ -265,357 +763,250 @@ export default function AdminDashboard() {
     phone: '',
     email: '',
     status: 'active',
-    image: '/udaipur_palace.png'
+    image: '/hero_udaipur_2.jpg'
   });
 
-  // Seeded list of 8 custom mockup vendors matching layout but NOT image data
-  const [vendorsList, setVendorsList] = useState([
-    {
-      id: 1,
-      name: 'Apex Sound & Lights',
-      category: 'Entertainment',
-      contact_person: 'Harish Vyas',
-      phone: '+91 94140 12345',
-      email: 'contact@apexsound.com',
-      status: 'active',
-      created_at: '2024-04-11T10:00:00.000Z',
-      image: '/celebrate_collage1.png'
-    },
-    {
-      id: 2,
-      name: 'Royal Decorators',
-      category: 'Decoration',
-      contact_person: 'Vikram Singh',
-      phone: '+91 82900 67890',
-      email: 'vikram@royaldecor.com',
-      status: 'active',
-      created_at: '2024-04-13T10:00:00.000Z',
-      image: '/udaipur_palace_light.png'
-    },
-    {
-      id: 3,
-      name: 'Marwar Catering Services',
-      category: 'Catering',
-      contact_person: 'Ramesh Patel',
-      phone: '+91 98290 11223',
-      email: 'info@marwarcatering.com',
-      status: 'active',
-      created_at: '2024-04-16T10:00:00.000Z',
-      image: '/udaipur_palace.png'
-    },
-    {
-      id: 4,
-      name: 'Lakeside Photography',
-      category: 'Photography',
-      contact_person: 'Priya Sharma',
-      phone: '+91 99280 44556',
-      email: 'priya@lakesidephoto.com',
-      status: 'active',
-      created_at: '2024-04-17T10:00:00.000Z',
-      image: '/services_venues.png'
-    },
-    {
-      id: 5,
-      name: 'Udaipur Event Management',
-      category: 'Event Planner',
-      contact_person: 'Amit Mehta',
-      phone: '+91 70140 77889',
-      email: 'info@udaipurevents.com',
-      status: 'inactive',
-      created_at: '2024-04-19T10:00:00.000Z',
-      image: '/landing_wedding.png'
-    },
-    {
-      id: 6,
-      name: 'Heritage Travels',
-      category: 'Transport',
-      contact_person: 'Sanjay Jain',
-      phone: '+91 94600 33445',
-      email: 'bookings@heritagetravels.com',
-      status: 'active',
-      created_at: '2024-04-21T10:00:00.000Z',
-      image: '/celebrate_collage2.png'
-    },
-    {
-      id: 7,
-      name: 'Sweet Delights Bakery',
-      category: 'Catering',
-      contact_person: 'Divya Joshi',
-      phone: '+91 94130 99887',
-      email: 'orders@sweetdelights.com',
-      status: 'active',
-      created_at: '2024-04-23T10:00:00.000Z',
-      image: '/services_scenarios.png'
-    },
-    {
-      id: 8,
-      name: 'Udaipur Tent & Stage',
-      category: 'Equipment',
-      contact_person: 'Suresh Sen',
-      phone: '+91 98870 55667',
-      email: 'contact@udaipurtent.com',
-      status: 'inactive',
-      created_at: '2024-04-26T10:00:00.000Z',
-      image: '/landing_custom.png'
+  // Seeded list of 15 custom mockup Udaipur vendors matching layout
+  const [vendorsList, setVendorsList] = useState(defaultVendorsList);
+
+  // Admin Profile States
+  const [adminName, setAdminName] = useState('');
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPhone, setAdminPhone] = useState('');
+  const [adminDesignation, setAdminDesignation] = useState('');
+  const [adminLocation, setAdminLocation] = useState('');
+  const [adminBio, setAdminBio] = useState('');
+  const [adminAvatar, setAdminAvatar] = useState('');
+
+  const [adminSubmitLoading, setAdminSubmitLoading] = useState(false);
+  const [adminUploadLoading, setAdminUploadLoading] = useState(false);
+
+  // Admin Change Password States
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordSubmitLoading, setPasswordSubmitLoading] = useState(false);
+
+  // Load admin profile data
+  useEffect(() => {
+    if (user) {
+      setAdminName(user.name || '');
+      setAdminEmail(user.email || '');
+      setAdminAvatar(user.avatar || '');
+
+      const localKey = `profile_settings_${user.id}`;
+      const localSettings = localStorage.getItem(localKey);
+      if (localSettings) {
+        try {
+          const parsed = JSON.parse(localSettings);
+          setAdminPhone(parsed.phoneNumber || '');
+          setAdminDesignation(parsed.designation || 'System Administrator');
+          setAdminLocation(parsed.location || 'Udaipur, Rajasthan, India');
+          setAdminBio(parsed.bio || 'Managing heritage venue events, bookings, and platform coordination.');
+        } catch (e) {}
+      } else {
+        setAdminPhone('+91 98765 43210');
+        setAdminDesignation('System Administrator');
+        setAdminLocation('Udaipur, Rajasthan, India');
+        setAdminBio('Managing heritage venue events, bookings, and platform coordination.');
+      }
     }
-  ]);
+  }, [user]);
 
-  const [activeSettingsTab, setActiveSettingsTab] = useState('general');
-
-  // General Settings States
-  const [siteTitle, setSiteTitle] = useState('JAGAH');
-  const [siteTagline, setSiteTagline] = useState('Plan. Organize. Celebrate.');
-  const [siteEmail, setSiteEmail] = useState('info@aieventplanner.com');
-  const [sitePhone, setSitePhone] = useState('+91 98765 43210');
-  const [siteAddress, setSiteAddress] = useState('45, Saheli Marg, Udaipur, Rajasthan, India - 313001');
-  const [siteAbout, setSiteAbout] = useState('JAGAH is an all-in-one platform to manage events, venues, vendors, bookings and payments seamlessly.');
-  const [siteThemeColor, setSiteThemeColor] = useState('#6C3AED');
-  const [siteLanguage, setSiteLanguage] = useState('English');
-  const [siteCurrency, setSiteCurrency] = useState('INR (₹)');
-  const [siteTimezone, setSiteTimezone] = useState('(GMT+05:30) Asia/Kolkata');
-  const [siteDateFormat, setSiteDateFormat] = useState('DD MMM YYYY (10 Apr 2024)');
-  const [siteTimeFormat, setSiteTimeFormat] = useState('12 Hour (hh:mm AM/PM)');
-  const [siteWeekStartsOn, setSiteWeekStartsOn] = useState('Monday');
-
-  // Email Settings States
-  const [smtpHost, setSmtpHost] = useState('smtp.mailtrap.io');
-  const [smtpPort, setSmtpPort] = useState('2525');
-  const [smtpUsername, setSmtpUsername] = useState('api-key-user');
-  const [smtpPassword, setSmtpPassword] = useState('••••••••••••••••');
-  const [smtpEncryption, setSmtpEncryption] = useState('TLS');
-  const [smtpSenderName, setSmtpSenderName] = useState('JAGAH Support');
-  const [smtpSenderEmail, setSmtpSenderEmail] = useState('noreply@aieventplanner.com');
-
-  // Payment Settings States
-  const [stripePublicKey, setStripePublicKey] = useState('pk_test_51N2...3u98');
-  const [stripeSecretKey, setStripeSecretKey] = useState('sk_test_51N2...8y4w');
-  const [razorpayKeyId, setRazorpayKeyId] = useState('rzp_test_9A...bC2d');
-  const [razorpayKeySecret, setRazorpayKeySecret] = useState('••••••••••••••••••••••••');
-  const [paymentSandboxMode, setPaymentSandboxMode] = useState(true);
-
-  // Notification Settings States
-  const [notifyEmailEnabled, setNotifyEmailEnabled] = useState(true);
-  const [notifyPushEnabled, setNotifyPushEnabled] = useState(false);
-  const [notifyOnBookingCreated, setNotifyOnBookingCreated] = useState(true);
-  const [notifyOnPaymentReceived, setNotifyOnPaymentReceived] = useState(true);
-  const [notifyOnEventUpdated, setNotifyOnEventUpdated] = useState(false);
-  const [notifyOnLowBudgetAlert, setNotifyOnLowBudgetAlert] = useState(true);
-
-  // System Settings States
-  const [systemMaintenanceMode, setSystemMaintenanceMode] = useState(false);
-  const [systemDebugMode, setSystemDebugMode] = useState(true);
-  const [systemAllowRegistration, setSystemAllowRegistration] = useState(true);
-  const [systemMaxUploadSize, setSystemMaxUploadSize] = useState('10 MB');
-  const [systemCacheTimeout, setSystemCacheTimeout] = useState('60 Min');
-
-  // Backup Settings States
-  const [backupsList, setBackupsList] = useState([
-    { id: 1, filename: 'database_backup_2026_05_25.sql', size: '2.4 MB', date: '25 May 2026, 02:30 AM' },
-    { id: 2, filename: 'database_backup_2026_05_20.sql', size: '2.3 MB', date: '20 May 2026, 02:30 AM' }
-  ]);
+  // Helper to shift old 2024 mock dates to 2026 dynamically relative to today
+  const adjustMockDate = (dateStr, id) => {
+    if (!dateStr) return dateStr;
+    // If it's a 2024 date, let's dynamically shift it relative to current date
+    if (dateStr.startsWith('2024')) {
+      const now = new Date();
+      let daysAgo = 2;
+      if (id === 1) daysAgo = 1;
+      else if (id === 2) daysAgo = 3;
+      else if (id === 3) daysAgo = 5;
+      else if (id === 4) daysAgo = 10;
+      else if (id === 5) daysAgo = 15;
+      else if (id === 6) daysAgo = 20;
+      else if (id === 7) daysAgo = 25;
+      else if (id === 8) daysAgo = 35;
+      else if (id === 9) daysAgo = 45;
+      else daysAgo = 10 + (id * 5);
+      const d = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+      return d.toISOString();
+    }
+    return dateStr;
+  };
 
   // Load saved settings from localStorage on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedSiteTitle = localStorage.getItem('siteTitle');
-      if (savedSiteTitle) setSiteTitle(savedSiteTitle);
-      const savedSiteTagline = localStorage.getItem('siteTagline');
-      if (savedSiteTagline) setSiteTagline(savedSiteTagline);
-      const savedSiteEmail = localStorage.getItem('siteEmail');
-      if (savedSiteEmail) setSiteEmail(savedSiteEmail);
-      const savedSitePhone = localStorage.getItem('sitePhone');
-      if (savedSitePhone) setSitePhone(savedSitePhone);
-      const savedSiteAddress = localStorage.getItem('siteAddress');
-      if (savedSiteAddress) setSiteAddress(savedSiteAddress);
-      const savedSiteAbout = localStorage.getItem('siteAbout');
-      if (savedSiteAbout) setSiteAbout(savedSiteAbout);
-      const savedSiteThemeColor = localStorage.getItem('siteThemeColor');
-      if (savedSiteThemeColor) setSiteThemeColor(savedSiteThemeColor);
-      const savedSiteLanguage = localStorage.getItem('siteLanguage');
-      if (savedSiteLanguage) setSiteLanguage(savedSiteLanguage);
-      const savedSiteCurrency = localStorage.getItem('siteCurrency');
-      if (savedSiteCurrency) setSiteCurrency(savedSiteCurrency);
-      const savedSiteTimezone = localStorage.getItem('siteTimezone');
-      if (savedSiteTimezone) setSiteTimezone(savedSiteTimezone);
-      const savedSiteDateFormat = localStorage.getItem('siteDateFormat');
-      if (savedSiteDateFormat) setSiteDateFormat(savedSiteDateFormat);
-      const savedSiteTimeFormat = localStorage.getItem('siteTimeFormat');
-      if (savedSiteTimeFormat) setSiteTimeFormat(savedSiteTimeFormat);
-      const savedSiteWeekStartsOn = localStorage.getItem('siteWeekStartsOn');
-      if (savedSiteWeekStartsOn) setSiteWeekStartsOn(savedSiteWeekStartsOn);
 
-      const savedSmtpHost = localStorage.getItem('smtpHost');
-      if (savedSmtpHost) setSmtpHost(savedSmtpHost);
-      const savedSmtpPort = localStorage.getItem('smtpPort');
-      if (savedSmtpPort) setSmtpPort(savedSmtpPort);
-      const savedSmtpUsername = localStorage.getItem('smtpUsername');
-      if (savedSmtpUsername) setSmtpUsername(savedSmtpUsername);
-      const savedSmtpPassword = localStorage.getItem('smtpPassword');
-      if (savedSmtpPassword) setSmtpPassword(savedSmtpPassword);
-      const savedSmtpEncryption = localStorage.getItem('smtpEncryption');
-      if (savedSmtpEncryption) setSmtpEncryption(savedSmtpEncryption);
-      const savedSmtpSenderName = localStorage.getItem('smtpSenderName');
-      if (savedSmtpSenderName) setSmtpSenderName(savedSmtpSenderName);
-      const savedSmtpSenderEmail = localStorage.getItem('smtpSenderEmail');
-      if (savedSmtpSenderEmail) setSmtpSenderEmail(savedSmtpSenderEmail);
+      const savedVenues = localStorage.getItem('venues_data');
+      let parsedVenues = null;
+      if (savedVenues) {
+        try { parsedVenues = JSON.parse(savedVenues); } catch (e) {}
+      }
+      const hasVenuePlaceholder = parsedVenues && parsedVenues.some(v => v.image && v.image.endsWith('.png') && !v.image.includes('logo.png'));
 
-      const savedStripePublicKey = localStorage.getItem('stripePublicKey');
-      if (savedStripePublicKey) setStripePublicKey(savedStripePublicKey);
-      const savedStripeSecretKey = localStorage.getItem('stripeSecretKey');
-      if (savedStripeSecretKey) setStripeSecretKey(savedStripeSecretKey);
-      const savedRazorpayKeyId = localStorage.getItem('razorpayKeyId');
-      if (savedRazorpayKeyId) setRazorpayKeyId(savedRazorpayKeyId);
-      const savedRazorpayKeySecret = localStorage.getItem('razorpayKeySecret');
-      if (savedRazorpayKeySecret) setRazorpayKeySecret(savedRazorpayKeySecret);
-      const savedPaymentSandboxMode = localStorage.getItem('paymentSandboxMode');
-      if (savedPaymentSandboxMode) setPaymentSandboxMode(savedPaymentSandboxMode === 'true');
+      let finalVenues = defaultVenuesList;
+      if (parsedVenues && !hasVenuePlaceholder) {
+        try {
+          finalVenues = parsedVenues.map(v => {
+            const event_type = v.event_type || (v.type ? (v.type.toLowerCase().includes('resort') ? 'resort' : v.type.toLowerCase().includes('palace') ? 'palace' : v.type.toLowerCase().includes('lawn') ? 'banquet' : 'hotel') : 'hotel');
+            const type = v.type || (event_type.charAt(0).toUpperCase() + event_type.slice(1) + ' Venue');
+            const defaultVenue = defaultVenuesList.find(dv => dv.id.toString() === v.id.toString());
+            const gallery = (defaultVenue && defaultVenue.id <= 10)
+              ? defaultVenue.gallery
+              : (v.gallery || (defaultVenue ? defaultVenue.gallery : []));
+            const image = (defaultVenue && defaultVenue.id <= 10)
+              ? defaultVenue.image
+              : (v.image || '/leela_palace.jpg');
+            return {
+              ...v,
+              image,
+              event_type,
+              type,
+              status: v.status || 'active',
+              maxCapacity: v.maxCapacity || v.guest_count || 300,
+              guest_count: v.guest_count || v.maxCapacity || 300,
+              location: v.location || 'Udaipur',
+              gallery
+            };
+          });
+        } catch (e) {
+          finalVenues = defaultVenuesList;
+        }
+      }
 
-      const savedNotifyEmailEnabled = localStorage.getItem('notifyEmailEnabled');
-      if (savedNotifyEmailEnabled) setNotifyEmailEnabled(savedNotifyEmailEnabled === 'true');
-      const savedNotifyPushEnabled = localStorage.getItem('notifyPushEnabled');
-      if (savedNotifyPushEnabled) setNotifyPushEnabled(savedNotifyPushEnabled === 'true');
-      const savedNotifyOnBookingCreated = localStorage.getItem('notifyOnBookingCreated');
-      if (savedNotifyOnBookingCreated) setNotifyOnBookingCreated(savedNotifyOnBookingCreated === 'true');
-      const savedNotifyOnPaymentReceived = localStorage.getItem('notifyOnPaymentReceived');
-      if (savedNotifyOnPaymentReceived) setNotifyOnPaymentReceived(savedNotifyOnPaymentReceived === 'true');
-      const savedNotifyOnEventUpdated = localStorage.getItem('notifyOnEventUpdated');
-      if (savedNotifyOnEventUpdated) setNotifyOnEventUpdated(savedNotifyOnEventUpdated === 'true');
-      const savedNotifyOnLowBudgetAlert = localStorage.getItem('notifyOnLowBudgetAlert');
-      if (savedNotifyOnLowBudgetAlert) setNotifyOnLowBudgetAlert(savedNotifyOnLowBudgetAlert === 'true');
+      const adjustedVenues = finalVenues.map(v => ({
+        ...v,
+        created_at: adjustMockDate(v.created_at, v.id)
+      }));
+      setVenuesList(adjustedVenues);
+      localStorage.setItem('venues_data', JSON.stringify(adjustedVenues));
 
-      const savedSystemMaintenanceMode = localStorage.getItem('systemMaintenanceMode');
-      if (savedSystemMaintenanceMode) setSystemMaintenanceMode(savedSystemMaintenanceMode === 'true');
-      const savedSystemDebugMode = localStorage.getItem('systemDebugMode');
-      if (savedSystemDebugMode) setSystemDebugMode(savedSystemDebugMode === 'true');
-      const savedSystemAllowRegistration = localStorage.getItem('systemAllowRegistration');
-      if (savedSystemAllowRegistration) setSystemAllowRegistration(savedSystemAllowRegistration === 'true');
-      const savedSystemMaxUploadSize = localStorage.getItem('systemMaxUploadSize');
-      if (savedSystemMaxUploadSize) setSystemMaxUploadSize(savedSystemMaxUploadSize);
-      const savedSystemCacheTimeout = localStorage.getItem('systemCacheTimeout');
-      if (savedSystemCacheTimeout) setSystemCacheTimeout(savedSystemCacheTimeout);
+      const savedVendors = localStorage.getItem('vendors_data');
+      let parsedVendors = null;
+      if (savedVendors) {
+        try { parsedVendors = JSON.parse(savedVendors); } catch (e) {}
+      }
+      const hasVendorPlaceholder = parsedVendors && parsedVendors.some(v => v.image && v.image.endsWith('.png'));
 
-      const savedBackupsList = localStorage.getItem('backupsList');
-      if (savedBackupsList) setBackupsList(JSON.parse(savedBackupsList));
+      let finalVendors = defaultVendorsList;
+      if (parsedVendors && !hasVendorPlaceholder) {
+        finalVendors = parsedVendors;
+      }
+      const adjustedVendors = finalVendors.map(v => ({
+        ...v,
+        created_at: adjustMockDate(v.created_at, v.id)
+      }));
+      setVendorsList(adjustedVendors);
+      localStorage.setItem('vendors_data', JSON.stringify(adjustedVendors));
     }
   }, []);
 
-  const handleSaveGeneralSettings = (e) => {
-    e.preventDefault();
-    localStorage.setItem('siteTitle', siteTitle);
-    localStorage.setItem('siteTagline', siteTagline);
-    localStorage.setItem('siteEmail', siteEmail);
-    localStorage.setItem('sitePhone', sitePhone);
-    localStorage.setItem('siteAddress', siteAddress);
-    localStorage.setItem('siteAbout', siteAbout);
-    localStorage.setItem('siteThemeColor', siteThemeColor);
-    localStorage.setItem('siteLanguage', siteLanguage);
-    localStorage.setItem('siteCurrency', siteCurrency);
-    localStorage.setItem('siteTimezone', siteTimezone);
-    localStorage.setItem('siteDateFormat', siteDateFormat);
-    localStorage.setItem('siteTimeFormat', siteTimeFormat);
-    localStorage.setItem('siteWeekStartsOn', siteWeekStartsOn);
-    showToast('General settings saved successfully!', 'success');
-  };
+  const handleAdminAvatarUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-  const handleSaveEmailSettings = (e) => {
-    e.preventDefault();
-    localStorage.setItem('smtpHost', smtpHost);
-    localStorage.setItem('smtpPort', smtpPort);
-    localStorage.setItem('smtpUsername', smtpUsername);
-    localStorage.setItem('smtpPassword', smtpPassword);
-    localStorage.setItem('smtpEncryption', smtpEncryption);
-    localStorage.setItem('smtpSenderName', smtpSenderName);
-    localStorage.setItem('smtpSenderEmail', smtpSenderEmail);
-    showToast('Email settings saved successfully!', 'success');
-  };
+    if (file.size > 2 * 1024 * 1024) {
+      return showToast('Image file size must be less than 2MB', 'warning');
+    }
 
-  const handleSavePaymentSettings = (e) => {
-    e.preventDefault();
-    localStorage.setItem('stripePublicKey', stripePublicKey);
-    localStorage.setItem('stripeSecretKey', stripeSecretKey);
-    localStorage.setItem('razorpayKeyId', razorpayKeyId);
-    localStorage.setItem('razorpayKeySecret', razorpayKeySecret);
-    localStorage.setItem('paymentSandboxMode', paymentSandboxMode.toString());
-    showToast('Payment settings saved successfully!', 'success');
-  };
+    if (!file.type.startsWith('image/')) {
+      return showToast('Please select a valid image file', 'warning');
+    }
 
-  const handleSaveNotificationSettings = (e) => {
-    e.preventDefault();
-    localStorage.setItem('notifyEmailEnabled', notifyEmailEnabled.toString());
-    localStorage.setItem('notifyPushEnabled', notifyPushEnabled.toString());
-    localStorage.setItem('notifyOnBookingCreated', notifyOnBookingCreated.toString());
-    localStorage.setItem('notifyOnPaymentReceived', notifyOnPaymentReceived.toString());
-    localStorage.setItem('notifyOnEventUpdated', notifyOnEventUpdated.toString());
-    localStorage.setItem('notifyOnLowBudgetAlert', notifyOnLowBudgetAlert.toString());
-    showToast('Notification settings saved successfully!', 'success');
-  };
-
-  const handleSaveSystemSettings = (e) => {
-    e.preventDefault();
-    localStorage.setItem('systemMaintenanceMode', systemMaintenanceMode.toString());
-    localStorage.setItem('systemDebugMode', systemDebugMode.toString());
-    localStorage.setItem('systemAllowRegistration', systemAllowRegistration.toString());
-    localStorage.setItem('systemMaxUploadSize', systemMaxUploadSize);
-    localStorage.setItem('systemCacheTimeout', systemCacheTimeout);
-    showToast('System settings saved successfully!', 'success');
-  };
-
-  const handleCreateBackup = () => {
-    const newId = backupsList.length > 0 ? Math.max(...backupsList.map(b => b.id)) + 1 : 1;
-    const now = new Date();
-    const pad = (n) => String(n).padStart(2, '0');
-    const filename = `database_backup_${now.getFullYear()}_${pad(now.getMonth()+1)}_${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}.sql`;
-    
-    const day = now.getDate();
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const month = months[now.getMonth()];
-    const year = now.getFullYear();
-    let hours = now.getHours();
-    const minutes = pad(now.getMinutes());
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12;
-    hours = hours ? hours : 12;
-    const formattedDate = `${day} ${month} ${year}, ${hours}:${minutes} ${ampm}`;
-
-    const newBackup = {
-      id: newId,
-      filename,
-      size: `${(Math.random() * 2 + 1).toFixed(1)} MB`,
-      date: formattedDate
+    setAdminUploadLoading(true);
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64String = reader.result;
+      try {
+        const res = await authFetch('/profile/avatar', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ avatar: base64String })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setAdminAvatar(data.avatar);
+          if (updateUserAvatar) {
+            updateUserAvatar(data.avatar);
+          }
+          showToast('Admin profile photo updated successfully!', 'success');
+        } else {
+          const data = await res.json();
+          throw new Error(data.message || 'Failed to upload photo');
+        }
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        setAdminUploadLoading(false);
+      }
     };
-
-    const updatedList = [newBackup, ...backupsList];
-    setBackupsList(updatedList);
-    localStorage.setItem('backupsList', JSON.stringify(updatedList));
-    showToast(`Backup "${filename}" created successfully!`, 'success');
+    reader.readAsDataURL(file);
   };
 
-  const handleDeleteBackup = (id, filename) => {
-    if (confirm(`Are you sure you want to delete the backup file "${filename}"?`)) {
-      const updatedList = backupsList.filter(b => b.id !== id);
-      setBackupsList(updatedList);
-      localStorage.setItem('backupsList', JSON.stringify(updatedList));
-      showToast(`Backup "${filename}" deleted!`, 'success');
+  const handleSaveAdminProfile = async (e) => {
+    e.preventDefault();
+    setAdminSubmitLoading(true);
+
+    try {
+      // 1. Save locally to persist the extra fields using user-scoped key
+      const profileObj = {
+        fullName: adminName,
+        emailAddress: adminEmail,
+        phoneNumber: adminPhone,
+        designation: adminDesignation,
+        location: adminLocation,
+        bio: adminBio
+      };
+      const localKey = user ? `profile_settings_${user.id}` : 'profile_settings';
+      localStorage.setItem(localKey, JSON.stringify(profileObj));
+
+      // 2. Call API to update full name in DB
+      const res = await authFetch('/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: adminName })
+      });
+      
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Failed to update name in database');
+      }
+
+      // 3. Sync changes to global AuthContext state
+      if (updateUserName) {
+        updateUserName(adminName);
+      }
+
+      showToast('Admin profile changes saved successfully!', 'success');
+    } catch (err) {
+      showToast(err.message || 'Error saving changes', 'error');
+    } finally {
+      setAdminSubmitLoading(false);
     }
   };
 
-  const handleRestoreBackup = (filename) => {
-    if (confirm(`WARNING: Restoring backup "${filename}" will overwrite all current system records. Are you sure you want to continue?`)) {
-      showToast(`Restoring from backup "${filename}"...`, 'info');
-      setTimeout(() => {
-        showToast(`System restored to backup snapshot successfully!`, 'success');
-      }, 1500);
+  const handleUpdateAdminPassword = async (e) => {
+    e.preventDefault();
+    if (!newPassword || !confirmPassword) {
+      return showToast('Please fill out all password fields', 'warning');
     }
-  };
+    if (newPassword !== confirmPassword) {
+      return showToast('New passwords do not match!', 'error');
+    }
+    if (newPassword.length < 6) {
+      return showToast('Password must be at least 6 characters long', 'warning');
+    }
 
-  const handleSendTestEmail = () => {
-    const emailTarget = prompt("Enter email address to send a test message to:", siteEmail);
-    if (emailTarget) {
-      showToast(`Sending test SMTP mail connection to ${emailTarget}...`, 'info');
-      setTimeout(() => {
-        showToast(`Test email successfully sent to ${emailTarget}!`, 'success');
-      }, 1200);
-    }
+    setPasswordSubmitLoading(true);
+    // Mock password update
+    setTimeout(() => {
+      setPasswordSubmitLoading(false);
+      setNewPassword('');
+      setConfirmPassword('');
+      showToast('Admin password updated successfully!', 'success');
+    }, 1000);
   };
 
   // Sync tab with router query parameter
@@ -628,27 +1019,55 @@ export default function AdminDashboard() {
   }, [router.query.tab]);
 
   // Fetch metrics & records from system database
-  const fetchAdminData = async () => {
-    setLoading(true);
+  const fetchAdminData = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
-      const [uRes, eRes, fRes] = await Promise.all([
+      const [uRes, eRes, fRes] = await Promise.allSettled([
         authFetch('/admin/users'),
-        authFetch('/events'),
+        authFetch('/admin/events'),
         authFetch('/feedback')
       ]);
 
-      if (uRes.ok && eRes.ok && fRes.ok) {
-        const uData = await uRes.json();
-        const eData = await eRes.json();
-        const fData = await fRes.json();
+      if (uRes.status === 'fulfilled' && uRes.value.ok) {
+        const uData = await uRes.value.json();
         setUsersList(uData);
-        setEvents(eData);
+      } else {
+        const errReason = uRes.status === 'rejected' ? uRes.reason : `HTTP ${uRes.value?.status}`;
+        if (!silent) console.error('Error fetching administrative users:', errReason);
+      }
+
+      if (eRes.status === 'fulfilled' && eRes.value.ok) {
+        const eData = await eRes.value.json();
+        const adjustedEvents = eData.map(e => {
+          if (e.id === 1 || e.title === 'Annual College Farewell 2026') {
+            const now = new Date();
+            const d = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
+            const dateStr = d.toISOString().split('T')[0];
+            return {
+              ...e,
+              date: dateStr,
+              created_at: d.toISOString()
+            };
+          }
+          return e;
+        });
+        setEvents(adjustedEvents);
+      } else {
+        const errReason = eRes.status === 'rejected' ? eRes.reason : `HTTP ${eRes.value?.status}`;
+        if (!silent) console.error('Error fetching events:', errReason);
+      }
+
+      if (fRes.status === 'fulfilled' && fRes.value.ok) {
+        const fData = await fRes.value.json();
         setFeedbacks(fData);
+      } else {
+        const errReason = fRes.status === 'rejected' ? fRes.reason : `HTTP ${fRes.value?.status}`;
+        if (!silent) console.error('Error fetching feedback:', errReason);
       }
     } catch (err) {
-      console.error('Error fetching administrative data:', err);
+      if (!silent) console.error('Error fetching administrative data:', err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -659,9 +1078,32 @@ export default function AdminDashboard() {
         router.replace('/dashboard');
       } else {
         fetchAdminData();
+        // Clear default date range on client mount
+        setDashboardStartDate('');
+        setDashboardEndDate('');
+        setEventsChartRangeLabel('All Time');
+        setRevenueChartRangeLabel('All Time');
       }
     }
   }, [user, authLoading]);
+
+  useEffect(() => {
+    if (user && user.role === 'admin') {
+      const interval = setInterval(() => {
+        fetchAdminData(true);
+      }, 5000);
+
+      const handleFocus = () => {
+        fetchAdminData(true);
+      };
+      window.addEventListener('focus', handleFocus);
+
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener('focus', handleFocus);
+      };
+    }
+  }, [user]);
 
   // User Management Actions
   const handleToggleBlock = async (userId, currentStatus) => {
@@ -730,7 +1172,9 @@ export default function AdminDashboard() {
   // Venue Management Actions
   const handleToggleVenueStatus = (venueId, currentStatus) => {
     const nextStatus = currentStatus === 'active' ? 'inactive' : 'active';
-    setVenuesList(prev => prev.map(v => v.id === venueId ? { ...v, status: nextStatus } : v));
+    const updated = venuesList.map(v => v.id === venueId ? { ...v, status: nextStatus } : v);
+    setVenuesList(updated);
+    localStorage.setItem('venues_data', JSON.stringify(updated));
     showToast(`Venue status updated to ${nextStatus}`, 'success');
   };
 
@@ -738,19 +1182,47 @@ export default function AdminDashboard() {
     if (!window.confirm(`Are you sure you want to delete venue "${name}"?`)) {
       return;
     }
-    setVenuesList(prev => prev.filter(v => v.id !== venueId));
+    const updated = venuesList.filter(v => v.id !== venueId);
+    setVenuesList(updated);
+    localStorage.setItem('venues_data', JSON.stringify(updated));
     showToast(`Deleted venue "${name}"`, 'success');
   };
 
   const handleSaveVenue = (e) => {
     e.preventDefault();
     if (editingVenue) {
-      setVenuesList(prev => prev.map(v => v.id === editingVenue.id ? { 
+      const updated = venuesList.map(v => v.id === editingVenue.id ? { 
         ...editingVenue,
-        guest_count: parseInt(editingVenue.guest_count)
-      } : v));
+        guest_count: parseInt(editingVenue.guest_count),
+        maxCapacity: parseInt(editingVenue.guest_count) // keep maxCapacity in sync for User catalog
+      } : v);
+      setVenuesList(updated);
+      localStorage.setItem('venues_data', JSON.stringify(updated));
       showToast(`Venue details updated successfully`, 'success');
       setEditingVenue(null);
+    }
+  };
+
+  const handleAddUser = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await authFetch('/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newUserData)
+      });
+      if (res.ok) {
+        const addedUser = await res.json();
+        showToast(`User "${addedUser.name}" created successfully!`, 'success');
+        setUsersList(prev => [...prev, addedUser]);
+        setNewUserData({ name: '', email: '', password: '', role: 'user' });
+        setIsAddUserModalOpen(false);
+      } else {
+        const errData = await res.json();
+        showToast(errData.message || 'Error creating user', 'error');
+      }
+    } catch (err) {
+      showToast(err.message, 'error');
     }
   };
 
@@ -762,12 +1234,22 @@ export default function AdminDashboard() {
       name: newVenueData.name,
       location: newVenueData.location,
       event_type: newVenueData.event_type,
+      type: newVenueData.event_type.charAt(0).toUpperCase() + newVenueData.event_type.slice(1) + ' Venue', // sync type
       guest_count: parseInt(newVenueData.guest_count) || 200,
+      minCapacity: 50,
+      maxCapacity: parseInt(newVenueData.guest_count) || 200,
+      priceTier: '₹₹₹',
+      priceNum: 3,
+      rating: 4.5,
+      amenities: ['AC Hall', 'Parking'],
+      description: newVenueData.name + ' located in ' + newVenueData.location,
       status: newVenueData.status || 'active',
       created_at: newVenueData.created_at || new Date().toISOString(),
-      image: newVenueData.image || '/udaipur_palace.png'
+      image: resolveImage(newVenueData.image, 'venue', newVenueData.name)
     };
-    setVenuesList(prev => [newVenue, ...prev]);
+    const updated = [newVenue, ...venuesList];
+    setVenuesList(updated);
+    localStorage.setItem('venues_data', JSON.stringify(updated));
     showToast(`New venue "${newVenue.name}" added successfully`, 'success');
     setIsAddVenueModalOpen(false);
   };
@@ -775,7 +1257,9 @@ export default function AdminDashboard() {
   // Vendor Management Actions
   const handleToggleVendorStatus = (vendorId, currentStatus) => {
     const nextStatus = currentStatus === 'active' ? 'inactive' : 'active';
-    setVendorsList(prev => prev.map(v => v.id === vendorId ? { ...v, status: nextStatus } : v));
+    const updated = vendorsList.map(v => v.id === vendorId ? { ...v, status: nextStatus } : v);
+    setVendorsList(updated);
+    localStorage.setItem('vendors_data', JSON.stringify(updated));
     showToast(`Vendor status updated to ${nextStatus}`, 'success');
   };
 
@@ -783,16 +1267,20 @@ export default function AdminDashboard() {
     if (!window.confirm(`Are you sure you want to delete vendor "${name}"?`)) {
       return;
     }
-    setVendorsList(prev => prev.filter(v => v.id !== vendorId));
+    const updated = vendorsList.filter(v => v.id !== vendorId);
+    setVendorsList(updated);
+    localStorage.setItem('vendors_data', JSON.stringify(updated));
     showToast(`Deleted vendor "${name}"`, 'success');
   };
 
   const handleSaveVendor = (e) => {
     e.preventDefault();
     if (editingVendor) {
-      setVendorsList(prev => prev.map(v => v.id === editingVendor.id ? { 
+      const updated = vendorsList.map(v => v.id === editingVendor.id ? { 
         ...editingVendor
-      } : v));
+      } : v);
+      setVendorsList(updated);
+      localStorage.setItem('vendors_data', JSON.stringify(updated));
       showToast(`Vendor details updated successfully`, 'success');
       setEditingVendor(null);
     }
@@ -810,9 +1298,11 @@ export default function AdminDashboard() {
       email: data.email,
       status: data.status || 'active',
       created_at: data.created_at || new Date().toISOString(),
-      image: data.image || '/celebrate_collage1.png'
+      image: resolveImage(data.image, 'vendor', data.category)
     };
-    setVendorsList(prev => [newVendor, ...prev]);
+    const updated = [newVendor, ...vendorsList];
+    setVendorsList(updated);
+    localStorage.setItem('vendors_data', JSON.stringify(updated));
     showToast(`New vendor "${newVendor.name}" added successfully`, 'success');
     setIsAddVendorModalOpen(false);
   };
@@ -945,6 +1435,23 @@ export default function AdminDashboard() {
     );
   }
 
+  // Filtered lists for Dashboard Tab
+  const dashboardFilteredEvents = events.filter(e => {
+    if (!e.date) return true;
+    const eventDateStr = typeof e.date === 'string' && e.date.includes('T') ? e.date.split('T')[0] : e.date;
+    if (dashboardStartDate && eventDateStr < dashboardStartDate) return false;
+    if (dashboardEndDate && eventDateStr > dashboardEndDate) return false;
+    return true;
+  });
+
+  const dashboardFilteredUsers = usersList.filter(u => {
+    if (!u.created_at) return true;
+    const userDateStr = typeof u.created_at === 'string' && u.created_at.includes('T') ? u.created_at.split('T')[0] : u.created_at;
+    if (dashboardStartDate && userDateStr < dashboardStartDate) return false;
+    if (dashboardEndDate && userDateStr > dashboardEndDate) return false;
+    return true;
+  });
+
   // Seeding high-fidelity values exactly matching the system database data
   const displayEvents = events.length;
   const displayUsers = usersList.length;
@@ -954,6 +1461,41 @@ export default function AdminDashboard() {
     .filter(e => e.status === 'approved' || e.status === 'ongoing' || e.status === 'completed')
     .reduce((sum, e) => sum + parseFloat(e.budget || 0), 0);
   const displayRevenue = `₹ ${totalConfirmedRevenue.toLocaleString()}`;
+
+  const confirmedEvents = events.filter(e => e.status === 'approved' || e.status === 'ongoing' || e.status === 'completed');
+  const filteredConfirmedEvents = confirmedEvents.filter(e => {
+    if (!e.date) return true;
+    const eventDateStr = typeof e.date === 'string' && e.date.includes('T') ? e.date.split('T')[0] : e.date;
+    if (revenueChartStartDate && eventDateStr < revenueChartStartDate) return false;
+    if (revenueChartEndDate && eventDateStr > revenueChartEndDate) return false;
+    return true;
+  });
+  const totalConfirmedRev = filteredConfirmedEvents.reduce((sum, e) => sum + parseFloat(e.budget || 0), 0);
+  
+  const revByType = filteredConfirmedEvents.reduce((acc, e) => {
+    const type = (e.event_type || 'Other').toLowerCase();
+    let group = 'other';
+    if (type.includes('wed')) group = 'wedding';
+    else if (type.includes('corp') || type.includes('seminar') || type.includes('meet')) group = 'corporate';
+    else if (type.includes('party') || type.includes('birth')) group = 'party';
+    else if (type.includes('conf')) group = 'conference';
+    
+    acc[group] = (acc[group] || 0) + parseFloat(e.budget || 0);
+    return acc;
+  }, {});
+
+  const wedPct = totalConfirmedRev > 0 ? Math.round((revByType.wedding || 0) / totalConfirmedRev * 100) : 0;
+  const corpPct = totalConfirmedRev > 0 ? Math.round((revByType.corporate || 0) / totalConfirmedRev * 100) : 0;
+  const partyPct = totalConfirmedRev > 0 ? Math.round((revByType.party || 0) / totalConfirmedRev * 100) : 0;
+  const confPct = totalConfirmedRev > 0 ? Math.round((revByType.conference || 0) / totalConfirmedRev * 100) : 0;
+  const otherPct = totalConfirmedRev > 0 ? Math.max(0, 100 - wedPct - corpPct - partyPct - confPct) : 0;
+
+  const circ = 440;
+  const wedDashSize = (wedPct / 100) * circ;
+  const corpDashSize = (corpPct / 100) * circ;
+  const partyDashSize = (partyPct / 100) * circ;
+  const confDashSize = (confPct / 100) * circ;
+  const otherDashSize = (otherPct / 100) * circ;
 
   const getInitials = (name) => {
     if (!name) return 'U';
@@ -983,13 +1525,13 @@ export default function AdminDashboard() {
   const filteredUsers = usersList.filter(u => {
     const query = userSearchQuery.toLowerCase();
     const matchesSearch = 
-      u.name.toLowerCase().includes(query) ||
-      u.email.toLowerCase().includes(query) ||
+      (u.name || '').toLowerCase().includes(query) ||
+      (u.email || '').toLowerCase().includes(query) ||
       (u.phone && u.phone.includes(query));
 
     let matchesRole = true;
     if (userRoleFilter !== 'All') {
-      matchesRole = u.role.toLowerCase() === userRoleFilter.toLowerCase();
+      matchesRole = (u.role || '').toLowerCase() === userRoleFilter.toLowerCase();
     }
 
     let matchesStatus = true;
@@ -998,7 +1540,16 @@ export default function AdminDashboard() {
       matchesStatus = mappedStatus === userStatusFilter.toLowerCase();
     }
 
-    return matchesSearch && matchesRole && matchesStatus;
+    let matchesDate = true;
+    if (u.created_at) {
+      const userDateStr = typeof u.created_at === 'string' && u.created_at.includes('T') ? u.created_at.split('T')[0] : u.created_at;
+      if (userStartDate && userDateStr < userStartDate) matchesDate = false;
+      if (userEndDate && userDateStr > userEndDate) matchesDate = false;
+    } else if (userStartDate || userEndDate) {
+      matchesDate = false;
+    }
+
+    return matchesSearch && matchesRole && matchesStatus && matchesDate;
   });
 
   const userTotalPages = Math.max(1, Math.ceil(filteredUsers.length / userPageSize));
@@ -1008,10 +1559,18 @@ export default function AdminDashboard() {
   const userShowingFrom = filteredUsers.length === 0 ? 0 : userStartIndex + 1;
   const userShowingTo = Math.min(userStartIndex + userPageSize, filteredUsers.length);
 
-  const displayTotalUsersCount = usersList.length;
-  const displayActiveUsersCount = usersList.filter(u => u.status !== 'blocked').length;
-  const displayInactiveUsersCount = usersList.filter(u => u.status === 'blocked').length;
-  const displayNewUsersCount = usersList.filter(u => {
+  const dateFilteredUsers = usersList.filter(u => {
+    if (!u.created_at) return true;
+    const userDateStr = typeof u.created_at === 'string' && u.created_at.includes('T') ? u.created_at.split('T')[0] : u.created_at;
+    if (userStartDate && userDateStr < userStartDate) return false;
+    if (userEndDate && userDateStr > userEndDate) return false;
+    return true;
+  });
+
+  const displayTotalUsersCount = dateFilteredUsers.length;
+  const displayActiveUsersCount = dateFilteredUsers.filter(u => u.status !== 'blocked').length;
+  const displayInactiveUsersCount = dateFilteredUsers.filter(u => u.status === 'blocked').length;
+  const displayNewUsersCount = dateFilteredUsers.filter(u => {
     const d = new Date(u.created_at || Date.now());
     const now = new Date();
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
@@ -1021,20 +1580,29 @@ export default function AdminDashboard() {
   const filteredVenues = venuesList.filter(v => {
     const query = venueSearchQuery.toLowerCase();
     const matchesSearch = 
-      v.name.toLowerCase().includes(query) ||
-      v.location.toLowerCase().includes(query);
+      (v.name || '').toLowerCase().includes(query) ||
+      (v.location || '').toLowerCase().includes(query);
 
     let matchesStatus = true;
     if (venueStatusFilter !== 'All') {
-      matchesStatus = v.status.toLowerCase() === venueStatusFilter.toLowerCase();
+      matchesStatus = (v.status || 'active').toLowerCase() === venueStatusFilter.toLowerCase();
     }
 
     let matchesType = true;
     if (venueTypeFilter !== 'All') {
-      matchesType = v.event_type.toLowerCase() === venueTypeFilter.toLowerCase();
+      matchesType = (v.event_type || '').toLowerCase() === venueTypeFilter.toLowerCase();
     }
 
-    return matchesSearch && matchesStatus && matchesType;
+    let matchesDate = true;
+    if (v.created_at) {
+      const venueDateStr = typeof v.created_at === 'string' && v.created_at.includes('T') ? v.created_at.split('T')[0] : v.created_at;
+      if (venueStartDate && venueDateStr < venueStartDate) matchesDate = false;
+      if (venueEndDate && venueDateStr > venueEndDate) matchesDate = false;
+    } else if (venueStartDate || venueEndDate) {
+      matchesDate = false;
+    }
+
+    return matchesSearch && matchesStatus && matchesType && matchesDate;
   });
 
   const venueTotalPages = Math.max(1, Math.ceil(filteredVenues.length / venuePageSize));
@@ -1044,11 +1612,19 @@ export default function AdminDashboard() {
   const venueShowingFrom = filteredVenues.length === 0 ? 0 : venueStartIndex + 1;
   const venueShowingTo = Math.min(venueStartIndex + venuePageSize, filteredVenues.length);
 
+  const dateFilteredVenues = venuesList.filter(v => {
+    if (!v.created_at) return true;
+    const venueDateStr = typeof v.created_at === 'string' && v.created_at.includes('T') ? v.created_at.split('T')[0] : v.created_at;
+    if (venueStartDate && venueDateStr < venueStartDate) return false;
+    if (venueEndDate && venueDateStr > venueEndDate) return false;
+    return true;
+  });
+
   // Stats Counters calculated dynamically for Venues
-  const displayTotalVenues = venuesList.length;
-  const displayActiveVenues = venuesList.filter(v => v.status === 'active').length;
-  const displayInactiveVenues = venuesList.filter(v => v.status === 'inactive').length;
-  const displayNewVenues = venuesList.filter(v => {
+  const displayTotalVenues = dateFilteredVenues.length;
+  const displayActiveVenues = dateFilteredVenues.filter(v => v.status === 'active').length;
+  const displayInactiveVenues = dateFilteredVenues.filter(v => v.status === 'inactive').length;
+  const displayNewVenues = dateFilteredVenues.filter(v => {
     const d = new Date(v.created_at || Date.now());
     const now = new Date();
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
@@ -1058,22 +1634,31 @@ export default function AdminDashboard() {
   const filteredVendors = vendorsList.filter(v => {
     const query = vendorSearchQuery.toLowerCase();
     const matchesSearch = 
-      v.name.toLowerCase().includes(query) ||
+      (v.name || '').toLowerCase().includes(query) ||
       (v.contact_person && v.contact_person.toLowerCase().includes(query)) ||
       (v.email && v.email.toLowerCase().includes(query)) ||
       (v.phone && v.phone.includes(query));
 
     let matchesStatus = true;
     if (vendorStatusFilter !== 'All') {
-      matchesStatus = v.status.toLowerCase() === vendorStatusFilter.toLowerCase();
+      matchesStatus = (v.status || '').toLowerCase() === vendorStatusFilter.toLowerCase();
     }
 
     let matchesCategory = true;
     if (vendorCategoryFilter !== 'All') {
-      matchesCategory = v.category.toLowerCase() === vendorCategoryFilter.toLowerCase();
+      matchesCategory = (v.category || '').toLowerCase() === vendorCategoryFilter.toLowerCase();
     }
 
-    return matchesSearch && matchesStatus && matchesCategory;
+    let matchesDate = true;
+    if (v.created_at) {
+      const vendorDateStr = typeof v.created_at === 'string' && v.created_at.includes('T') ? v.created_at.split('T')[0] : v.created_at;
+      if (vendorStartDate && vendorDateStr < vendorStartDate) matchesDate = false;
+      if (vendorEndDate && vendorDateStr > vendorEndDate) matchesDate = false;
+    } else if (vendorStartDate || vendorEndDate) {
+      matchesDate = false;
+    }
+
+    return matchesSearch && matchesStatus && matchesCategory && matchesDate;
   });
 
   const vendorTotalPages = Math.max(1, Math.ceil(filteredVendors.length / vendorPageSize));
@@ -1083,11 +1668,19 @@ export default function AdminDashboard() {
   const vendorShowingFrom = filteredVendors.length === 0 ? 0 : vendorStartIndex + 1;
   const vendorShowingTo = Math.min(vendorStartIndex + vendorPageSize, filteredVendors.length);
 
+  const dateFilteredVendors = vendorsList.filter(v => {
+    if (!v.created_at) return true;
+    const vendorDateStr = typeof v.created_at === 'string' && v.created_at.includes('T') ? v.created_at.split('T')[0] : v.created_at;
+    if (vendorStartDate && vendorDateStr < vendorStartDate) return false;
+    if (vendorEndDate && vendorDateStr > vendorEndDate) return false;
+    return true;
+  });
+
   // Stats Counters calculated dynamically for Vendors
-  const displayTotalVendorsCount = vendorsList.length;
-  const displayActiveVendorsCount = vendorsList.filter(v => v.status === 'active').length;
-  const displayInactiveVendorsCount = vendorsList.filter(v => v.status === 'inactive').length;
-  const displayNewVendorsCount = vendorsList.filter(v => {
+  const displayTotalVendorsCount = dateFilteredVendors.length;
+  const displayActiveVendorsCount = dateFilteredVendors.filter(v => v.status === 'active').length;
+  const displayInactiveVendorsCount = dateFilteredVendors.filter(v => v.status === 'inactive').length;
+  const displayNewVendorsCount = dateFilteredVendors.filter(v => {
     const d = new Date(v.created_at || Date.now());
     const now = new Date();
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
@@ -1099,12 +1692,12 @@ export default function AdminDashboard() {
     
     // Find client name for the event from usersList
     const client = usersList.find(u => u.id === e.user_id);
-    const clientName = client ? client.name.toLowerCase() : 'system user';
+    const clientName = client ? (client.name || '').toLowerCase() : 'system user';
     
     const matchesSearch = 
-      e.title.toLowerCase().includes(query) ||
+      (e.title || '').toLowerCase().includes(query) ||
       clientName.includes(query) ||
-      e.location.toLowerCase().includes(query) ||
+      (e.location || '').toLowerCase().includes(query) ||
       (e.phone && e.phone.includes(query));
 
     // Status filter match (Confirmed, Pending, Cancelled)
@@ -1122,10 +1715,33 @@ export default function AdminDashboard() {
     // Category / Event Type filter match
     let matchesEvent = true;
     if (bookingEventFilter !== 'All') {
-      matchesEvent = e.event_type.toLowerCase() === bookingEventFilter.toLowerCase();
+      matchesEvent = (e.event_type || '').toLowerCase() === bookingEventFilter.toLowerCase();
     }
 
-    return matchesSearch && matchesStatus && matchesEvent;
+    let matchesDate = true;
+    if (bookingStartDate || bookingEndDate) {
+      const eventDateStr = typeof e.date === 'string' && e.date.includes('T') ? e.date.split('T')[0] : e.date;
+      
+      const eventDateObj = new Date(e.date);
+      const bookingDateObj = e.created_at ? new Date(e.created_at) : new Date(eventDateObj.getTime() - 44 * 24 * 60 * 60 * 1000);
+      const bookingDateStr = bookingDateObj.toISOString().split('T')[0];
+
+      let matchesBookingDate = true;
+      let matchesEventDate = true;
+
+      if (bookingStartDate) {
+        if (bookingDateStr < bookingStartDate) matchesBookingDate = false;
+        if (eventDateStr < bookingStartDate) matchesEventDate = false;
+      }
+      if (bookingEndDate) {
+        if (bookingDateStr > bookingEndDate) matchesBookingDate = false;
+        if (eventDateStr > bookingEndDate) matchesEventDate = false;
+      }
+      
+      matchesDate = matchesBookingDate || matchesEventDate;
+    }
+
+    return matchesSearch && matchesStatus && matchesEvent && matchesDate;
   });
 
   // Pagination bounds calculations for Bookings
@@ -1136,11 +1752,36 @@ export default function AdminDashboard() {
   const bookingShowingFrom = filteredBookings.length === 0 ? 0 : bookingStartIndex + 1;
   const bookingShowingTo = Math.min(bookingStartIndex + bookingPageSize, filteredBookings.length);
 
+  const dateFilteredBookings = events.filter(e => {
+    if (bookingStartDate || bookingEndDate) {
+      const eventDateStr = typeof e.date === 'string' && e.date.includes('T') ? e.date.split('T')[0] : e.date;
+      
+      const eventDateObj = new Date(e.date);
+      const bookingDateObj = e.created_at ? new Date(e.created_at) : new Date(eventDateObj.getTime() - 44 * 24 * 60 * 60 * 1000);
+      const bookingDateStr = bookingDateObj.toISOString().split('T')[0];
+
+      let matchesBookingDate = true;
+      let matchesEventDate = true;
+
+      if (bookingStartDate) {
+        if (bookingDateStr < bookingStartDate) matchesBookingDate = false;
+        if (eventDateStr < bookingStartDate) matchesEventDate = false;
+      }
+      if (bookingEndDate) {
+        if (bookingDateStr > bookingEndDate) matchesBookingDate = false;
+        if (eventDateStr > bookingEndDate) matchesEventDate = false;
+      }
+      
+      return matchesBookingDate || matchesEventDate;
+    }
+    return true;
+  });
+
   // Stats Counters calculated dynamically for Bookings
-  const displayTotalBookings = events.length;
-  const displayConfirmedBookings = events.filter(e => e.status === 'approved' || e.status === 'ongoing' || e.status === 'completed').length;
-  const displayPendingBookings = events.filter(e => e.status === 'pending' || e.status === 'planning').length;
-  const displayCancelledBookings = events.filter(e => e.status === 'cancelled').length;
+  const displayTotalBookings = dateFilteredBookings.length;
+  const displayConfirmedBookings = dateFilteredBookings.filter(e => e.status === 'approved' || e.status === 'ongoing' || e.status === 'completed').length;
+  const displayPendingBookings = dateFilteredBookings.filter(e => e.status === 'pending' || e.status === 'planning').length;
+  const displayCancelledBookings = dateFilteredBookings.filter(e => e.status === 'cancelled').length;
 
   const confirmedPercent = displayTotalBookings > 0 ? ((displayConfirmedBookings / displayTotalBookings) * 100).toFixed(2) : '0.00';
   const pendingPercent = displayTotalBookings > 0 ? ((displayPendingBookings / displayTotalBookings) * 100).toFixed(2) : '0.00';
@@ -1150,12 +1791,12 @@ export default function AdminDashboard() {
   const reportsFilteredEvents = events.filter(e => {
     let matchesEvent = true;
     if (reportEventFilter !== 'All') {
-      matchesEvent = e.event_type.toLowerCase() === reportEventFilter.toLowerCase();
+      matchesEvent = (e.event_type || '').toLowerCase() === reportEventFilter.toLowerCase();
     }
     
     let matchesVenue = true;
     if (reportVenueFilter !== 'All') {
-      matchesVenue = e.location.toLowerCase().includes(reportVenueFilter.toLowerCase());
+      matchesVenue = (e.location || '').toLowerCase().includes(reportVenueFilter.toLowerCase());
     }
 
     let matchesDate = true;
@@ -1218,7 +1859,7 @@ export default function AdminDashboard() {
     .slice(0, 5)
     .map((e) => ({
       name: e.title,
-      image: e.image || '/udaipur_palace.png',
+      image: resolveImage(e.image, 'event', e.event_type),
       bookingsCount: Math.max(1, Math.round(e.guest_count / 10))
     }));
 
@@ -1226,7 +1867,7 @@ export default function AdminDashboard() {
   const reportsTopVenues = [...venuesList]
     .map(v => ({
       name: v.name,
-      image: v.image || '/udaipur_palace.png',
+      image: resolveImage(v.image, 'venue', v.name),
       bookingsCount: venueBookingsMap[v.id] || 0
     }))
     .sort((a, b) => b.bookingsCount - a.bookingsCount)
@@ -1236,7 +1877,7 @@ export default function AdminDashboard() {
   const reportsTopVendors = [...vendorsList]
     .map(v => ({
       name: v.name,
-      image: v.image || '/celebrate_collage1.png',
+      image: resolveImage(v.image, 'vendor', v.category),
       category: v.category,
       bookingsCount: vendorBookingsMap[v.id] || 0
     }))
@@ -1248,9 +1889,9 @@ export default function AdminDashboard() {
     // Search query match
     const query = eventSearchQuery.toLowerCase();
     const matchesSearch = 
-      e.title.toLowerCase().includes(query) ||
-      e.event_type.toLowerCase().includes(query) ||
-      e.location.toLowerCase().includes(query);
+      (e.title || '').toLowerCase().includes(query) ||
+      (e.event_type || '').toLowerCase().includes(query) ||
+      (e.location || '').toLowerCase().includes(query);
 
     // Status filter match
     let matchesStatus = true;
@@ -1267,10 +1908,20 @@ export default function AdminDashboard() {
     // Type filter match
     let matchesType = true;
     if (eventTypeFilter !== 'All') {
-      matchesType = e.event_type.toLowerCase() === eventTypeFilter.toLowerCase();
+      matchesType = (e.event_type || '').toLowerCase() === eventTypeFilter.toLowerCase();
     }
 
-    return matchesSearch && matchesStatus && matchesType;
+    // Date filter match
+    let matchesDate = true;
+    if (e.date) {
+      const eventDateStr = typeof e.date === 'string' && e.date.includes('T') ? e.date.split('T')[0] : e.date;
+      if (eventStartDate && eventDateStr < eventStartDate) matchesDate = false;
+      if (eventEndDate && eventDateStr > eventEndDate) matchesDate = false;
+    } else if (eventStartDate || eventEndDate) {
+      matchesDate = false;
+    }
+
+    return matchesSearch && matchesStatus && matchesType && matchesDate;
   });
 
   // Pagination bounds calculations
@@ -1333,7 +1984,7 @@ export default function AdminDashboard() {
     // 3. Rating Filter
     let matchesRating = true;
     if (feedbackRatingFilter !== 'All') {
-      matchesRating = f.rating.toString() === feedbackRatingFilter.replace(' Stars', '').replace(' Star', '');
+      matchesRating = (f.rating || '').toString() === feedbackRatingFilter.replace(' Stars', '').replace(' Star', '');
     }
 
     // 4. Status Filter
@@ -1392,6 +2043,85 @@ export default function AdminDashboard() {
       initial: getInitials(u.name),
       color: getInitialsColor(getInitials(u.name))
     }));
+
+  const getChartData = () => {
+    let start, end;
+    if (!eventsChartStartDate || !eventsChartEndDate) {
+      if (events && events.length > 0) {
+        const dates = events.map(e => new Date(e.date)).filter(d => !isNaN(d.getTime()));
+        if (dates.length > 0) {
+          start = new Date(Math.min(...dates));
+          end = new Date(Math.max(...dates));
+          if (start.getTime() === end.getTime()) {
+            start = new Date(start.getTime() - 3 * 24 * 60 * 60 * 1000);
+            end = new Date(end.getTime() + 3 * 24 * 60 * 60 * 1000);
+          }
+        } else {
+          end = new Date();
+          start = new Date();
+          start.setDate(end.getDate() - 30);
+        }
+      } else {
+        end = new Date();
+        start = new Date();
+        start.setDate(end.getDate() - 30);
+      }
+    } else {
+      start = new Date(eventsChartStartDate);
+      end = new Date(eventsChartEndDate);
+    }
+    
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+    
+    const diffTime = end - start;
+    
+    // Generate 7 points
+    const points = [];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    for (let i = 0; i < 7; i++) {
+      let ptDate;
+      if (diffTime <= 0) {
+        ptDate = new Date(start);
+      } else {
+        ptDate = new Date(start.getTime() + (diffTime / 6) * i);
+      }
+      
+      const windowStart = new Date(ptDate);
+      windowStart.setHours(0, 0, 0, 0);
+      const windowEnd = new Date(ptDate);
+      windowEnd.setHours(23, 59, 59, 999);
+      
+      const count = events.filter(e => {
+        if (!e.date) return false;
+        const eDate = new Date(e.date);
+        return eDate >= windowStart && eDate <= windowEnd;
+      }).length;
+      
+      points.push({
+        label: `${ptDate.getDate()} ${months[ptDate.getMonth()]}`,
+        count: count
+      });
+    }
+    
+    const counts = points.map(p => p.count);
+    const maxVal = Math.max(...counts, 1);
+    
+    // Map to coordinates: x from 0 to 500, y from 40 to 160 (height 200)
+    const coords = points.map((p, idx) => {
+      const x = (500 / 6) * idx;
+      const height = 120; // safe height to avoid overflow inside svg
+      const y = 160 - (p.count / maxVal) * height;
+      return { x, y, count: p.count, label: p.label };
+    });
+    
+    return coords;
+  };
+
+  const chartCoords = getChartData();
+  const chartAreaPath = `M 0 ${chartCoords[0].y} ` + chartCoords.map(c => `L ${c.x} ${c.y}`).join(' ') + ` L 500 200 L 0 200 Z`;
+  const chartLinePath = `M 0 ${chartCoords[0].y} ` + chartCoords.map(c => `L ${c.x} ${c.y}`).join(' ');
 
   const timeAgo = (date) => {
     const seconds = Math.floor((new Date() - date) / 1000);
@@ -1526,7 +2256,7 @@ export default function AdminDashboard() {
         <div>
           <h1 className={`text-2xl font-bold tracking-tight ${isLight ? 'text-gray-900' : 'text-white'} flex items-center gap-2.5`}>
             <ShieldCheck className="w-7 h-7 text-indigo-600 dark:text-indigo-400" />
-            Admin Dashboard
+            Admin Panel
           </h1>
           <p className={`text-xs ${isLight ? 'text-gray-500' : 'text-gray-400'} mt-1`}>
             Manage events, moderate users, review Udaipur heritage venues, and analyze platform performance.
@@ -1555,11 +2285,141 @@ export default function AdminDashboard() {
             </div>
             
             {/* Date Picker Badge */}
-            <div className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-semibold ${
-              isLight ? 'bg-white border-gray-200 text-gray-700 shadow-sm' : 'bg-white/5 border-white/5 text-gray-300'
-            }`}>
-              <Calendar className="w-4 h-4 text-indigo-500 shrink-0" />
-              <span>20 May 2026 - 26 May 2026</span>
+            <div className="relative" ref={dashboardDatePickerRef}>
+              <button
+                type="button"
+                onClick={() => setIsDashboardDatePickerOpen(!isDashboardDatePickerOpen)}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-semibold cursor-pointer transition-all hover:opacity-90 ${
+                  isLight ? 'bg-white border-gray-200 text-gray-700 shadow-sm' : 'bg-white/5 border-white/5 text-gray-300'
+                }`}
+              >
+                <Calendar className="w-4 h-4 text-indigo-500 shrink-0" />
+                <span>{dashboardStartDate && dashboardEndDate ? `${formatEventDate(dashboardStartDate)} - ${formatEventDate(dashboardEndDate)}` : 'Select Date Range'}</span>
+                <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isDashboardDatePickerOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isDashboardDatePickerOpen && (
+                <div className={`absolute right-0 top-11 w-72 border rounded-2xl shadow-2xl p-4 z-50 animate-scale-up flex flex-col gap-3 text-left ${
+                  isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0f111a] border-white/10 text-gray-200'
+                }`}>
+                  <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>Select Date Range</span>
+                  
+                  {/* Preset ranges buttons */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const end = new Date();
+                        const start = new Date();
+                        start.setDate(end.getDate() - 7);
+                        setDashboardStartDate(start.toISOString().split('T')[0]);
+                        setDashboardEndDate(end.toISOString().split('T')[0]);
+                        setEventsChartRangeLabel('This Week');
+                        setRevenueChartRangeLabel('This Week');
+                        setIsDashboardDatePickerOpen(false);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-center border transition-all cursor-pointer ${
+                        isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/5 hover:bg-white/5 text-gray-300'
+                      }`}
+                    >
+                      Last 7 Days
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const end = new Date();
+                        const start = new Date();
+                        start.setDate(end.getDate() - 30);
+                        setDashboardStartDate(start.toISOString().split('T')[0]);
+                        setDashboardEndDate(end.toISOString().split('T')[0]);
+                        setEventsChartRangeLabel('Last 30 Days');
+                        setRevenueChartRangeLabel('Last 30 Days');
+                        setIsDashboardDatePickerOpen(false);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-center border transition-all cursor-pointer ${
+                        isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/5 hover:bg-white/5 text-gray-300'
+                      }`}
+                    >
+                      Last 30 Days
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const now = new Date();
+                        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+                        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                        setDashboardStartDate(start.toISOString().split('T')[0]);
+                        setDashboardEndDate(end.toISOString().split('T')[0]);
+                        setEventsChartRangeLabel('This Month');
+                        setRevenueChartRangeLabel('This Month');
+                        setIsDashboardDatePickerOpen(false);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-center border transition-all cursor-pointer ${
+                        isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/5 hover:bg-white/5 text-gray-300'
+                      }`}
+                    >
+                      This Month
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDashboardStartDate('');
+                        setDashboardEndDate('');
+                        setEventsChartRangeLabel('All Time');
+                        setRevenueChartRangeLabel('All Time');
+                        setIsDashboardDatePickerOpen(false);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-center border transition-all cursor-pointer ${
+                        isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/5 hover:bg-white/5 text-gray-300'
+                      }`}
+                    >
+                      Clear Range
+                    </button>
+                  </div>
+
+                  <div className={`border-t my-1 ${isLight ? 'border-gray-100' : 'border-white/5'}`} />
+
+                  {/* Custom date range inputs */}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-1">
+                      <label className={`text-[9px] font-bold uppercase ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>Start Date</label>
+                      <input
+                        type="date"
+                        value={dashboardStartDate}
+                        onChange={e => setDashboardStartDate(e.target.value)}
+                        className={`border rounded-xl text-xs py-2 px-3 focus:outline-none focus:border-indigo-500 font-semibold w-full ${
+                          isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
+                        }`}
+                        style={{ colorScheme: isLight ? 'light' : 'dark' }}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className={`text-[9px] font-bold uppercase ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>End Date</label>
+                      <input
+                        type="date"
+                        value={dashboardEndDate}
+                        onChange={e => setDashboardEndDate(e.target.value)}
+                        className={`border rounded-xl text-xs py-2 px-3 focus:outline-none focus:border-indigo-500 font-semibold w-full ${
+                          isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
+                        }`}
+                        style={{ colorScheme: isLight ? 'light' : 'dark' }}
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEventsChartRangeLabel('Custom');
+                      setRevenueChartRangeLabel('Custom');
+                      setIsDashboardDatePickerOpen(false);
+                    }}
+                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-2 px-4 rounded-xl transition-all cursor-pointer text-center font-semibold"
+                  >
+                    Apply Range
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1657,11 +2517,89 @@ export default function AdminDashboard() {
             }`}>
               <div className="flex justify-between items-center pb-2 border-b border-white/5">
                 <span className={`text-xs font-bold uppercase tracking-wider ${isLight ? 'text-gray-800' : 'text-gray-200'}`}>Events Overview</span>
-                <div className={`flex items-center gap-1 text-[10px] font-bold border px-2.5 py-1.5 rounded-lg cursor-pointer ${
-                  isLight ? 'border-gray-200 bg-gray-50 text-gray-700' : 'border-white/5 bg-white/5 text-gray-300'
-                }`}>
-                  <span>This Week</span>
-                  <ChevronDown className="w-3 h-3" />
+                <div className="relative" ref={eventsChartDropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsEventsChartDropdownOpen(!isEventsChartDropdownOpen)}
+                    className={`flex items-center gap-1 text-[10px] font-bold border px-2.5 py-1.5 rounded-lg cursor-pointer transition-all hover:opacity-90 ${
+                      isLight ? 'border-gray-200 bg-gray-50 text-gray-700' : 'border-white/5 bg-white/5 text-gray-300'
+                    }`}
+                  >
+                    <span>{eventsChartRangeLabel}</span>
+                    <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${isEventsChartDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {isEventsChartDropdownOpen && (
+                    <div className={`absolute right-0 top-9 w-40 border rounded-xl shadow-2xl p-2 z-40 animate-scale-up flex flex-col gap-1 text-left ${
+                      isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0f111a] border-white/10 text-gray-200'
+                    }`}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEventsChartStartDate('');
+                          setEventsChartEndDate('');
+                          setEventsChartRangeLabel('All Time');
+                          setIsEventsChartDropdownOpen(false);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold text-left hover:bg-indigo-500/10 hover:text-indigo-400 transition-all cursor-pointer ${
+                          isLight ? 'text-gray-700' : 'text-gray-200'
+                        }`}
+                      >
+                        All Time
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const end = new Date();
+                          const start = new Date();
+                          start.setDate(end.getDate() - 7);
+                          setEventsChartStartDate(start.toISOString().split('T')[0]);
+                          setEventsChartEndDate(end.toISOString().split('T')[0]);
+                          setEventsChartRangeLabel('This Week');
+                          setIsEventsChartDropdownOpen(false);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold text-left hover:bg-indigo-500/10 hover:text-indigo-400 transition-all cursor-pointer ${
+                          isLight ? 'text-gray-700' : 'text-gray-200'
+                        }`}
+                      >
+                        This Week
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const end = new Date();
+                          const start = new Date();
+                          start.setDate(end.getDate() - 30);
+                          setEventsChartStartDate(start.toISOString().split('T')[0]);
+                          setEventsChartEndDate(end.toISOString().split('T')[0]);
+                          setEventsChartRangeLabel('Last 30 Days');
+                          setIsEventsChartDropdownOpen(false);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold text-left hover:bg-indigo-500/10 hover:text-indigo-400 transition-all cursor-pointer ${
+                          isLight ? 'text-gray-700' : 'text-gray-200'
+                        }`}
+                      >
+                        Last 30 Days
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const now = new Date();
+                          const start = new Date(now.getFullYear(), now.getMonth(), 1);
+                          const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                          setEventsChartStartDate(start.toISOString().split('T')[0]);
+                          setEventsChartEndDate(end.toISOString().split('T')[0]);
+                          setEventsChartRangeLabel('This Month');
+                          setIsEventsChartDropdownOpen(false);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold text-left hover:bg-indigo-500/10 hover:text-indigo-400 transition-all cursor-pointer ${
+                          isLight ? 'text-gray-700' : 'text-gray-200'
+                        }`}
+                      >
+                        This Month
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1682,31 +2620,33 @@ export default function AdminDashboard() {
                   <line x1="0" y1="200" x2="500" y2="200" stroke={isLight ? "#e5e7eb" : "#ffffff"} strokeOpacity="0.1" strokeWidth="1" />
 
                   {/* Gradient Area under line */}
-                  <path d="M 0 147.5 L 83.33 110 L 166.66 121.25 L 250 68.75 L 333.33 87.5 L 416.66 147.5 L 500 125 L 500 200 L 0 200 Z" fill="url(#chart-glow)" />
+                  <path d={chartAreaPath} fill="url(#chart-glow)" />
 
                   {/* Smooth line */}
-                  <path d="M 0 147.5 L 83.33 110 L 166.66 121.25 L 250 68.75 L 333.33 87.5 L 416.66 147.5 L 500 125" fill="none" stroke="#8b5cf6" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d={chartLinePath} fill="none" stroke="#8b5cf6" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
 
-                  {/* Daily Circles */}
-                  <circle cx="0" cy="147.5" r="5" fill="#8b5cf6" stroke={isLight ? "#fff" : "#0d1117"} strokeWidth="1.5" />
-                  <circle cx="83.33" cy="110" r="5" fill="#8b5cf6" stroke={isLight ? "#fff" : "#0d1117"} strokeWidth="1.5" />
-                  <circle cx="166.66" cy="121.25" r="5" fill="#8b5cf6" stroke={isLight ? "#fff" : "#0d1117"} strokeWidth="1.5" />
-                  <circle cx="250" cy="68.75" r="5" fill="#8b5cf6" stroke={isLight ? "#fff" : "#0d1117"} strokeWidth="1.5" />
-                  <circle cx="333.33" cy="87.5" r="5" fill="#8b5cf6" stroke={isLight ? "#fff" : "#0d1117"} strokeWidth="1.5" />
-                  <circle cx="416.66" cy="147.5" r="5" fill="#8b5cf6" stroke={isLight ? "#fff" : "#0d1117"} strokeWidth="1.5" />
-                  <circle cx="500" cy="125" r="5" fill="#8b5cf6" stroke={isLight ? "#fff" : "#0d1117"} strokeWidth="1.5" />
+                  {/* Daily Circles and Value Labels */}
+                  {chartCoords.map((c, idx) => (
+                    <g key={idx}>
+                      <circle cx={c.x} cy={c.y} r="5" fill="#8b5cf6" stroke={isLight ? "#fff" : "#0d1117"} strokeWidth="1.5" />
+                      <text
+                        x={c.x}
+                        y={c.y - 10}
+                        textAnchor="middle"
+                        className={`text-[9px] font-extrabold ${isLight ? 'fill-gray-700' : 'fill-gray-300'}`}
+                      >
+                        {c.count}
+                      </text>
+                    </g>
+                  ))}
                 </svg>
               </div>
 
               {/* Chart Dates Legend */}
               <div className="flex justify-between items-center text-[9px] font-bold text-gray-500 uppercase px-1">
-                <span>20 May</span>
-                <span>21 May</span>
-                <span>22 May</span>
-                <span>23 May</span>
-                <span>24 May</span>
-                <span>25 May</span>
-                <span>26 May</span>
+                {chartCoords.map((c, idx) => (
+                  <span key={idx}>{c.label}</span>
+                ))}
               </div>
             </div>
 
@@ -1769,11 +2709,89 @@ export default function AdminDashboard() {
             }`}>
               <div className="flex justify-between items-center pb-2 border-b border-white/5">
                 <span className={`text-xs font-bold uppercase tracking-wider ${isLight ? 'text-gray-800' : 'text-gray-200'}`}>Revenue Overview</span>
-                <div className={`flex items-center gap-1 text-[10px] font-bold border px-2 py-1 rounded-lg cursor-pointer ${
-                  isLight ? 'border-gray-200 bg-gray-50 text-gray-700' : 'border-white/5 bg-white/5 text-gray-300'
-                }`}>
-                  <span>This Month</span>
-                  <ChevronDown className="w-3 h-3" />
+                <div className="relative" ref={revenueChartDropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsRevenueChartDropdownOpen(!isRevenueChartDropdownOpen)}
+                    className={`flex items-center gap-1 text-[10px] font-bold border px-2.5 py-1.5 rounded-lg cursor-pointer transition-all hover:opacity-90 ${
+                      isLight ? 'border-gray-200 bg-gray-50 text-gray-700' : 'border-white/5 bg-white/5 text-gray-300'
+                    }`}
+                  >
+                    <span>{revenueChartRangeLabel}</span>
+                    <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isRevenueChartDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {isRevenueChartDropdownOpen && (
+                    <div className={`absolute right-0 top-8 w-40 border rounded-xl shadow-2xl p-2 z-40 animate-scale-up flex flex-col gap-1 text-left ${
+                      isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0f111a] border-white/10 text-gray-200'
+                    }`}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRevenueChartStartDate('');
+                          setRevenueChartEndDate('');
+                          setRevenueChartRangeLabel('All Time');
+                          setIsRevenueChartDropdownOpen(false);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold text-left hover:bg-indigo-500/10 hover:text-indigo-400 transition-all cursor-pointer ${
+                          isLight ? 'text-gray-700' : 'text-gray-200'
+                        }`}
+                      >
+                        All Time
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const now = new Date();
+                          const start = new Date(now.getFullYear(), now.getMonth(), 1);
+                          const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                          setRevenueChartStartDate(start.toISOString().split('T')[0]);
+                          setRevenueChartEndDate(end.toISOString().split('T')[0]);
+                          setRevenueChartRangeLabel('This Month');
+                          setIsRevenueChartDropdownOpen(false);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold text-left hover:bg-indigo-500/10 hover:text-indigo-400 transition-all cursor-pointer ${
+                          isLight ? 'text-gray-700' : 'text-gray-200'
+                        }`}
+                      >
+                        This Month
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const end = new Date();
+                          const start = new Date();
+                          start.setDate(end.getDate() - 7);
+                          setRevenueChartStartDate(start.toISOString().split('T')[0]);
+                          setRevenueChartEndDate(end.toISOString().split('T')[0]);
+                          setRevenueChartRangeLabel('This Week');
+                          setIsRevenueChartDropdownOpen(false);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold text-left hover:bg-indigo-500/10 hover:text-indigo-400 transition-all cursor-pointer ${
+                          isLight ? 'text-gray-700' : 'text-gray-200'
+                        }`}
+                      >
+                        This Week
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const end = new Date();
+                          const start = new Date();
+                          start.setDate(end.getDate() - 30);
+                          setRevenueChartStartDate(start.toISOString().split('T')[0]);
+                          setRevenueChartEndDate(end.toISOString().split('T')[0]);
+                          setRevenueChartRangeLabel('Last 30 Days');
+                          setIsRevenueChartDropdownOpen(false);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold text-left hover:bg-indigo-500/10 hover:text-indigo-400 transition-all cursor-pointer ${
+                          isLight ? 'text-gray-700' : 'text-gray-200'
+                        }`}
+                      >
+                        Last 30 Days
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1781,22 +2799,35 @@ export default function AdminDashboard() {
               <div className="flex-1 flex flex-col items-center justify-center gap-4 py-2">
                 <div className="relative w-40 h-40 flex items-center justify-center">
                   <svg viewBox="0 0 200 200" className="w-full h-full overflow-visible transform rotate-[-90deg]">
-                    {/* Weddings: 45% (Size: 198, Offset: 0) */}
-                    <circle cx="100" cy="100" r="70" fill="transparent" stroke="#8b5cf6" strokeWidth="18" strokeDasharray="198 242" strokeDashoffset="0" strokeLinecap="round" />
-                    {/* Corporate: 25% (Size: 110, Offset: -198) */}
-                    <circle cx="100" cy="100" r="70" fill="transparent" stroke="#3b82f6" strokeWidth="18" strokeDasharray="110 330" strokeDashoffset="-198" strokeLinecap="round" />
-                    {/* Parties: 15% (Size: 66, Offset: -308) */}
-                    <circle cx="100" cy="100" r="70" fill="transparent" stroke="#10b981" strokeWidth="18" strokeDasharray="66 374" strokeDashoffset="-308" strokeLinecap="round" />
-                    {/* Conferences: 10% (Size: 44, Offset: -374) */}
-                    <circle cx="100" cy="100" r="70" fill="transparent" stroke="#f59e0b" strokeWidth="18" strokeDasharray="44 396" strokeDashoffset="-374" strokeLinecap="round" />
-                    {/* Others: 5% (Size: 22, Offset: -418) */}
-                    <circle cx="100" cy="100" r="70" fill="transparent" stroke="#6b7280" strokeWidth="18" strokeDasharray="22 418" strokeDashoffset="-418" strokeLinecap="round" />
+                    {/* Weddings */}
+                    {wedPct > 0 && (
+                      <circle cx="100" cy="100" r="70" fill="transparent" stroke="#8b5cf6" strokeWidth="18" strokeDasharray={`${wedDashSize} ${circ - wedDashSize}`} strokeDashoffset={0} strokeLinecap="round" />
+                    )}
+                    {/* Corporate */}
+                    {corpPct > 0 && (
+                      <circle cx="100" cy="100" r="70" fill="transparent" stroke="#3b82f6" strokeWidth="18" strokeDasharray={`${corpDashSize} ${circ - corpDashSize}`} strokeDashoffset={-wedDashSize} strokeLinecap="round" />
+                    )}
+                    {/* Parties */}
+                    {partyPct > 0 && (
+                      <circle cx="100" cy="100" r="70" fill="transparent" stroke="#10b981" strokeWidth="18" strokeDasharray={`${partyDashSize} ${circ - partyDashSize}`} strokeDashoffset={-(wedDashSize + corpDashSize)} strokeLinecap="round" />
+                    )}
+                    {/* Conferences */}
+                    {confPct > 0 && (
+                      <circle cx="100" cy="100" r="70" fill="transparent" stroke="#f59e0b" strokeWidth="18" strokeDasharray={`${confDashSize} ${circ - confDashSize}`} strokeDashoffset={-(wedDashSize + corpDashSize + partyDashSize)} strokeLinecap="round" />
+                    )}
+                    {/* Others */}
+                    {otherPct > 0 && (
+                      <circle cx="100" cy="100" r="70" fill="transparent" stroke="#6b7280" strokeWidth="18" strokeDasharray={`${otherDashSize} ${circ - otherDashSize}`} strokeDashoffset={-(wedDashSize + corpDashSize + partyDashSize + confDashSize)} strokeLinecap="round" />
+                    )}
+                    {totalConfirmedRev === 0 && (
+                      <circle cx="100" cy="100" r="70" fill="transparent" stroke={isLight ? "#e5e7eb" : "#374151"} strokeWidth="18" />
+                    )}
                   </svg>
                   
                   {/* Absolute Center Content */}
                   <div className="absolute flex flex-col items-center text-center leading-none">
                     <span className={`text-[9px] font-bold uppercase tracking-wider ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>Total Revenue</span>
-                    <span className={`text-sm font-extrabold mt-1.5 font-outfit ${isLight ? 'text-gray-900' : 'text-white'}`}>{displayRevenue}</span>
+                    <span className={`text-sm font-extrabold mt-1.5 font-outfit ${isLight ? 'text-gray-900' : 'text-white'}`}>₹ {totalConfirmedRev.toLocaleString()}</span>
                   </div>
                 </div>
 
@@ -1804,19 +2835,19 @@ export default function AdminDashboard() {
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 w-full text-[10px] font-bold px-1">
                   <div className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rounded bg-[#8b5cf6] shrink-0"></span>
-                    <span className={`${isLight ? 'text-gray-600' : 'text-gray-400'}`}>Weddings: 45%</span>
+                    <span className={`${isLight ? 'text-gray-600' : 'text-gray-400'}`}>Weddings: {wedPct}%</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rounded bg-[#3b82f6] shrink-0"></span>
-                    <span className={`${isLight ? 'text-gray-600' : 'text-gray-400'}`}>Corp: 25%</span>
+                    <span className={`${isLight ? 'text-gray-600' : 'text-gray-400'}`}>Corp: {corpPct}%</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rounded bg-[#10b981] shrink-0"></span>
-                    <span className={`${isLight ? 'text-gray-600' : 'text-gray-400'}`}>Parties: 15%</span>
+                    <span className={`${isLight ? 'text-gray-600' : 'text-gray-400'}`}>Parties: {partyPct}%</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rounded bg-[#f59e0b] shrink-0"></span>
-                    <span className={`${isLight ? 'text-gray-600' : 'text-gray-400'}`}>Conf: 10%</span>
+                    <span className={`${isLight ? 'text-gray-600' : 'text-gray-400'}`}>Conf: {confPct}%</span>
                   </div>
                 </div>
               </div>
@@ -1940,11 +2971,6 @@ export default function AdminDashboard() {
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
             <div>
               <h2 className={`text-xl font-extrabold ${isLight ? 'text-gray-900' : 'text-white'}`}>Events</h2>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-500 mt-1 uppercase tracking-wider">
-                <span>Dashboard</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-                <span className="text-indigo-600 dark:text-indigo-400">Events</span>
-              </div>
             </div>
             
             <button
@@ -2080,20 +3106,144 @@ export default function AdminDashboard() {
             </div>
 
             {/* Date Picker Button */}
-            <div className={`flex items-center gap-2 px-3.5 py-3 rounded-xl border text-xs font-semibold cursor-pointer w-full sm:w-auto justify-center ${
-              isLight ? 'bg-white border-gray-200 text-gray-700 shadow-sm hover:bg-gray-50' : 'bg-white/5 border-white/5 text-gray-300 hover:bg-white/8'
-            }`}>
-              <Calendar className="w-4 h-4 text-indigo-500 shrink-0" />
-              <span>Select Date Range</span>
-            </div>
+            <div className="relative w-full sm:w-auto" ref={eventDatePickerRef}>
+              <button
+                type="button"
+                onClick={() => setIsEventDatePickerOpen(!isEventDatePickerOpen)}
+                className={`flex items-center gap-2 px-3.5 py-3 rounded-xl border text-xs font-semibold cursor-pointer w-full sm:w-auto justify-center transition-all hover:opacity-90 ${
+                  isLight ? 'bg-white border-gray-200 text-gray-700 shadow-sm' : 'bg-white/5 border-white/5 text-gray-300'
+                }`}
+              >
+                <Calendar className="w-4 h-4 text-indigo-500 shrink-0" />
+                <span>
+                  {eventStartDate || eventEndDate
+                    ? `${eventStartDate ? formatEventDate(eventStartDate) : '...'} - ${eventEndDate ? formatEventDate(eventEndDate) : '...'}`
+                    : 'Select Date Range'}
+                </span>
+                <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isEventDatePickerOpen ? 'rotate-180' : ''}`} />
+              </button>
 
-            {/* Filter Toggle Button */}
-            <button className={`flex items-center gap-2 px-4 py-3 rounded-xl border text-xs font-semibold cursor-pointer w-full sm:w-auto justify-center ${
-              isLight ? 'bg-white border-gray-200 text-gray-700 shadow-sm hover:bg-gray-50' : 'bg-white/5 border-white/5 text-gray-300 hover:bg-white/8'
-            }`}>
-              <Sliders className="w-4 h-4 text-indigo-500 shrink-0" />
-              <span>Filter</span>
-            </button>
+              {isEventDatePickerOpen && (
+                <div className={`absolute right-0 top-13 w-72 border rounded-2xl shadow-2xl p-4 z-50 animate-scale-up flex flex-col gap-3 text-left ${
+                  isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0f111a] border-white/10 text-gray-200'
+                }`}>
+                  <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>Select Event Date Range</span>
+                  
+                  {/* Preset ranges buttons */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const end = new Date();
+                        const start = new Date();
+                        start.setDate(end.getDate() - 7);
+                        setEventStartDate(start.toISOString().split('T')[0]);
+                        setEventEndDate(end.toISOString().split('T')[0]);
+                        setIsEventDatePickerOpen(false);
+                        setEventCurrentPage(1);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-center border transition-all cursor-pointer ${
+                        isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/5 hover:bg-white/5 text-gray-300'
+                      }`}
+                    >
+                      Last 7 Days
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const end = new Date();
+                        const start = new Date();
+                        start.setDate(end.getDate() - 30);
+                        setEventStartDate(start.toISOString().split('T')[0]);
+                        setEventEndDate(end.toISOString().split('T')[0]);
+                        setIsEventDatePickerOpen(false);
+                        setEventCurrentPage(1);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-center border transition-all cursor-pointer ${
+                        isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/5 hover:bg-white/5 text-gray-300'
+                      }`}
+                    >
+                      Last 30 Days
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const now = new Date();
+                        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+                        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                        setEventStartDate(start.toISOString().split('T')[0]);
+                        setEventEndDate(end.toISOString().split('T')[0]);
+                        setIsEventDatePickerOpen(false);
+                        setEventCurrentPage(1);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-center border transition-all cursor-pointer ${
+                        isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/5 hover:bg-white/5 text-gray-300'
+                      }`}
+                    >
+                      This Month
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEventStartDate('');
+                        setEventEndDate('');
+                        setIsEventDatePickerOpen(false);
+                        setEventCurrentPage(1);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-center border transition-all cursor-pointer ${
+                        isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/5 hover:bg-white/5 text-gray-300'
+                      }`}
+                    >
+                      Clear Range
+                    </button>
+                  </div>
+
+                  <div className={`border-t my-1 ${isLight ? 'border-gray-100' : 'border-white/5'}`} />
+
+                  {/* Custom date range inputs */}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-1">
+                      <label className={`text-[9px] font-bold uppercase ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>Start Date</label>
+                      <input
+                        type="date"
+                        value={eventStartDate}
+                        onChange={e => {
+                          setEventStartDate(e.target.value);
+                          setEventCurrentPage(1);
+                        }}
+                        className={`border rounded-xl text-xs py-2 px-3 focus:outline-none focus:border-indigo-500 font-semibold w-full ${
+                          isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
+                        }`}
+                        style={{ colorScheme: isLight ? 'light' : 'dark' }}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className={`text-[9px] font-bold uppercase ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>End Date</label>
+                      <input
+                        type="date"
+                        value={eventEndDate}
+                        onChange={e => {
+                          setEventEndDate(e.target.value);
+                          setEventCurrentPage(1);
+                        }}
+                        className={`border rounded-xl text-xs py-2 px-3 focus:outline-none focus:border-indigo-500 font-semibold w-full ${
+                          isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
+                        }`}
+                        style={{ colorScheme: isLight ? 'light' : 'dark' }}
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsEventDatePickerOpen(false)}
+                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-2 px-4 rounded-xl transition-all cursor-pointer text-center font-semibold"
+                  >
+                    Apply & Close
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
 
@@ -2133,11 +3283,11 @@ export default function AdminDashboard() {
 
                     // Format Date and Time
                     const formattedDate = formatEventDate(e.date);
-                    const formattedTime = formatEventTime(e.date);
+                    const formattedTime = formatEventTime(e.time || e.date);
 
                     // Event Type badge class
                     const getEventTypeStyle = (type) => {
-                      const t = type.toLowerCase();
+                      const t = (type || '').toLowerCase();
                       if (t === 'wedding') {
                         return 'bg-purple-100 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400';
                       } else if (t === 'corporate') {
@@ -2156,7 +3306,7 @@ export default function AdminDashboard() {
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="w-11 h-11 rounded-lg overflow-hidden shrink-0 bg-gray-100 border border-gray-200/50 dark:bg-white/5 dark:border-white/5">
-                              <img src={e.image || '/udaipur_palace.png'} alt={e.title} className="w-full h-full object-cover" />
+                              <img src={resolveImage(e.image, 'event', e.event_type)} alt={e.title} className="w-full h-full object-cover" />
                             </div>
                             <span className={`font-bold truncate text-left ${isLight ? 'text-gray-900' : 'text-white'}`}>{e.title}</span>
                           </div>
@@ -2165,7 +3315,7 @@ export default function AdminDashboard() {
                         {/* Event Type Badge */}
                         <td className="py-4 px-4">
                           <span className={`text-[11px] font-bold px-3 py-1 rounded-lg ${getEventTypeStyle(e.event_type)}`}>
-                            {e.event_type.charAt(0).toUpperCase() + e.event_type.slice(1)}
+                            {(e.event_type || 'Other').charAt(0).toUpperCase() + (e.event_type || 'Other').slice(1)}
                           </span>
                         </td>
 
@@ -2192,9 +3342,9 @@ export default function AdminDashboard() {
 
                         {/* Actions Button Columns */}
                         <td className="py-4 px-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center justify-end gap-2 relative">
                             <button
-                              onClick={() => router.push(`/events/${e.id}`)}
+                              onClick={() => setViewingEventDetails(e)}
                               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
                                 isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/10 hover:bg-white/5 text-gray-300'
                               }`}
@@ -2211,11 +3361,67 @@ export default function AdminDashboard() {
                               <Edit className="w-3.5 h-3.5" />
                               <span>Edit</span>
                             </button>
-                            <button className={`p-1.5 rounded-lg border cursor-pointer ${
-                              isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/10 hover:bg-white/5 text-gray-400'
-                            }`}>
+                            <button
+                              onClick={() => setActiveEventMenuId(activeEventMenuId === e.id ? null : e.id)}
+                              className={`p-1.5 rounded-lg border cursor-pointer ${
+                                isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/10 hover:bg-white/5 text-gray-400'
+                              }`}
+                            >
                               <MoreVertical className="w-3.5 h-3.5" />
                             </button>
+
+                            {/* Dropdown Options popover menu */}
+                            {activeEventMenuId === e.id && (
+                              <div className="absolute right-0 top-10 w-44 glass-panel border rounded-xl shadow-2xl p-2 z-50 animate-scale-up flex flex-col text-left">
+                                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider px-2 py-1">Moderate Event</span>
+                                
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleUpdateEventStatus(e.id, 'approved');
+                                    setActiveEventMenuId(null);
+                                  }}
+                                  className="w-full text-left px-2 py-1.5 rounded-lg text-xs font-semibold text-gray-300 hover:bg-white/5 hover:text-white transition-all cursor-pointer"
+                                >
+                                  ✔️ Approve Event
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleUpdateEventStatus(e.id, 'pending');
+                                    setActiveEventMenuId(null);
+                                  }}
+                                  className="w-full text-left px-2 py-1.5 rounded-lg text-xs font-semibold text-gray-300 hover:bg-white/5 hover:text-white transition-all cursor-pointer"
+                                >
+                                  ⏳ Mark as Pending
+                                </button>
+
+                                <div className="border-t border-white/5 my-1" />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleUpdateEventStatus(e.id, 'cancelled');
+                                    setActiveEventMenuId(null);
+                                  }}
+                                  className="w-full text-left px-2 py-1.5 rounded-lg text-xs font-semibold text-rose-450 hover:bg-rose-500/10 hover:text-rose-400 transition-all cursor-pointer"
+                                >
+                                  ❌ Cancel Event
+                                </button>
+
+                                <div className="border-t border-white/5 my-1" />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleDeleteEvent(e.id, e.title);
+                                    setActiveEventMenuId(null);
+                                  }}
+                                  className="w-full text-left px-2 py-1.5 rounded-lg text-xs font-semibold text-rose-450 hover:bg-rose-500/10 hover:text-rose-400 transition-all cursor-pointer"
+                                >
+                                  🗑️ Delete Event
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </td>
 
@@ -2309,15 +3515,10 @@ export default function AdminDashboard() {
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
             <div>
               <h2 className={`text-xl font-extrabold ${isLight ? 'text-gray-900' : 'text-white'}`}>Users</h2>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-500 mt-1 uppercase tracking-wider">
-                <span>Dashboard</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-                <span className="text-indigo-600 dark:text-indigo-400">Users</span>
-              </div>
             </div>
             
             <button
-              onClick={() => showToast('Add New User feature coming soon!', 'info')}
+              onClick={() => setIsAddUserModalOpen(true)}
               className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-3 px-4.5 rounded-xl transition-all shadow-lg shadow-indigo-600/15 cursor-pointer flex items-center gap-2"
             >
               <Plus className="w-4.5 h-4.5 shrink-0" />
@@ -2455,20 +3656,144 @@ export default function AdminDashboard() {
             </div>
 
             {/* Date Picker Button */}
-            <div className={`flex items-center gap-2 px-3.5 py-3 rounded-xl border text-xs font-semibold cursor-pointer w-full sm:w-auto justify-center ${
-              isLight ? 'bg-white border-gray-200 text-gray-700 shadow-sm hover:bg-gray-50' : 'bg-white/5 border-white/5 text-gray-300 hover:bg-white/8'
-            }`}>
-              <Calendar className="w-4 h-4 text-indigo-500 shrink-0" />
-              <span>Select Date Range</span>
-            </div>
+            <div className="relative w-full sm:w-auto" ref={userDataPickerRef}>
+              <button
+                type="button"
+                onClick={() => setIsUserDatePickerOpen(!isUserDatePickerOpen)}
+                className={`flex items-center gap-2 px-3.5 py-3 rounded-xl border text-xs font-semibold cursor-pointer w-full sm:w-auto justify-center transition-all hover:opacity-90 ${
+                  isLight ? 'bg-white border-gray-200 text-gray-700 shadow-sm' : 'bg-white/5 border-white/5 text-gray-300'
+                }`}
+              >
+                <Calendar className="w-4 h-4 text-indigo-500 shrink-0" />
+                <span>
+                  {userStartDate || userEndDate
+                    ? `${userStartDate ? formatEventDate(userStartDate) : '...'} - ${userEndDate ? formatEventDate(userEndDate) : '...'}`
+                    : 'Select Date Range'}
+                </span>
+                <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isUserDatePickerOpen ? 'rotate-180' : ''}`} />
+              </button>
 
-            {/* Filter Toggle Button */}
-            <button className={`flex items-center gap-2 px-4 py-3 rounded-xl border text-xs font-semibold cursor-pointer w-full sm:w-auto justify-center ${
-              isLight ? 'bg-white border-gray-200 text-gray-700 shadow-sm hover:bg-gray-50' : 'bg-white/5 border-white/5 text-gray-300 hover:bg-white/8'
-            }`}>
-              <Sliders className="w-4 h-4 text-indigo-500 shrink-0" />
-              <span>Filter</span>
-            </button>
+              {isUserDatePickerOpen && (
+                <div className={`absolute right-0 top-13 w-72 border rounded-2xl shadow-2xl p-4 z-50 animate-scale-up flex flex-col gap-3 text-left ${
+                  isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0f111a] border-white/10 text-gray-200'
+                }`}>
+                  <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>Select User Date Range</span>
+                  
+                  {/* Preset ranges buttons */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const end = new Date();
+                        const start = new Date();
+                        start.setDate(end.getDate() - 7);
+                        setUserStartDate(start.toISOString().split('T')[0]);
+                        setUserEndDate(end.toISOString().split('T')[0]);
+                        setIsUserDatePickerOpen(false);
+                        setUserCurrentPage(1);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-center border transition-all cursor-pointer ${
+                        isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/5 hover:bg-white/5 text-gray-300'
+                      }`}
+                    >
+                      Last 7 Days
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const end = new Date();
+                        const start = new Date();
+                        start.setDate(end.getDate() - 30);
+                        setUserStartDate(start.toISOString().split('T')[0]);
+                        setUserEndDate(end.toISOString().split('T')[0]);
+                        setIsUserDatePickerOpen(false);
+                        setUserCurrentPage(1);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-center border transition-all cursor-pointer ${
+                        isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/5 hover:bg-white/5 text-gray-300'
+                      }`}
+                    >
+                      Last 30 Days
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const now = new Date();
+                        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+                        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                        setUserStartDate(start.toISOString().split('T')[0]);
+                        setUserEndDate(end.toISOString().split('T')[0]);
+                        setIsUserDatePickerOpen(false);
+                        setUserCurrentPage(1);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-center border transition-all cursor-pointer ${
+                        isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/5 hover:bg-white/5 text-gray-300'
+                      }`}
+                    >
+                      This Month
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUserStartDate('');
+                        setUserEndDate('');
+                        setIsUserDatePickerOpen(false);
+                        setUserCurrentPage(1);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-center border transition-all cursor-pointer ${
+                        isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/5 hover:bg-white/5 text-gray-300'
+                      }`}
+                    >
+                      Clear Range
+                    </button>
+                  </div>
+
+                  <div className={`border-t my-1 ${isLight ? 'border-gray-100' : 'border-white/5'}`} />
+
+                  {/* Custom date range inputs */}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-1">
+                      <label className={`text-[9px] font-bold uppercase ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>Start Date</label>
+                      <input
+                        type="date"
+                        value={userStartDate}
+                        onChange={e => {
+                          setUserStartDate(e.target.value);
+                          setUserCurrentPage(1);
+                        }}
+                        className={`border rounded-xl text-xs py-2 px-3 focus:outline-none focus:border-indigo-500 font-semibold w-full ${
+                          isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
+                        }`}
+                        style={{ colorScheme: isLight ? 'light' : 'dark' }}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className={`text-[9px] font-bold uppercase ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>End Date</label>
+                      <input
+                        type="date"
+                        value={userEndDate}
+                        onChange={e => {
+                          setUserEndDate(e.target.value);
+                          setUserCurrentPage(1);
+                        }}
+                        className={`border rounded-xl text-xs py-2 px-3 focus:outline-none focus:border-indigo-500 font-semibold w-full ${
+                          isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
+                        }`}
+                        style={{ colorScheme: isLight ? 'light' : 'dark' }}
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsUserDatePickerOpen(false)}
+                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-2 px-4 rounded-xl transition-all cursor-pointer text-center font-semibold"
+                  >
+                    Apply Range
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Users Ledger Table Container */}
@@ -2502,9 +3827,9 @@ export default function AdminDashboard() {
                       ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
                       : 'bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400';
 
-                    const roleColor = u.role.toLowerCase() === 'admin'
+                    const roleColor = (u.role || '').toLowerCase() === 'admin'
                       ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
-                      : u.role.toLowerCase() === 'vendor'
+                      : (u.role || '').toLowerCase() === 'vendor'
                         ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400'
                         : 'bg-purple-100 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400';
 
@@ -2520,9 +3845,17 @@ export default function AdminDashboard() {
                         {/* Name with initials avatar */}
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-3 min-w-0">
-                            <div className={`w-8 h-8 rounded-full border flex items-center justify-center font-bold text-xs shrink-0 ${initialsColorClass}`}>
-                              {initials}
-                            </div>
+                            {u.avatar ? (
+                              <img
+                                src={u.avatar}
+                                alt={u.name}
+                                className="w-8 h-8 rounded-full object-cover shrink-0 border border-white/10"
+                              />
+                            ) : (
+                              <div className={`w-8 h-8 rounded-full border flex items-center justify-center font-bold text-xs shrink-0 ${initialsColorClass}`}>
+                                {initials}
+                              </div>
+                            )}
                             <span className={`font-bold truncate text-left ${isLight ? 'text-gray-900' : 'text-white'}`}>
                               {u.name}
                             </span>
@@ -2540,7 +3873,7 @@ export default function AdminDashboard() {
                         </td>
 
                         {/* Phone */}
-                        <td className="py-4 px-4 text-left font-medium">{u.phone || '+91 98765 43210'}</td>
+                        <td className="py-4 px-4 text-left font-medium">{u.phone || '-'}</td>
 
                         {/* Status badge */}
                         <td className="py-4 px-4 text-left">
@@ -2558,7 +3891,7 @@ export default function AdminDashboard() {
                         <td className="py-4 px-4 text-right">
                           <div className="flex items-center justify-end gap-2 relative">
                             <button
-                              onClick={() => showToast(`Viewing profile of ${u.name}`, 'info')}
+                              onClick={() => setViewingUserProfile(u)}
                               className={`flex items-center justify-center p-1.5 rounded-lg border cursor-pointer ${
                                 isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/10 hover:bg-white/5 text-gray-300'
                               }`}
@@ -2738,11 +4071,6 @@ export default function AdminDashboard() {
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
             <div>
               <h2 className={`text-xl font-extrabold ${isLight ? 'text-gray-900' : 'text-white'}`}>Venues</h2>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-500 mt-1 uppercase tracking-wider">
-                <span>Dashboard</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-                <span className="text-indigo-600 dark:text-indigo-400">Venues</span>
-              </div>
             </div>
             
             <button
@@ -2753,7 +4081,7 @@ export default function AdminDashboard() {
                   event_type: 'hotel',
                   guest_count: 200,
                   status: 'active',
-                  image: '/udaipur_palace.png'
+                  image: '/leela_palace.jpg'
                 });
                 setIsAddVenueModalOpen(true);
               }}
@@ -2895,20 +4223,146 @@ export default function AdminDashboard() {
             </div>
 
             {/* Date Picker Button */}
-            <div className={`flex items-center gap-2 px-3.5 py-3 rounded-xl border text-xs font-semibold cursor-pointer w-full sm:w-auto justify-center ${
-              isLight ? 'bg-white border-gray-200 text-gray-700 shadow-sm hover:bg-gray-50' : 'bg-white/5 border-white/5 text-gray-300 hover:bg-white/8'
-            }`}>
-              <Calendar className="w-4 h-4 text-indigo-500 shrink-0" />
-              <span>Select Date Range</span>
+            <div className="relative w-full sm:w-auto" ref={venueDatePickerRef}>
+              <button
+                type="button"
+                onClick={() => setIsVenueDatePickerOpen(!isVenueDatePickerOpen)}
+                className={`flex items-center gap-2 px-3.5 py-3 rounded-xl border text-xs font-semibold cursor-pointer w-full sm:w-auto justify-center transition-all hover:opacity-90 ${
+                  isLight ? 'bg-white border-gray-200 text-gray-700 shadow-sm' : 'bg-white/5 border-white/5 text-gray-300'
+                }`}
+              >
+                <Calendar className="w-4 h-4 text-indigo-500 shrink-0" />
+                <span>
+                  {venueStartDate || venueEndDate
+                    ? `${venueStartDate ? formatEventDate(venueStartDate) : '...'} - ${venueEndDate ? formatEventDate(venueEndDate) : '...'}`
+                    : 'Select Date Range'}
+                </span>
+                <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isVenueDatePickerOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isVenueDatePickerOpen && (
+                <div className={`absolute right-0 top-13 w-72 border rounded-2xl shadow-2xl p-4 z-50 animate-scale-up flex flex-col gap-3 text-left ${
+                  isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0f111a] border-white/10 text-gray-200'
+                }`}>
+                  <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>Select Venue Date Range</span>
+                  
+                  {/* Preset ranges buttons */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const end = new Date();
+                        const start = new Date();
+                        start.setDate(end.getDate() - 7);
+                        setVenueStartDate(start.toISOString().split('T')[0]);
+                        setVenueEndDate(end.toISOString().split('T')[0]);
+                        setIsVenueDatePickerOpen(false);
+                        setVenueCurrentPage(1);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-center border transition-all cursor-pointer ${
+                        isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/5 hover:bg-white/5 text-gray-300'
+                      }`}
+                    >
+                      Last 7 Days
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const end = new Date();
+                        const start = new Date();
+                        start.setDate(end.getDate() - 30);
+                        setVenueStartDate(start.toISOString().split('T')[0]);
+                        setVenueEndDate(end.toISOString().split('T')[0]);
+                        setIsVenueDatePickerOpen(false);
+                        setVenueCurrentPage(1);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-center border transition-all cursor-pointer ${
+                        isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/5 hover:bg-white/5 text-gray-300'
+                      }`}
+                    >
+                      Last 30 Days
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const now = new Date();
+                        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+                        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                        setVenueStartDate(start.toISOString().split('T')[0]);
+                        setVenueEndDate(end.toISOString().split('T')[0]);
+                        setIsVenueDatePickerOpen(false);
+                        setVenueCurrentPage(1);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-center border transition-all cursor-pointer ${
+                        isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/5 hover:bg-white/5 text-gray-300'
+                      }`}
+                    >
+                      This Month
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setVenueStartDate('');
+                        setVenueEndDate('');
+                        setIsVenueDatePickerOpen(false);
+                        setVenueCurrentPage(1);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-center border transition-all cursor-pointer ${
+                        isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/5 hover:bg-white/5 text-gray-300'
+                      }`}
+                    >
+                      Clear Range
+                    </button>
+                  </div>
+
+                  <div className={`border-t my-1 ${isLight ? 'border-gray-100' : 'border-white/5'}`} />
+
+                  {/* Custom date range inputs */}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-1">
+                      <label className={`text-[9px] font-bold uppercase ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>Start Date</label>
+                      <input
+                        type="date"
+                        value={venueStartDate}
+                        onChange={e => {
+                          setVenueStartDate(e.target.value);
+                          setVenueCurrentPage(1);
+                        }}
+                        className={`border rounded-xl text-xs py-2 px-3 focus:outline-none focus:border-indigo-500 font-semibold w-full ${
+                          isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
+                        }`}
+                        style={{ colorScheme: isLight ? 'light' : 'dark' }}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className={`text-[9px] font-bold uppercase ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>End Date</label>
+                      <input
+                        type="date"
+                        value={venueEndDate}
+                        onChange={e => {
+                          setVenueEndDate(e.target.value);
+                          setVenueCurrentPage(1);
+                        }}
+                        className={`border rounded-xl text-xs py-2 px-3 focus:outline-none focus:border-indigo-500 font-semibold w-full ${
+                          isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
+                        }`}
+                        style={{ colorScheme: isLight ? 'light' : 'dark' }}
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsVenueDatePickerOpen(false)}
+                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-2 px-4 rounded-xl transition-all cursor-pointer text-center font-semibold"
+                  >
+                    Apply & Close
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* Filter Toggle Button */}
-            <button className={`flex items-center gap-2 px-4 py-3 rounded-xl border text-xs font-semibold cursor-pointer w-full sm:w-auto justify-center ${
-              isLight ? 'bg-white border-gray-200 text-gray-700 shadow-sm hover:bg-gray-50' : 'bg-white/5 border-white/5 text-gray-300 hover:bg-white/8'
-            }`}>
-              <Sliders className="w-4 h-4 text-indigo-500 shrink-0" />
-              <span>Filter</span>
-            </button>
+
           </div>
 
           {/* Venues Ledger Table Container */}
@@ -2940,11 +4394,11 @@ export default function AdminDashboard() {
                       ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
                       : 'bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400';
 
-                    const typeColor = v.event_type.toLowerCase() === 'palace'
+                    const typeColor = (v.event_type || '').toLowerCase() === 'palace'
                       ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
-                      : v.event_type.toLowerCase() === 'resort'
+                      : (v.event_type || '').toLowerCase() === 'resort'
                         ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
-                        : v.event_type.toLowerCase() === 'banquet'
+                        : (v.event_type || '').toLowerCase() === 'banquet'
                           ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400'
                           : 'bg-purple-100 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400';
 
@@ -2961,7 +4415,7 @@ export default function AdminDashboard() {
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="w-12 h-8 rounded-lg overflow-hidden shrink-0 bg-gray-150 border border-gray-200/50 dark:bg-white/5 dark:border-white/5">
-                              <img src={v.image || '/udaipur_palace.png'} alt={v.name} className="w-full h-full object-cover" />
+                              <img src={resolveImage(v.image, 'venue', v.name)} alt={v.name} className="w-full h-full object-cover" />
                             </div>
                             <span className={`font-bold truncate text-left ${isLight ? 'text-gray-900' : 'text-white'}`}>
                               {v.name}
@@ -2998,7 +4452,7 @@ export default function AdminDashboard() {
                         <td className="py-4 px-4 text-right">
                           <div className="flex items-center justify-end gap-2 relative">
                             <button
-                              onClick={() => showToast(`Viewing analytics of ${v.name}`, 'info')}
+                              onClick={() => setViewingVenueDetails(v)}
                               className={`flex items-center justify-center p-1.5 rounded-lg border cursor-pointer ${
                                 isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/10 hover:bg-white/5 text-gray-300'
                               }`}
@@ -3145,11 +4599,6 @@ export default function AdminDashboard() {
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
             <div>
               <h2 className={`text-xl font-extrabold ${isLight ? 'text-gray-900' : 'text-white'}`}>Vendors</h2>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-500 mt-1 uppercase tracking-wider">
-                <span>Dashboard</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-                <span className="text-indigo-600 dark:text-indigo-400">Vendors</span>
-              </div>
             </div>
             
             <button
@@ -3161,7 +4610,7 @@ export default function AdminDashboard() {
                   phone: '',
                   email: '',
                   status: 'active',
-                  image: '/celebrate_collage1.png'
+                  image: '/hero_udaipur_2.jpg'
                 });
                 setIsAddVendorModalOpen(true);
               }}
@@ -3306,20 +4755,146 @@ export default function AdminDashboard() {
             </div>
 
             {/* Date Picker Button */}
-            <div className={`flex items-center gap-2 px-3.5 py-3 rounded-xl border text-xs font-semibold cursor-pointer w-full sm:w-auto justify-center ${
-              isLight ? 'bg-white border-gray-200 text-gray-700 shadow-sm hover:bg-gray-50' : 'bg-white/5 border-white/5 text-gray-300 hover:bg-white/8'
-            }`}>
-              <Calendar className="w-4 h-4 text-indigo-500 shrink-0" />
-              <span>Select Date Range</span>
+            <div className="relative w-full sm:w-auto" ref={vendorDatePickerRef}>
+              <button
+                type="button"
+                onClick={() => setIsVendorDatePickerOpen(!isVendorDatePickerOpen)}
+                className={`flex items-center gap-2 px-3.5 py-3 rounded-xl border text-xs font-semibold cursor-pointer w-full sm:w-auto justify-center transition-all hover:opacity-90 ${
+                  isLight ? 'bg-white border-gray-200 text-gray-700 shadow-sm' : 'bg-white/5 border-white/5 text-gray-300'
+                }`}
+              >
+                <Calendar className="w-4 h-4 text-indigo-500 shrink-0" />
+                <span>
+                  {vendorStartDate || vendorEndDate
+                    ? `${vendorStartDate ? formatEventDate(vendorStartDate) : '...'} - ${vendorEndDate ? formatEventDate(vendorEndDate) : '...'}`
+                    : 'Select Date Range'}
+                </span>
+                <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isVendorDatePickerOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isVendorDatePickerOpen && (
+                <div className={`absolute right-0 top-13 w-72 border rounded-2xl shadow-2xl p-4 z-50 animate-scale-up flex flex-col gap-3 text-left ${
+                  isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0f111a] border-white/10 text-gray-200'
+                }`}>
+                  <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>Select Vendor Date Range</span>
+                  
+                  {/* Preset ranges buttons */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const end = new Date();
+                        const start = new Date();
+                        start.setDate(end.getDate() - 7);
+                        setVendorStartDate(start.toISOString().split('T')[0]);
+                        setVendorEndDate(end.toISOString().split('T')[0]);
+                        setIsVendorDatePickerOpen(false);
+                        setVendorCurrentPage(1);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-center border transition-all cursor-pointer ${
+                        isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/5 hover:bg-white/5 text-gray-300'
+                      }`}
+                    >
+                      Last 7 Days
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const end = new Date();
+                        const start = new Date();
+                        start.setDate(end.getDate() - 30);
+                        setVendorStartDate(start.toISOString().split('T')[0]);
+                        setVendorEndDate(end.toISOString().split('T')[0]);
+                        setIsVendorDatePickerOpen(false);
+                        setVendorCurrentPage(1);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-center border transition-all cursor-pointer ${
+                        isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/5 hover:bg-white/5 text-gray-300'
+                      }`}
+                    >
+                      Last 30 Days
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const now = new Date();
+                        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+                        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                        setVendorStartDate(start.toISOString().split('T')[0]);
+                        setVendorEndDate(end.toISOString().split('T')[0]);
+                        setIsVendorDatePickerOpen(false);
+                        setVendorCurrentPage(1);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-center border transition-all cursor-pointer ${
+                        isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/5 hover:bg-white/5 text-gray-300'
+                      }`}
+                    >
+                      This Month
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setVendorStartDate('');
+                        setVendorEndDate('');
+                        setIsVendorDatePickerOpen(false);
+                        setVendorCurrentPage(1);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-center border transition-all cursor-pointer ${
+                        isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/5 hover:bg-white/5 text-gray-300'
+                      }`}
+                    >
+                      Clear Range
+                    </button>
+                  </div>
+
+                  <div className={`border-t my-1 ${isLight ? 'border-gray-100' : 'border-white/5'}`} />
+
+                  {/* Custom date range inputs */}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-1">
+                      <label className={`text-[9px] font-bold uppercase ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>Start Date</label>
+                      <input
+                        type="date"
+                        value={vendorStartDate}
+                        onChange={e => {
+                          setVendorStartDate(e.target.value);
+                          setVendorCurrentPage(1);
+                        }}
+                        className={`border rounded-xl text-xs py-2 px-3 focus:outline-none focus:border-indigo-500 font-semibold w-full ${
+                          isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
+                        }`}
+                        style={{ colorScheme: isLight ? 'light' : 'dark' }}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className={`text-[9px] font-bold uppercase ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>End Date</label>
+                      <input
+                        type="date"
+                        value={vendorEndDate}
+                        onChange={e => {
+                          setVendorEndDate(e.target.value);
+                          setVendorCurrentPage(1);
+                        }}
+                        className={`border rounded-xl text-xs py-2 px-3 focus:outline-none focus:border-indigo-500 font-semibold w-full ${
+                          isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
+                        }`}
+                        style={{ colorScheme: isLight ? 'light' : 'dark' }}
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsVendorDatePickerOpen(false)}
+                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-2 px-4 rounded-xl transition-all cursor-pointer text-center font-semibold"
+                  >
+                    Apply & Close
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* Filter Toggle Button */}
-            <button className={`flex items-center gap-2 px-4 py-3 rounded-xl border text-xs font-semibold cursor-pointer w-full sm:w-auto justify-center ${
-              isLight ? 'bg-white border-gray-200 text-gray-700 shadow-sm hover:bg-gray-50' : 'bg-white/5 border-white/5 text-gray-300 hover:bg-white/8'
-            }`}>
-              <Sliders className="w-4 h-4 text-indigo-500 shrink-0" />
-              <span>Filter</span>
-            </button>
+
           </div>
 
           {/* Vendors Ledger Table Container */}
@@ -3352,15 +4927,15 @@ export default function AdminDashboard() {
                       ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
                       : 'bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400';
 
-                    const categoryColor = v.category.toLowerCase() === 'catering'
+                    const categoryColor = (v.category || '').toLowerCase() === 'catering'
                       ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
-                      : v.category.toLowerCase() === 'decoration'
+                      : (v.category || '').toLowerCase() === 'decoration'
                         ? 'bg-purple-100 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400'
-                        : v.category.toLowerCase() === 'entertainment'
+                        : (v.category || '').toLowerCase() === 'entertainment'
                           ? 'bg-pink-100 text-pink-700 dark:bg-pink-500/10 dark:text-pink-400'
-                          : v.category.toLowerCase() === 'photography'
+                          : (v.category || '').toLowerCase() === 'photography'
                             ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400'
-                            : v.category.toLowerCase() === 'event planner'
+                            : (v.category || '').toLowerCase() === 'event planner'
                               ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
                               : 'bg-gray-100 text-gray-700 dark:bg-gray-500/10 dark:text-gray-400';
 
@@ -3377,7 +4952,7 @@ export default function AdminDashboard() {
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="w-12 h-8 rounded-lg overflow-hidden shrink-0 bg-gray-150 border border-gray-200/50 dark:bg-white/5 dark:border-white/5">
-                              <img src={v.image || '/celebrate_collage1.png'} alt={v.name} className="w-full h-full object-cover" />
+                              <img src={resolveImage(v.image, 'vendor', v.category)} alt={v.name} className="w-full h-full object-cover" />
                             </div>
                             <span className={`font-bold truncate text-left ${isLight ? 'text-gray-900' : 'text-white'}`}>
                               {v.name}
@@ -3417,7 +4992,7 @@ export default function AdminDashboard() {
                         <td className="py-4 px-4 text-right">
                           <div className="flex items-center justify-end gap-2 relative">
                             <button
-                              onClick={() => showToast(`Viewing analytics of ${v.name}`, 'info')}
+                              onClick={() => setViewingVendorDetails(v)}
                               className={`flex items-center justify-center p-1.5 rounded-lg border cursor-pointer ${
                                 isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/10 hover:bg-white/5 text-gray-300'
                               }`}
@@ -3564,20 +5139,7 @@ export default function AdminDashboard() {
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
             <div>
               <h2 className={`text-xl font-extrabold ${isLight ? 'text-gray-900' : 'text-white'}`}>Bookings</h2>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-500 mt-1 uppercase tracking-wider">
-                <span>Dashboard</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-                <span className="text-indigo-600 dark:text-indigo-400">Bookings</span>
-              </div>
             </div>
-            
-            <button
-              onClick={() => showToast('Exporting bookings ledger...', 'info')}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-3 px-4.5 rounded-xl transition-all shadow-lg shadow-indigo-600/15 cursor-pointer flex items-center gap-2"
-            >
-              <Download className="w-4 h-4 shrink-0" />
-              <span>Export Bookings</span>
-            </button>
           </div>
 
           {/* 4 Stats Cards Row */}
@@ -3713,20 +5275,146 @@ export default function AdminDashboard() {
             </div>
 
             {/* Date Picker Button */}
-            <div className={`flex items-center gap-2 px-3.5 py-3 rounded-xl border text-xs font-semibold cursor-pointer w-full sm:w-auto justify-center ${
-              isLight ? 'bg-white border-gray-200 text-gray-700 shadow-sm hover:bg-gray-50' : 'bg-white/5 border-white/5 text-gray-300 hover:bg-white/8'
-            }`}>
-              <Calendar className="w-4 h-4 text-indigo-500 shrink-0" />
-              <span>Select Date Range</span>
+            <div className="relative w-full sm:w-auto" ref={bookingDatePickerRef}>
+              <button
+                type="button"
+                onClick={() => setIsBookingDatePickerOpen(!isBookingDatePickerOpen)}
+                className={`flex items-center gap-2 px-3.5 py-3 rounded-xl border text-xs font-semibold cursor-pointer w-full sm:w-auto justify-center transition-all hover:opacity-90 ${
+                  isLight ? 'bg-white border-gray-200 text-gray-700 shadow-sm' : 'bg-white/5 border-white/5 text-gray-300'
+                }`}
+              >
+                <Calendar className="w-4 h-4 text-indigo-500 shrink-0" />
+                <span>
+                  {bookingStartDate || bookingEndDate
+                    ? `${bookingStartDate ? formatEventDate(bookingStartDate) : '...'} - ${bookingEndDate ? formatEventDate(bookingEndDate) : '...'}`
+                    : 'Select Date Range'}
+                </span>
+                <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isBookingDatePickerOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isBookingDatePickerOpen && (
+                <div className={`absolute right-0 top-13 w-72 border rounded-2xl shadow-2xl p-4 z-50 animate-scale-up flex flex-col gap-3 text-left ${
+                  isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0f111a] border-white/10 text-gray-200'
+                }`}>
+                  <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>Select Booking Date Range</span>
+                  
+                  {/* Preset ranges buttons */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const end = new Date();
+                        const start = new Date();
+                        start.setDate(end.getDate() - 7);
+                        setBookingStartDate(start.toISOString().split('T')[0]);
+                        setBookingEndDate(end.toISOString().split('T')[0]);
+                        setIsBookingDatePickerOpen(false);
+                        setBookingCurrentPage(1);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-center border transition-all cursor-pointer ${
+                        isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/5 hover:bg-white/5 text-gray-300'
+                      }`}
+                    >
+                      Last 7 Days
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const end = new Date();
+                        const start = new Date();
+                        start.setDate(end.getDate() - 30);
+                        setBookingStartDate(start.toISOString().split('T')[0]);
+                        setBookingEndDate(end.toISOString().split('T')[0]);
+                        setIsBookingDatePickerOpen(false);
+                        setBookingCurrentPage(1);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-center border transition-all cursor-pointer ${
+                        isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/5 hover:bg-white/5 text-gray-300'
+                      }`}
+                    >
+                      Last 30 Days
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const now = new Date();
+                        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+                        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                        setBookingStartDate(start.toISOString().split('T')[0]);
+                        setBookingEndDate(end.toISOString().split('T')[0]);
+                        setIsBookingDatePickerOpen(false);
+                        setBookingCurrentPage(1);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-center border transition-all cursor-pointer ${
+                        isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/5 hover:bg-white/5 text-gray-300'
+                      }`}
+                    >
+                      This Month
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBookingStartDate('');
+                        setBookingEndDate('');
+                        setIsBookingDatePickerOpen(false);
+                        setBookingCurrentPage(1);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-center border transition-all cursor-pointer ${
+                        isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/5 hover:bg-white/5 text-gray-300'
+                      }`}
+                    >
+                      Clear Range
+                    </button>
+                  </div>
+
+                  <div className={`border-t my-1 ${isLight ? 'border-gray-100' : 'border-white/5'}`} />
+
+                  {/* Custom date range inputs */}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-1">
+                      <label className={`text-[9px] font-bold uppercase ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>Start Date</label>
+                      <input
+                        type="date"
+                        value={bookingStartDate}
+                        onChange={e => {
+                          setBookingStartDate(e.target.value);
+                          setBookingCurrentPage(1);
+                        }}
+                        className={`border rounded-xl text-xs py-2 px-3 focus:outline-none focus:border-indigo-500 font-semibold w-full ${
+                          isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
+                        }`}
+                        style={{ colorScheme: isLight ? 'light' : 'dark' }}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className={`text-[9px] font-bold uppercase ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>End Date</label>
+                      <input
+                        type="date"
+                        value={bookingEndDate}
+                        onChange={e => {
+                          setBookingEndDate(e.target.value);
+                          setBookingCurrentPage(1);
+                        }}
+                        className={`border rounded-xl text-xs py-2 px-3 focus:outline-none focus:border-indigo-500 font-semibold w-full ${
+                          isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
+                        }`}
+                        style={{ colorScheme: isLight ? 'light' : 'dark' }}
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsBookingDatePickerOpen(false)}
+                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-2 px-4 rounded-xl transition-all cursor-pointer text-center font-semibold"
+                  >
+                    Apply & Close
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* Filter Toggle Button */}
-            <button className={`flex items-center gap-2 px-4 py-3 rounded-xl border text-xs font-semibold cursor-pointer w-full sm:w-auto justify-center ${
-              isLight ? 'bg-white border-gray-200 text-gray-700 shadow-sm hover:bg-gray-50' : 'bg-white/5 border-white/5 text-gray-300 hover:bg-white/8'
-            }`}>
-              <Sliders className="w-4 h-4 text-indigo-500 shrink-0" />
-              <span>Filter</span>
-            </button>
+
           </div>
 
           {/* Bookings Ledger Table Container */}
@@ -3802,7 +5490,7 @@ export default function AdminDashboard() {
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="w-12 h-8 rounded-lg overflow-hidden shrink-0 bg-gray-150 border border-gray-200/50 dark:bg-white/5 dark:border-white/5">
-                              <img src={b.image || '/udaipur_palace.png'} alt={b.title} className="w-full h-full object-cover" />
+                              <img src={resolveImage(b.image, 'event', b.event_type)} alt={b.title} className="w-full h-full object-cover" />
                             </div>
                             <span className={`font-bold truncate text-left ${isLight ? 'text-gray-900' : 'text-white'}`}>
                               {b.title}
@@ -3986,28 +5674,14 @@ export default function AdminDashboard() {
       {activeTab === 'reports' && (
         <div className="flex flex-col gap-6 animate-scale-up">
           
-          {/* Breadcrumb Header Row */}
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
             <div>
               <h2 className={`text-xl font-extrabold ${isLight ? 'text-gray-900' : 'text-white'}`}>Reports</h2>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-500 mt-1 uppercase tracking-wider">
-                <span>Dashboard</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-                <span className="text-indigo-600 dark:text-indigo-400">Reports</span>
-              </div>
             </div>
-            
-            <button
-              onClick={() => showToast('Exporting reports summary...', 'info')}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-3 px-4.5 rounded-xl transition-all shadow-lg shadow-indigo-600/15 cursor-pointer flex items-center gap-2"
-            >
-              <Download className="w-4 h-4 shrink-0" />
-              <span>Export Report</span>
-            </button>
           </div>
 
           {/* Filter Toolbar Row */}
-          <div className={`p-4 rounded-2xl border flex flex-wrap lg:flex-nowrap items-center gap-3 w-full ${
+          <div className={`p-4 rounded-2xl border flex flex-wrap md:flex-nowrap items-center gap-2.5 w-full ${
             isLight ? 'bg-white border-gray-200 shadow-sm' : 'bg-white/5 border-white/5'
           }`}>
             {/* Start Date input */}
@@ -4041,7 +5715,7 @@ export default function AdminDashboard() {
               <select
                 value={reportEventFilter}
                 onChange={e => setReportEventFilter(e.target.value)}
-                className={`appearance-none border rounded-xl text-xs py-3 pl-4 pr-10 focus:outline-none focus:border-indigo-500 font-semibold cursor-pointer w-full sm:w-auto ${
+                className={`appearance-none border rounded-xl text-xs py-2 pl-3 pr-8 focus:outline-none focus:border-indigo-500 font-semibold cursor-pointer w-full sm:w-36 ${
                   isLight ? 'bg-white border-gray-200 text-gray-800 shadow-sm' : 'bg-[#0d0f14] border-white/5 text-gray-200'
                 }`}
               >
@@ -4060,7 +5734,7 @@ export default function AdminDashboard() {
               <select
                 value={reportVenueFilter}
                 onChange={e => setReportVenueFilter(e.target.value)}
-                className={`appearance-none border rounded-xl text-xs py-3 pl-4 pr-10 focus:outline-none focus:border-indigo-500 font-semibold cursor-pointer w-full sm:w-auto ${
+                className={`appearance-none border rounded-xl text-xs py-2 pl-3 pr-8 focus:outline-none focus:border-indigo-500 font-semibold cursor-pointer w-full sm:w-36 ${
                   isLight ? 'bg-white border-gray-200 text-gray-800 shadow-sm' : 'bg-[#0d0f14] border-white/5 text-gray-200'
                 }`}
               >
@@ -4079,7 +5753,7 @@ export default function AdminDashboard() {
               <select
                 value={reportVendorFilter}
                 onChange={e => setReportVendorFilter(e.target.value)}
-                className={`appearance-none border rounded-xl text-xs py-3 pl-4 pr-10 focus:outline-none focus:border-indigo-500 font-semibold cursor-pointer w-full sm:w-auto ${
+                className={`appearance-none border rounded-xl text-xs py-2 pl-3 pr-8 focus:outline-none focus:border-indigo-500 font-semibold cursor-pointer w-full sm:w-36 ${
                   isLight ? 'bg-white border-gray-200 text-gray-800 shadow-sm' : 'bg-[#0d0f14] border-white/5 text-gray-200'
                 }`}
               >
@@ -4092,14 +5766,6 @@ export default function AdminDashboard() {
               <ChevronDown className="absolute right-3.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
             </div>
 
-            {/* Apply Filters Button */}
-            <button
-              onClick={() => showToast('Filters applied successfully', 'success')}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-3 px-4.5 rounded-xl transition-all shadow-lg cursor-pointer"
-            >
-              Apply Filters
-            </button>
-
             {/* Reset Button */}
             <button
               onClick={() => {
@@ -4110,10 +5776,11 @@ export default function AdminDashboard() {
                 setReportEndDate('2026-05-31');
                 showToast('Filters reset to default values', 'info');
               }}
-              className={`border rounded-xl text-xs py-3 px-4.5 font-bold transition-all cursor-pointer w-full sm:w-auto ${
+              className={`border rounded-xl text-xs py-2 px-3 font-bold transition-all cursor-pointer w-full sm:w-auto flex items-center justify-center gap-1.5 ${
                 isLight ? 'border-gray-200 text-gray-700 bg-white hover:bg-gray-50 shadow-sm' : 'border-white/10 text-gray-300 hover:bg-white/5 hover:text-white'
               }`}
             >
+              <RotateCcw className="w-3.5 h-3.5" />
               Reset
             </button>
           </div>
@@ -4437,8 +6104,8 @@ export default function AdminDashboard() {
                   reportsTopVendors.map((item, idx) => (
                     <div key={idx} className="flex justify-between items-center p-2 rounded-xl border border-white/5">
                       <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-500 flex items-center justify-center shrink-0 font-bold text-[9px]">
-                          {item.category.slice(0, 2).toUpperCase()}
+                        <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 bg-gray-150 border border-white/5">
+                          <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                         </div>
                         <span className={`truncate font-bold ${isLight ? 'text-gray-905' : 'text-white'}`}>{item.name}</span>
                       </div>
@@ -4464,20 +6131,7 @@ export default function AdminDashboard() {
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
             <div>
               <h2 className={`text-xl font-extrabold ${isLight ? 'text-gray-900' : 'text-white'}`}>Feedback</h2>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-500 mt-1 uppercase tracking-wider">
-                <span>Dashboard</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-                <span className="text-indigo-600 dark:text-indigo-400">Feedback</span>
-              </div>
             </div>
-            
-            <button
-              onClick={handleExportFeedback}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-3 px-4.5 rounded-xl transition-all shadow-lg shadow-indigo-600/15 cursor-pointer flex items-center gap-2"
-            >
-              <Download className="w-4 h-4 shrink-0" />
-              <span>Export Feedback</span>
-            </button>
           </div>
 
           {/* Stats Cards (4 metrics columns) */}
@@ -4777,10 +6431,7 @@ export default function AdminDashboard() {
                         <td className="py-4 px-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
                             <button
-                              onClick={() => {
-                                alert(`Feedback Details:\n\nUser: ${f.name || 'Anonymous'}\nEmail: ${f.email || 'None'}\nRating: ${f.rating} / 5 Stars\nComment: ${f.comment || 'None'}\nSubmitted: ${formatFeedbackDate(f.created_at)}`);
-                                showToast('Viewing feedback details', 'info');
-                              }}
+                              onClick={() => setViewingFeedbackDetails(f)}
                               title="View Details"
                               className={`p-1.5 rounded-lg border cursor-pointer transition-all ${
                                 isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/10 hover:bg-white/5 text-gray-300'
@@ -4788,20 +6439,7 @@ export default function AdminDashboard() {
                             >
                               <Eye className="w-3.5 h-3.5" />
                             </button>
-                            <button
-                              onClick={() => {
-                                const replyText = prompt(`Reply to ${f.name || 'User'}'s feedback:\n"${f.comment || ''}"`);
-                                if (replyText) {
-                                  showToast(`Reply sent to ${f.email || 'user'}: "${replyText}"`, 'success');
-                                }
-                              }}
-                              title="Send Reply"
-                              className={`p-1.5 rounded-lg border cursor-pointer transition-all ${
-                                isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/10 hover:bg-white/5 text-gray-300'
-                              }`}
-                            >
-                              <Send className="w-3.5 h-3.5" />
-                            </button>
+
                             <button
                               onClick={() => {
                                 if (confirm(`Are you sure you want to delete this feedback?`)) {
@@ -4897,1045 +6535,252 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* ==================================================== */}
-      {/* TAB 9: SETTINGS PANEL (MOCKUP COMPLIANT TAB WITH PERSISTENCE) */}
-      {/* ==================================================== */}
       {activeTab === 'settings' && (
-        <div className="flex flex-col gap-6 animate-scale-up">
-          
-          {/* Breadcrumb Header Row */}
-          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-            <div>
-              <h2 className={`text-xl font-extrabold ${isLight ? 'text-gray-900' : 'text-white'}`}>Settings</h2>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-500 mt-1 uppercase tracking-wider">
-                <span>Dashboard</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-                <span className="text-indigo-600 dark:text-indigo-400">Settings</span>
+        <div className="flex flex-col gap-6 animate-scale-up text-left">
+          {/* Header */}
+          <div>
+            <h2 className={`text-xl font-extrabold ${isLight ? 'text-gray-900' : 'text-white'}`}>Admin Settings</h2>
+            <p className="text-xs text-gray-500 mt-1">
+              Manage your administrator profile credentials, display preferences, and account security.
+            </p>
+          </div>
+
+          {/* Main Layout Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start mt-2">
+            
+            {/* Left Side: Avatar Card */}
+            <div className={`lg:col-span-1 p-6 rounded-2xl border flex flex-col items-center justify-center text-center gap-4 ${
+              isLight ? 'bg-white border-gray-200 shadow-sm' : 'bg-white/5 border-white/5 backdrop-blur-md'
+            }`}>
+              <div className="relative group w-32 h-32 rounded-full overflow-hidden border-4 border-indigo-500/20 hover:border-indigo-500 transition-all shadow-xl bg-slate-800 flex items-center justify-center">
+                {adminAvatar ? (
+                  <img
+                    src={adminAvatar}
+                    alt={adminName}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white text-4xl font-extrabold uppercase">
+                    {adminName ? adminName[0] : 'A'}
+                  </div>
+                )}
+                
+                {adminUploadLoading && (
+                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
+                  </div>
+                )}
               </div>
-            </div>
-          </div>
 
-          {/* Sub Navigation pills */}
-          <div className={`p-1.5 rounded-2xl border flex flex-wrap gap-1 ${
-            isLight ? 'bg-white border-gray-200 shadow-sm' : 'bg-white/5 border-white/5'
-          }`}>
-            <button
-              onClick={() => setActiveSettingsTab('general')}
-              className={`flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeSettingsTab === 'general'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/15'
-                  : 'text-gray-500 hover:text-gray-400 hover:bg-white/5'
-              }`}
-            >
-              <Settings className="w-3.5 h-3.5" />
-              General Settings
-            </button>
-            <button
-              onClick={() => setActiveSettingsTab('email')}
-              className={`flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeSettingsTab === 'email'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/15'
-                  : 'text-gray-500 hover:text-gray-400 hover:bg-white/5'
-              }`}
-            >
-              <Mail className="w-3.5 h-3.5" />
-              Email Settings
-            </button>
-            <button
-              onClick={() => setActiveSettingsTab('payment')}
-              className={`flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeSettingsTab === 'payment'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/15'
-                  : 'text-gray-500 hover:text-gray-400 hover:bg-white/5'
-              }`}
-            >
-              <CreditCard className="w-3.5 h-3.5" />
-              Payment Settings
-            </button>
-            <button
-              onClick={() => setActiveSettingsTab('notification')}
-              className={`flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeSettingsTab === 'notification'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/15'
-                  : 'text-gray-500 hover:text-gray-400 hover:bg-white/5'
-              }`}
-            >
-              <Bell className="w-3.5 h-3.5" />
-              Notification Settings
-            </button>
-            <button
-              onClick={() => setActiveSettingsTab('system')}
-              className={`flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeSettingsTab === 'system'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/15'
-                  : 'text-gray-500 hover:text-gray-400 hover:bg-white/5'
-              }`}
-            >
-              <Sliders className="w-3.5 h-3.5" />
-              System Settings
-            </button>
-            <button
-              onClick={() => setActiveSettingsTab('backup')}
-              className={`flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeSettingsTab === 'backup'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/15'
-                  : 'text-gray-500 hover:text-gray-400 hover:bg-white/5'
-              }`}
-            >
-              <Download className="w-3.5 h-3.5" />
-              Backup & Restore
-            </button>
-          </div>
-
-          {/* ACTIVE SETTINGS TAB CONTENT */}
-          
-          {/* 1. GENERAL SETTINGS */}
-          {activeSettingsTab === 'general' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              
-              {/* Site Information Form */}
-              <form onSubmit={handleSaveGeneralSettings} className={`p-6 rounded-2xl border flex flex-col gap-4 ${
-                isLight ? 'bg-white border-gray-200 shadow-sm' : 'bg-white/5 border-white/5'
-              }`}>
-                <span className={`text-sm font-extrabold uppercase tracking-wider ${isLight ? 'text-gray-800' : 'text-white'}`}>
-                  Site Information
+              <div className="flex flex-col gap-1">
+                <span className={`text-sm font-bold ${isLight ? 'text-gray-800' : 'text-white'}`}>{adminName || 'System Admin'}</span>
+                <span className="text-[10px] font-extrabold bg-indigo-500/10 text-indigo-500 px-2.5 py-0.5 rounded-full uppercase tracking-wider self-center border border-indigo-500/20">
+                  {adminDesignation || 'Super Admin'}
                 </span>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1">
-                    <label className={`text-[10px] font-bold uppercase ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>Site Title</label>
-                    <input
-                      type="text"
-                      value={siteTitle}
-                      onChange={e => setSiteTitle(e.target.value)}
-                      className={`border rounded-xl text-xs py-2.5 px-3 focus:outline-none focus:border-indigo-500 font-semibold ${
-                        isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
-                      }`}
-                      required
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className={`text-[10px] font-bold uppercase ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>Tagline</label>
-                    <input
-                      type="text"
-                      value={siteTagline}
-                      onChange={e => setSiteTagline(e.target.value)}
-                      className={`border rounded-xl text-xs py-2.5 px-3 focus:outline-none focus:border-indigo-500 font-semibold ${
-                        isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
-                      }`}
-                      required
-                    />
-                  </div>
-                </div>
+              </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1">
-                    <label className={`text-[10px] font-bold uppercase ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>Email</label>
-                    <input
-                      type="email"
-                      value={siteEmail}
-                      onChange={e => setSiteEmail(e.target.value)}
-                      className={`border rounded-xl text-xs py-2.5 px-3 focus:outline-none focus:border-indigo-500 font-semibold ${
-                        isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
-                      }`}
-                      required
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className={`text-[10px] font-bold uppercase ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>Phone</label>
-                    <input
-                      type="text"
-                      value={sitePhone}
-                      onChange={e => setSitePhone(e.target.value)}
-                      className={`border rounded-xl text-xs py-2.5 px-3 focus:outline-none focus:border-indigo-500 font-semibold ${
-                        isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
-                      }`}
-                      required
-                    />
-                  </div>
-                </div>
+              <label className="px-4 py-2 border border-white/10 hover:border-indigo-500/35 bg-white/5 hover:bg-white/10 text-gray-300 dark:hover:text-white text-xs font-bold rounded-xl flex items-center gap-2 transition-all cursor-pointer">
+                <Camera className="w-4 h-4 text-indigo-400" />
+                <span>Change Photo</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAdminAvatarUpload}
+                  className="hidden"
+                  disabled={adminUploadLoading}
+                />
+              </label>
 
-                <div className="flex flex-col gap-1">
-                  <label className={`text-[10px] font-bold uppercase ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>Address</label>
-                  <input
-                    type="text"
-                    value={siteAddress}
-                    onChange={e => setSiteAddress(e.target.value)}
-                    className={`border rounded-xl text-xs py-2.5 px-3 focus:outline-none focus:border-indigo-500 font-semibold w-full ${
-                      isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
-                    }`}
-                    required
-                  />
-                </div>
+              <span className="text-[9px] text-gray-500 leading-normal font-semibold">
+                JPG, PNG or WEBP. Max size 2MB.
+              </span>
+            </div>
 
-                <div className="flex flex-col gap-1">
-                  <label className={`text-[10px] font-bold uppercase ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>About Us</label>
-                  <textarea
-                    rows="3"
-                    value={siteAbout}
-                    onChange={e => setSiteAbout(e.target.value)}
-                    className={`border rounded-xl text-xs py-2.5 px-3 focus:outline-none focus:border-indigo-500 font-semibold w-full resize-none ${
-                      isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
-                    }`}
-                    required
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-3 px-5 rounded-xl transition-all shadow-md shadow-indigo-600/15 cursor-pointer self-start"
-                >
-                  Save Changes
-                </button>
-              </form>
-
-              {/* Logo & Favicon / Style Cards Column */}
-              <div className="flex flex-col gap-6">
-                
-                {/* Logo & Favicon Card */}
-                <div className={`p-6 rounded-2xl border flex flex-col gap-5 ${
-                  isLight ? 'bg-white border-gray-200 shadow-sm' : 'bg-white/5 border-white/5'
+            {/* Right Side: Profile Info Form & Password Change */}
+            <div className="lg:col-span-3 flex flex-col gap-8">
+              
+              {/* Profile Details Card */}
+              <div className={`p-6 sm:p-8 rounded-2xl border flex flex-col gap-6 ${
+                isLight ? 'bg-white border-gray-200 shadow-sm' : 'bg-white/5 border-white/5 backdrop-blur-md'
+              }`}>
+                <h3 className={`text-xs font-bold uppercase tracking-wider border-b pb-3 ${
+                  isLight ? 'text-gray-800 border-gray-200' : 'text-gray-200 border-white/5'
                 }`}>
-                  <span className={`text-sm font-extrabold uppercase tracking-wider ${isLight ? 'text-gray-800' : 'text-white'}`}>
-                    Logo & Favicon
-                  </span>
+                  Administrative Profile Details
+                </h3>
 
-                  {/* Logo block */}
-                  <div className="flex flex-col gap-2">
-                    <span className={`text-[10px] font-bold uppercase ${isLight ? 'text-gray-500' : 'text-gray-400'}`}>Logo</span>
-                    <div className="flex items-center justify-between gap-4 p-3 rounded-xl border border-white/5 bg-white/2">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-indigo-600/10 text-indigo-500 flex items-center justify-center shrink-0">
-                          <Calendar className="w-6 h-6" />
-                        </div>
-                        <div className="flex flex-col">
-                          <span className={`text-xs font-bold ${isLight ? 'text-gray-800' : 'text-white'}`}>{siteTitle}</span>
-                          <span className="text-[9px] text-gray-500">Recommended size: 200 x 60px</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => showToast('Logo upload triggered', 'info')}
-                          className={`text-[10px] font-bold uppercase border py-2 px-3.5 rounded-lg hover:bg-white/5 cursor-pointer ${
-                            isLight ? 'border-gray-250 text-gray-700 bg-white' : 'border-white/10 text-gray-300'
-                          }`}
-                        >
-                          Change Logo
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => showToast('Cannot delete default system logo', 'error')}
-                          className="p-2 rounded-lg border border-rose-500/20 text-rose-500 bg-rose-500/5 hover:bg-rose-500/10 cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Favicon block */}
-                  <div className="flex flex-col gap-2">
-                    <span className={`text-[10px] font-bold uppercase ${isLight ? 'text-gray-500' : 'text-gray-400'}`}>Favicon</span>
-                    <div className="flex items-center justify-between gap-4 p-3 rounded-xl border border-white/5 bg-white/2">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-indigo-600/10 text-indigo-500 flex items-center justify-center shrink-0">
-                          <Calendar className="w-4 h-4" />
-                        </div>
-                        <div className="flex flex-col">
-                          <span className={`text-xs font-bold ${isLight ? 'text-gray-800' : 'text-white'}`}>{siteTitle} Icon</span>
-                          <span className="text-[9px] text-gray-500">Recommended size: 32 x 32px</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => showToast('Favicon upload triggered', 'info')}
-                          className={`text-[10px] font-bold uppercase border py-2 px-3.5 rounded-lg hover:bg-white/5 cursor-pointer ${
-                            isLight ? 'border-gray-250 text-gray-700 bg-white' : 'border-white/10 text-gray-300'
-                          }`}
-                        >
-                          Change Favicon
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => showToast('Cannot delete default favicon', 'error')}
-                          className="p-2 rounded-lg border border-rose-500/20 text-rose-500 bg-rose-500/5 hover:bg-rose-500/10 cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Site Theme Color picker input */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className={`text-[10px] font-bold uppercase ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>Site Theme Color</label>
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="color"
-                        value={siteThemeColor}
-                        onChange={e => setSiteThemeColor(e.target.value)}
-                        className="w-10 h-10 rounded-xl border border-white/10 cursor-pointer bg-transparent focus:outline-none"
-                      />
+                <form onSubmit={handleSaveAdminProfile} className="flex flex-col gap-5 text-xs font-bold">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    {/* Full Name */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className={`text-[10px] uppercase tracking-wider ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>Full Name</label>
                       <input
                         type="text"
-                        value={siteThemeColor}
-                        onChange={e => setSiteThemeColor(e.target.value)}
-                        className={`border rounded-xl text-xs py-2.5 px-3 focus:outline-none focus:border-indigo-500 font-semibold uppercase tracking-wider w-28 ${
-                          isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
+                        required
+                        value={adminName}
+                        onChange={(e) => setAdminName(e.target.value)}
+                        className={`w-full border rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-indigo-500 font-semibold ${
+                          isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-white'
+                        }`}
+                      />
+                    </div>
+
+                    {/* Email Address */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className={`text-[10px] uppercase tracking-wider ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>Email Address</label>
+                      <input
+                        type="email"
+                        required
+                        readOnly
+                        value={adminEmail}
+                        className={`w-full border rounded-xl px-4 py-3 text-xs cursor-not-allowed focus:outline-none opacity-60 font-semibold ${
+                          isLight ? 'bg-gray-50 border-gray-200 text-gray-500' : 'bg-white/3 border-white/5 text-gray-400'
                         }`}
                       />
                     </div>
                   </div>
-                </div>
 
-              </div>
-
-              {/* Localization Form card */}
-              <form onSubmit={handleSaveGeneralSettings} className={`p-6 rounded-2xl border flex flex-col gap-4 ${
-                isLight ? 'bg-white border-gray-200 shadow-sm' : 'bg-white/5 border-white/5'
-              }`}>
-                <span className={`text-sm font-extrabold uppercase tracking-wider ${isLight ? 'text-gray-800' : 'text-white'}`}>
-                  Localization
-                </span>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Language Selector */}
-                  <div className="flex flex-col gap-1">
-                    <label className={`text-[10px] font-bold uppercase ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>Default Language</label>
-                    <div className="relative">
-                      <select
-                        value={siteLanguage}
-                        onChange={e => setSiteLanguage(e.target.value)}
-                        className={`appearance-none border rounded-xl text-xs py-2.5 pl-3 pr-9 focus:outline-none focus:border-indigo-500 font-semibold cursor-pointer w-full ${
-                          isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    {/* Phone Number */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className={`text-[10px] uppercase tracking-wider ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>Phone Number</label>
+                      <input
+                        type="text"
+                        required
+                        value={adminPhone}
+                        onChange={(e) => setAdminPhone(e.target.value)}
+                        className={`w-full border rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-indigo-500 font-semibold ${
+                          isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-white'
                         }`}
-                      >
-                        <option value="English">English</option>
-                        <option value="Hindi">Hindi (हिन्दी)</option>
-                        <option value="Spanish">Spanish (Español)</option>
-                        <option value="French">French (Français)</option>
-                        <option value="German">German (Deutsch)</option>
-                      </select>
-                      <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+                      />
+                    </div>
+
+                    {/* Designation */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className={`text-[10px] uppercase tracking-wider ${isLight ? 'text-gray-555' : 'text-gray-400'}`}>Designation</label>
+                      <input
+                        type="text"
+                        required
+                        value={adminDesignation}
+                        onChange={(e) => setAdminDesignation(e.target.value)}
+                        className={`w-full border rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-indigo-500 font-semibold ${
+                          isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-white'
+                        }`}
+                      />
                     </div>
                   </div>
 
-                  {/* Currency Selector */}
-                  <div className="flex flex-col gap-1">
-                    <label className={`text-[10px] font-bold uppercase ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>Currency</label>
-                    <div className="relative">
-                      <select
-                        value={siteCurrency}
-                        onChange={e => setSiteCurrency(e.target.value)}
-                        className={`appearance-none border rounded-xl text-xs py-2.5 pl-3 pr-9 focus:outline-none focus:border-indigo-500 font-semibold cursor-pointer w-full ${
-                          isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
-                        }`}
-                      >
-                        <option value="INR (₹)">INR (₹)</option>
-                        <option value="USD ($)">USD ($)</option>
-                        <option value="EUR (€)">EUR (€)</option>
-                        <option value="GBP (£)">GBP (£)</option>
-                      </select>
-                      <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Timezone Selector */}
-                <div className="flex flex-col gap-1">
-                  <label className={`text-[10px] font-bold uppercase ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>Time Zone</label>
-                  <div className="relative w-full">
-                    <select
-                      value={siteTimezone}
-                      onChange={e => setSiteTimezone(e.target.value)}
-                      className={`appearance-none border rounded-xl text-xs py-2.5 pl-3 pr-9 focus:outline-none focus:border-indigo-500 font-semibold cursor-pointer w-full ${
-                        isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
-                      }`}
-                    >
-                      <option value="(GMT+05:30) Asia/Kolkata">(GMT+05:30) Asia/Kolkata</option>
-                      <option value="(GMT+00:00) UTC">(GMT+00:00) UTC</option>
-                      <option value="(GMT-05:00) Eastern Time (US & Canada)">(GMT-05:00) Eastern Time (US & Canada)</option>
-                      <option value="(GMT+01:00) Europe/London">(GMT+01:00) Europe/London</option>
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-3 px-5 rounded-xl transition-all shadow-md shadow-indigo-600/15 cursor-pointer self-start mt-2"
-                >
-                  Save Changes
-                </button>
-              </form>
-
-              {/* Date & Time Settings Form card */}
-              <form onSubmit={handleSaveGeneralSettings} className={`p-6 rounded-2xl border flex flex-col gap-4 ${
-                isLight ? 'bg-white border-gray-200 shadow-sm' : 'bg-white/5 border-white/5'
-              }`}>
-                <span className={`text-sm font-extrabold uppercase tracking-wider ${isLight ? 'text-gray-800' : 'text-white'}`}>
-                  Date & Time Settings
-                </span>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Date Format */}
-                  <div className="flex flex-col gap-1">
-                    <label className={`text-[10px] font-bold uppercase ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>Date Format</label>
-                    <div className="relative">
-                      <select
-                        value={siteDateFormat}
-                        onChange={e => setSiteDateFormat(e.target.value)}
-                        className={`appearance-none border rounded-xl text-xs py-2.5 pl-3 pr-9 focus:outline-none focus:border-indigo-500 font-semibold cursor-pointer w-full ${
-                          isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
-                        }`}
-                      >
-                        <option value="DD MMM YYYY (10 Apr 2024)">DD MMM YYYY (10 Apr 2024)</option>
-                        <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-                        <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                        <option value="DD-MM-YYYY">DD-MM-YYYY</option>
-                      </select>
-                      <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
-                    </div>
-                  </div>
-
-                  {/* Time Format */}
-                  <div className="flex flex-col gap-1">
-                    <label className={`text-[10px] font-bold uppercase ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>Time Format</label>
-                    <div className="relative">
-                      <select
-                        value={siteTimeFormat}
-                        onChange={e => setSiteTimeFormat(e.target.value)}
-                        className={`appearance-none border rounded-xl text-xs py-2.5 pl-3 pr-9 focus:outline-none focus:border-indigo-500 font-semibold cursor-pointer w-full ${
-                          isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
-                        }`}
-                      >
-                        <option value="12 Hour (hh:mm AM/PM)">12 Hour (hh:mm AM/PM)</option>
-                        <option value="24 Hour (HH:mm)">24 Hour (HH:mm)</option>
-                      </select>
-                      <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Week Starts On */}
-                <div className="flex flex-col gap-1">
-                  <label className={`text-[10px] font-bold uppercase ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>Week Starts On</label>
-                  <div className="relative w-full">
-                    <select
-                      value={siteWeekStartsOn}
-                      onChange={e => setSiteWeekStartsOn(e.target.value)}
-                      className={`appearance-none border rounded-xl text-xs py-2.5 pl-3 pr-9 focus:outline-none focus:border-indigo-500 font-semibold cursor-pointer w-full ${
-                        isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
-                      }`}
-                    >
-                      <option value="Monday">Monday</option>
-                      <option value="Sunday">Sunday</option>
-                      <option value="Saturday">Saturday</option>
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-3 px-5 rounded-xl transition-all shadow-md shadow-indigo-600/15 cursor-pointer self-start mt-2"
-                >
-                  Save Changes
-                </button>
-              </form>
-
-            </div>
-          )}
-
-          {/* 2. EMAIL SETTINGS (SMTP CONFIGS) */}
-          {activeSettingsTab === 'email' && (
-            <form onSubmit={handleSaveEmailSettings} className={`p-6 rounded-2xl border flex flex-col gap-4 max-w-3xl ${
-              isLight ? 'bg-white border-gray-200 shadow-sm' : 'bg-white/5 border-white/5'
-            }`}>
-              <div className="flex justify-between items-center pb-2 border-b border-white/5">
-                <span className={`text-sm font-extrabold uppercase tracking-wider ${isLight ? 'text-gray-800' : 'text-white'}`}>
-                  SMTP Configuration
-                </span>
-                
-                <button
-                  type="button"
-                  onClick={handleSendTestEmail}
-                  className={`text-[10px] font-bold uppercase border py-2 px-3 rounded-lg hover:bg-white/5 cursor-pointer ${
-                    isLight ? 'border-gray-250 text-indigo-600 bg-white' : 'border-white/10 text-indigo-400'
-                  }`}
-                >
-                  ✉️ Send Test Email
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="flex flex-col gap-1 sm:col-span-2">
-                  <label className={`text-[10px] font-bold uppercase ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>SMTP Server Host</label>
-                  <input
-                    type="text"
-                    value={smtpHost}
-                    onChange={e => setSmtpHost(e.target.value)}
-                    className={`border rounded-xl text-xs py-2.5 px-3 focus:outline-none focus:border-indigo-500 font-semibold ${
-                      isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
-                    }`}
-                    required
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className={`text-[10px] font-bold uppercase ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>SMTP Port</label>
-                  <input
-                    type="text"
-                    value={smtpPort}
-                    onChange={e => setSmtpPort(e.target.value)}
-                    className={`border rounded-xl text-xs py-2.5 px-3 focus:outline-none focus:border-indigo-500 font-semibold ${
-                      isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
-                    }`}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1">
-                  <label className={`text-[10px] font-bold uppercase ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>SMTP Username</label>
-                  <input
-                    type="text"
-                    value={smtpUsername}
-                    onChange={e => setSmtpUsername(e.target.value)}
-                    className={`border rounded-xl text-xs py-2.5 px-3 focus:outline-none focus:border-indigo-500 font-semibold ${
-                      isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
-                    }`}
-                    required
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className={`text-[10px] font-bold uppercase ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>SMTP Password</label>
-                  <input
-                    type="password"
-                    value={smtpPassword}
-                    onChange={e => setSmtpPassword(e.target.value)}
-                    className={`border rounded-xl text-xs py-2.5 px-3 focus:outline-none focus:border-indigo-500 font-semibold ${
-                      isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
-                    }`}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="flex flex-col gap-1">
-                  <label className={`text-[10px] font-bold uppercase ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>Encryption Security</label>
-                  <div className="relative">
-                    <select
-                      value={smtpEncryption}
-                      onChange={e => setSmtpEncryption(e.target.value)}
-                      className={`appearance-none border rounded-xl text-xs py-2.5 pl-3 pr-9 focus:outline-none focus:border-indigo-500 font-semibold cursor-pointer w-full ${
-                        isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
-                      }`}
-                    >
-                      <option value="TLS">TLS (Recommended)</option>
-                      <option value="SSL">SSL</option>
-                      <option value="None">None</option>
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label className={`text-[10px] font-bold uppercase ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>Sender Display Name</label>
-                  <input
-                    type="text"
-                    value={smtpSenderName}
-                    onChange={e => setSmtpSenderName(e.target.value)}
-                    className={`border rounded-xl text-xs py-2.5 px-3 focus:outline-none focus:border-indigo-500 font-semibold ${
-                      isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
-                    }`}
-                    required
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label className={`text-[10px] font-bold uppercase ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>Sender Email Address</label>
-                  <input
-                    type="email"
-                    value={smtpSenderEmail}
-                    onChange={e => setSmtpSenderEmail(e.target.value)}
-                    className={`border rounded-xl text-xs py-2.5 px-3 focus:outline-none focus:border-indigo-500 font-semibold ${
-                      isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
-                    }`}
-                    required
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-3 px-5 rounded-xl transition-all shadow-md shadow-indigo-600/15 cursor-pointer self-start mt-2"
-              >
-                Save Settings
-              </button>
-            </form>
-          )}
-
-          {/* 3. PAYMENT SETTINGS (STRIPE / RAZORPAY ENVIRONMENT CONTROLS) */}
-          {activeSettingsTab === 'payment' && (
-            <form onSubmit={handleSavePaymentSettings} className={`p-6 rounded-2xl border flex flex-col gap-4 max-w-3xl ${
-              isLight ? 'bg-white border-gray-200 shadow-sm' : 'bg-white/5 border-white/5'
-            }`}>
-              <div className="flex justify-between items-center pb-2 border-b border-white/5">
-                <span className={`text-sm font-extrabold uppercase tracking-wider ${isLight ? 'text-gray-800' : 'text-white'}`}>
-                  Payment Gateway Integration
-                </span>
-                
-                {/* Sandbox Toggle */}
-                <div className="flex items-center gap-3">
-                  <span className={`text-[10px] font-bold uppercase ${isLight ? 'text-gray-500' : 'text-gray-400'}`}>Sandbox (Test Mode)</span>
-                  <button
-                    type="button"
-                    onClick={() => setPaymentSandboxMode(!paymentSandboxMode)}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      paymentSandboxMode ? 'bg-indigo-600' : 'bg-gray-700'
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        paymentSandboxMode ? 'translate-x-5' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
-                </div>
-              </div>
-
-              {/* Stripe Config Box */}
-              <div className="p-4 rounded-xl border border-white/5 bg-white/2 flex flex-col gap-3">
-                <span className="text-[11px] font-bold text-indigo-500 uppercase tracking-wider">Stripe Gateway</span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1">
-                    <label className={`text-[10px] font-bold uppercase ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>Publishable Key</label>
+                  {/* Location */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className={`text-[10px] uppercase tracking-wider ${isLight ? 'text-gray-555' : 'text-gray-400'}`}>Office Location</label>
                     <input
                       type="text"
-                      value={stripePublicKey}
-                      onChange={e => setStripePublicKey(e.target.value)}
-                      className={`border rounded-xl text-xs py-2.5 px-3 focus:outline-none focus:border-indigo-500 font-semibold ${
-                        isLight ? 'bg-white border-gray-200 text-gray-850' : 'bg-[#0d0f14] border-white/5 text-gray-200'
-                      }`}
                       required
+                      value={adminLocation}
+                      onChange={(e) => setAdminLocation(e.target.value)}
+                      className={`w-full border rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-indigo-500 font-semibold ${
+                        isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-white'
+                      }`}
                     />
                   </div>
-                  <div className="flex flex-col gap-1">
-                    <label className={`text-[10px] font-bold uppercase ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>Secret Key</label>
-                    <input
-                      type="password"
-                      value={stripeSecretKey}
-                      onChange={e => setStripeSecretKey(e.target.value)}
-                      className={`border rounded-xl text-xs py-2.5 px-3 focus:outline-none focus:border-indigo-500 font-semibold ${
-                        isLight ? 'bg-white border-gray-200 text-gray-855' : 'bg-[#0d0f14] border-white/5 text-gray-200'
+
+                  {/* Bio Area */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className={`text-[10px] uppercase tracking-wider ${isLight ? 'text-gray-555' : 'text-gray-400'}`}>Administrative Bio / Notes</label>
+                    <textarea
+                      value={adminBio}
+                      onChange={(e) => setAdminBio(e.target.value)}
+                      rows={4}
+                      className={`w-full border rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-indigo-500 resize-none leading-relaxed font-semibold ${
+                        isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-white'
                       }`}
-                      required
                     />
                   </div>
-                </div>
-              </div>
 
-              {/* Razorpay Config Box */}
-              <div className="p-4 rounded-xl border border-white/5 bg-white/2 flex flex-col gap-3">
-                <span className="text-[11px] font-bold text-indigo-500 uppercase tracking-wider">Razorpay Gateway</span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1">
-                    <label className={`text-[10px] font-bold uppercase ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>Key ID</label>
-                    <input
-                      type="text"
-                      value={razorpayKeyId}
-                      onChange={e => setRazorpayKeyId(e.target.value)}
-                      className={`border rounded-xl text-xs py-2.5 px-3 focus:outline-none focus:border-indigo-500 font-semibold ${
-                        isLight ? 'bg-white border-gray-200 text-gray-850' : 'bg-[#0d0f14] border-white/5 text-gray-200'
-                      }`}
-                      required
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className={`text-[10px] font-bold uppercase ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>Key Secret</label>
-                    <input
-                      type="password"
-                      value={razorpayKeySecret}
-                      onChange={e => setRazorpayKeySecret(e.target.value)}
-                      className={`border rounded-xl text-xs py-2.5 px-3 focus:outline-none focus:border-indigo-500 font-semibold ${
-                        isLight ? 'bg-white border-gray-200 text-gray-855' : 'bg-[#0d0f14] border-white/5 text-gray-200'
-                      }`}
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-3 px-5 rounded-xl transition-all shadow-md shadow-indigo-600/15 cursor-pointer self-start mt-2"
-              >
-                Save Payment Keys
-              </button>
-            </form>
-          )}
-
-          {/* 4. NOTIFICATION SETTINGS (CHANNELS AND ALERTS CONFIGS) */}
-          {activeSettingsTab === 'notification' && (
-            <form onSubmit={handleSaveNotificationSettings} className={`p-6 rounded-2xl border flex flex-col gap-5 max-w-3xl ${
-              isLight ? 'bg-white border-gray-200 shadow-sm' : 'bg-white/5 border-white/5'
-            }`}>
-              <span className={`text-sm font-extrabold uppercase tracking-wider ${isLight ? 'text-gray-800' : 'text-white'}`}>
-                Notification Preferences
-              </span>
-
-              {/* Channels Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-2 border-b border-white/5">
-                {/* Email Notify */}
-                <div className="flex items-center justify-between p-4 rounded-xl border border-white/5 bg-white/2">
-                  <div className="flex flex-col gap-0.5">
-                    <span className={`text-xs font-bold ${isLight ? 'text-gray-800' : 'text-white'}`}>Email Notifications</span>
-                    <span className="text-[10px] text-gray-500">Send platform alerts to admin email</span>
-                  </div>
+                  {/* Save Changes CTA Button */}
                   <button
-                    type="button"
-                    onClick={() => setNotifyEmailEnabled(!notifyEmailEnabled)}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      notifyEmailEnabled ? 'bg-indigo-600' : 'bg-gray-700'
-                    }`}
+                    type="submit"
+                    disabled={adminSubmitLoading}
+                    className="px-5 py-3 bg-[#5a2bd4] hover:bg-[#4c24b5] disabled:opacity-40 disabled:pointer-events-none text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-indigo-600/10 cursor-pointer self-start"
                   >
-                    <span
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        notifyEmailEnabled ? 'translate-x-5' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                {/* Push Notify */}
-                <div className="flex items-center justify-between p-4 rounded-xl border border-white/5 bg-white/2">
-                  <div className="flex flex-col gap-0.5">
-                    <span className={`text-xs font-bold ${isLight ? 'text-gray-800' : 'text-white'}`}>Push Notifications</span>
-                    <span className="text-[10px] text-gray-500">Display browser notification prompts</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setNotifyPushEnabled(!notifyPushEnabled)}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      notifyPushEnabled ? 'bg-indigo-600' : 'bg-gray-700'
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        notifyPushEnabled ? 'translate-x-5' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
-                </div>
-              </div>
-
-              {/* Event Triggers checklist */}
-              <div className="flex flex-col gap-3">
-                <span className="text-[11px] font-bold text-indigo-500 uppercase tracking-wider">Trigger Events Notifications</span>
-                
-                <div className="flex flex-col gap-2.5">
-                  
-                  {/* Booking Created Trigger */}
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={notifyOnBookingCreated}
-                      onChange={e => setNotifyOnBookingCreated(e.target.checked)}
-                      className="w-4 h-4 rounded text-indigo-650 border-gray-300 focus:ring-indigo-500 cursor-pointer"
-                    />
-                    <div className="flex flex-col">
-                      <span className={`text-xs font-semibold ${isLight ? 'text-gray-800' : 'text-gray-200'}`}>On Booking Created</span>
-                      <span className="text-[9px] text-gray-500">Alert admin immediately when a client schedules any heritage/custom event</span>
-                    </div>
-                  </label>
-
-                  {/* Payment Received Trigger */}
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={notifyOnPaymentReceived}
-                      onChange={e => setNotifyOnPaymentReceived(e.target.checked)}
-                      className="w-4 h-4 rounded text-indigo-650 border-gray-300 focus:ring-indigo-500 cursor-pointer"
-                    />
-                    <div className="flex flex-col">
-                      <span className={`text-xs font-semibold ${isLight ? 'text-gray-800' : 'text-gray-200'}`}>On Payment Confirmation</span>
-                      <span className="text-[9px] text-gray-500">Alert admin when a payment transaction is successfully compiled</span>
-                    </div>
-                  </label>
-
-                  {/* Event Schedule Updated Trigger */}
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={notifyOnEventUpdated}
-                      onChange={e => setNotifyOnEventUpdated(e.target.checked)}
-                      className="w-4 h-4 rounded text-indigo-650 border-gray-300 focus:ring-indigo-500 cursor-pointer"
-                    />
-                    <div className="flex flex-col">
-                      <span className={`text-xs font-semibold ${isLight ? 'text-gray-800' : 'text-gray-200'}`}>On Event Status Change</span>
-                      <span className="text-[9px] text-gray-500">Send alerts when planners modify event statuses (e.g. cancelled/completed)</span>
-                    </div>
-                  </label>
-
-                  {/* Low Budget Trigger */}
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={notifyOnLowBudgetAlert}
-                      onChange={e => setNotifyOnLowBudgetAlert(e.target.checked)}
-                      className="w-4 h-4 rounded text-indigo-650 border-gray-300 focus:ring-indigo-500 cursor-pointer"
-                    />
-                    <div className="flex flex-col">
-                      <span className={`text-xs font-semibold ${isLight ? 'text-gray-800' : 'text-gray-200'}`}>On Low Event Budget Limits</span>
-                      <span className="text-[9px] text-gray-500">Generate warnings if expenses exceed 90% of the allocated event budget</span>
-                    </div>
-                  </label>
-
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-3 px-5 rounded-xl transition-all shadow-md shadow-indigo-600/15 cursor-pointer self-start mt-2"
-              >
-                Save Preferences
-              </button>
-            </form>
-          )}
-
-          {/* 5. SYSTEM SETTINGS (MAINTENANCE, REGISTRATION, LIMITS) */}
-          {activeSettingsTab === 'system' && (
-            <form onSubmit={handleSaveSystemSettings} className={`p-6 rounded-2xl border flex flex-col gap-4 max-w-3xl ${
-              isLight ? 'bg-white border-gray-200 shadow-sm' : 'bg-white/5 border-white/5'
-            }`}>
-              <span className={`text-sm font-extrabold uppercase tracking-wider ${isLight ? 'text-gray-800' : 'text-white'}`}>
-                System Configurations
-              </span>
-
-              {/* Maintenance Mode toggle */}
-              <div className="flex items-center justify-between p-4 rounded-xl border border-white/5 bg-white/2">
-                <div className="flex flex-col gap-0.5">
-                  <span className={`text-xs font-bold ${isLight ? 'text-gray-800' : 'text-white'}`}>Maintenance Mode</span>
-                  <span className="text-[10px] text-gray-550">Temporarily take the site offline for public access with a warning notice</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSystemMaintenanceMode(!systemMaintenanceMode)}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    systemMaintenanceMode ? 'bg-[#f43f5e]' : 'bg-gray-700'
-                  }`}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      systemMaintenanceMode ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-              </div>
-
-              {/* Debug Mode toggle */}
-              <div className="flex items-center justify-between p-4 rounded-xl border border-white/5 bg-white/2">
-                <div className="flex flex-col gap-0.5">
-                  <span className={`text-xs font-bold ${isLight ? 'text-gray-800' : 'text-white'}`}>Debug Mode</span>
-                  <span className="text-[10px] text-gray-550">Display detailed backend exception stacks on compilation warnings</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSystemDebugMode(!systemDebugMode)}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    systemDebugMode ? 'bg-indigo-600' : 'bg-gray-700'
-                  }`}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      systemDebugMode ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-              </div>
-
-              {/* Allow User Registration toggle */}
-              <div className="flex items-center justify-between p-4 rounded-xl border border-white/5 bg-white/2">
-                <div className="flex flex-col gap-0.5">
-                  <span className={`text-xs font-bold ${isLight ? 'text-gray-800' : 'text-white'}`}>Allow Registrations</span>
-                  <span className="text-[10px] text-gray-550">Enable or block standard client account registration forms</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSystemAllowRegistration(!systemAllowRegistration)}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    systemAllowRegistration ? 'bg-indigo-600' : 'bg-gray-700'
-                  }`}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      systemAllowRegistration ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-              </div>
-
-              {/* Limits configurations */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Max upload size dropdown */}
-                <div className="flex flex-col gap-1">
-                  <label className={`text-[10px] font-bold uppercase ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>Max Upload File Size</label>
-                  <div className="relative">
-                    <select
-                      value={systemMaxUploadSize}
-                      onChange={e => setSystemMaxUploadSize(e.target.value)}
-                      className={`appearance-none border rounded-xl text-xs py-2.5 pl-3 pr-9 focus:outline-none focus:border-indigo-500 font-semibold cursor-pointer w-full ${
-                        isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
-                      }`}
-                    >
-                      <option value="2 MB">2 MB</option>
-                      <option value="5 MB">5 MB</option>
-                      <option value="10 MB">10 MB</option>
-                      <option value="20 MB">20 MB</option>
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
-                  </div>
-                </div>
-
-                {/* Cache timeout dropdown */}
-                <div className="flex flex-col gap-1">
-                  <label className={`text-[10px] font-bold uppercase ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>Cache Timeout</label>
-                  <div className="relative">
-                    <select
-                      value={systemCacheTimeout}
-                      onChange={e => setSystemCacheTimeout(e.target.value)}
-                      className={`appearance-none border rounded-xl text-xs py-2.5 pl-3 pr-9 focus:outline-none focus:border-indigo-500 font-semibold cursor-pointer w-full ${
-                        isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-gray-200'
-                      }`}
-                    >
-                      <option value="5 Min">5 Min</option>
-                      <option value="15 Min">15 Min</option>
-                      <option value="30 Min">30 Min</option>
-                      <option value="60 Min">60 Min</option>
-                      <option value="120 Min">120 Min</option>
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
-                  </div>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-3 px-5 rounded-xl transition-all shadow-md shadow-indigo-600/15 cursor-pointer self-start mt-2"
-              >
-                Save System Configs
-              </button>
-            </form>
-          )}
-
-          {/* 6. BACKUP & RESTORE TAB */}
-          {activeSettingsTab === 'backup' && (
-            <div className="flex flex-col gap-6">
-              
-              {/* Trigger Backup Panel */}
-              <div className={`p-6 rounded-2xl border flex flex-col sm:flex-row justify-between sm:items-center gap-4 ${
-                isLight ? 'bg-white border-gray-200 shadow-sm' : 'bg-white/5 border-white/5'
-              }`}>
-                <div className="flex flex-col gap-0.5">
-                  <span className={`text-sm font-extrabold uppercase tracking-wider ${isLight ? 'text-gray-800' : 'text-white'}`}>Database Backup Utility</span>
-                  <span className="text-[11px] text-gray-500">Run manual SQL dumps to safeguard platform events, users, reviews, and vendors databases.</span>
-                </div>
-                
-                <button
-                  onClick={handleCreateBackup}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-3 px-4.5 rounded-xl transition-all shadow-md shadow-indigo-600/15 cursor-pointer shrink-0 flex items-center gap-2"
-                >
-                  <Download className="w-4 h-4 shrink-0" />
-                  <span>Generate SQL Dump</span>
-                </button>
-              </div>
-
-              {/* Backups List Table */}
-              <div className={`p-5 rounded-2xl border flex flex-col gap-4 overflow-x-auto ${
-                isLight ? 'bg-white border-gray-200/80 shadow-sm' : 'bg-white/5 border-white/5'
-              }`}>
-                <span className={`text-xs font-bold uppercase tracking-wider ${isLight ? 'text-gray-800' : 'text-gray-200'}`}>Saved Backup History Logs</span>
-                
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b border-white/5 font-semibold text-gray-500">
-                      <th className="py-4 px-4 font-semibold text-gray-500">#</th>
-                      <th className="py-4 px-4 font-semibold text-gray-500">Filename</th>
-                      <th className="py-4 px-4 font-semibold text-gray-500">File Size</th>
-                      <th className="py-4 px-4 font-semibold text-gray-500">Generated On</th>
-                      <th className="py-4 px-4 text-right font-semibold text-gray-500">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className={`divide-y divide-white/2 font-medium ${isLight ? 'text-gray-700' : 'text-gray-300'}`}>
-                    {backupsList.length === 0 ? (
-                      <tr>
-                        <td colSpan="5" className="py-8 text-center text-gray-500 font-semibold">No backup logs found. Please generate a new SQL dump.</td>
-                      </tr>
+                    {adminSubmitLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
                     ) : (
-                      backupsList.map((b, idx) => (
-                        <tr key={b.id || idx} className={`${isLight ? 'hover:bg-gray-55' : 'hover:bg-white/2'} transition-colors relative`}>
-                          <td className="py-4 px-4 font-bold text-gray-400">{idx + 1}</td>
-                          <td className={`py-4 px-4 font-bold ${isLight ? 'text-gray-800' : 'text-white'}`}>{b.filename}</td>
-                          <td className="py-4 px-4 text-gray-500 font-semibold">{b.size}</td>
-                          <td className="py-4 px-4 text-gray-500 font-semibold">{b.date}</td>
-                          <td className="py-4 px-4 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
-                              {/* Download link */}
-                              <button
-                                onClick={() => {
-                                  const textContent = `-- JAGAH SQL Dump\n-- Generated on ${b.date}\n-- File size ${b.size}\n-- Placeholder database snapshot structure.`;
-                                  const blob = new Blob([textContent], { type: 'text/sql' });
-                                  const downloadAnchor = document.createElement('a');
-                                  downloadAnchor.href = URL.createObjectURL(blob);
-                                  downloadAnchor.download = b.filename;
-                                  document.body.appendChild(downloadAnchor);
-                                  downloadAnchor.click();
-                                  downloadAnchor.remove();
-                                  showToast('Downloading SQL backup...', 'success');
-                                }}
-                                title="Download SQL Dump"
-                                className={`p-1.5 rounded-lg border cursor-pointer transition-all ${
-                                  isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/10 hover:bg-white/5 text-gray-300'
-                                }`}
-                              >
-                                <Download className="w-3.5 h-3.5" />
-                              </button>
-                              
-                              {/* Restore link */}
-                              <button
-                                onClick={() => handleRestoreBackup(b.filename)}
-                                title="Restore from snapshot"
-                                className={`p-1.5 rounded-lg border cursor-pointer transition-all ${
-                                  isLight ? 'border-gray-200 hover:bg-gray-50 text-emerald-600' : 'border-white/10 hover:bg-white/5 text-emerald-400'
-                                }`}
-                              >
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                              </button>
-
-                              {/* Delete link */}
-                              <button
-                                onClick={() => handleDeleteBackup(b.id, b.filename)}
-                                title="Delete Backup file"
-                                className={`p-1.5 rounded-lg border cursor-pointer transition-all hover:border-rose-500/30 hover:bg-rose-500/10 text-rose-450`}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
+                      <Check className="w-4 h-4 text-white" />
                     )}
-                  </tbody>
-                </table>
+                    Save Changes
+                  </button>
+                </form>
+              </div>
+
+              {/* Password Management Card */}
+              <div className={`p-6 sm:p-8 rounded-2xl border flex flex-col gap-6 ${
+                isLight ? 'bg-white border-gray-200 shadow-sm' : 'bg-white/5 border-white/5 backdrop-blur-md'
+              }`}>
+                <h3 className={`text-xs font-bold uppercase tracking-wider border-b pb-3 ${
+                  isLight ? 'text-gray-800 border-gray-200' : 'text-gray-200 border-white/5'
+                }`}>
+                  Change Password
+                </h3>
+
+                <form onSubmit={handleUpdateAdminPassword} className="flex flex-col gap-5 text-xs font-bold">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    {/* New Password */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className={`text-[10px] uppercase tracking-wider ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>New Password</label>
+                      <div className="relative">
+                        <input
+                          type="password"
+                          required
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="Min 6 characters"
+                          className={`w-full border rounded-xl pl-10 pr-4 py-3 text-xs focus:outline-none focus:border-indigo-500 font-semibold ${
+                            isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-white'
+                          }`}
+                        />
+                        <Lock className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
+                      </div>
+                    </div>
+
+                    {/* Confirm New Password */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className={`text-[10px] uppercase tracking-wider ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>Confirm New Password</label>
+                      <div className="relative">
+                        <input
+                          type="password"
+                          required
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="Re-enter password"
+                          className={`w-full border rounded-xl pl-10 pr-4 py-3 text-xs focus:outline-none focus:border-indigo-500 font-semibold ${
+                            isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-white'
+                          }`}
+                        />
+                        <Lock className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Change Password Button */}
+                  <button
+                    type="submit"
+                    disabled={passwordSubmitLoading}
+                    className="px-5 py-3 bg-[#5a2bd4] hover:bg-[#4c24b5] disabled:opacity-40 disabled:pointer-events-none text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-indigo-600/10 cursor-pointer self-start"
+                  >
+                    {passwordSubmitLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    ) : (
+                      <Check className="w-4 h-4 text-white" />
+                    )}
+                    Update Password
+                  </button>
+                </form>
               </div>
 
             </div>
-          )}
 
+          </div>
         </div>
       )}
 
@@ -6056,14 +6901,15 @@ export default function AdminDashboard() {
                     isLight ? 'bg-gray-50 border-gray-200 text-gray-900' : 'bg-white/5 border-white/5 text-white'
                   }`}
                 >
-                  <option value="/udaipur_palace.png">Udaipur Palace 1</option>
-                  <option value="/udaipur_palace_light.png">Udaipur Palace Light</option>
-                  <option value="/services_venues.png">Heritage Hotel</option>
-                  <option value="/celebrate_collage1.png">Lake View Fort</option>
-                  <option value="/celebrate_collage2.png">Royal Palace View</option>
-                  <option value="/landing_wedding.png">Lush Lawn</option>
-                  <option value="/services_scenarios.png">Aravali Resort</option>
-                  <option value="/landing_custom.png">Island Palace</option>
+                  <option value="/leela_palace.jpg">The Leela Palace</option>
+                  <option value="/monsoon_palace.jpg">Fateh Garh Resort</option>
+                  <option value="/hero_udaipur_3.jpg">Radisson Blu</option>
+                  <option value="/hero_udaipur_1.jpg">Bhanwar Singh Palace</option>
+                  <option value="/shiv_niwas.jpg">Ramada Resort</option>
+                  <option value="/jag_mandir.jpg">Bijolai Fort</option>
+                  <option value="/hero_udaipur_2.jpg">Hotel Hilltop Palace</option>
+                  <option value="/oberoi_udaivilas.jpg">The Oberoi Udaivilas</option>
+                  <option value="/taj_lake_palace.jpg">Taj Lake Palace</option>
                 </select>
               </div>
             </div>
@@ -6183,14 +7029,15 @@ export default function AdminDashboard() {
                     isLight ? 'bg-gray-50 border-gray-200 text-gray-900' : 'bg-white/5 border-white/5 text-white'
                   }`}
                 >
-                  <option value="/udaipur_palace.png">Udaipur Palace 1</option>
-                  <option value="/udaipur_palace_light.png">Udaipur Palace Light</option>
-                  <option value="/services_venues.png">Heritage Hotel</option>
-                  <option value="/celebrate_collage1.png">Lake View Fort</option>
-                  <option value="/celebrate_collage2.png">Royal Palace View</option>
-                  <option value="/landing_wedding.png">Lush Lawn</option>
-                  <option value="/services_scenarios.png">Aravali Resort</option>
-                  <option value="/landing_custom.png">Island Palace</option>
+                  <option value="/leela_palace.jpg">The Leela Palace</option>
+                  <option value="/monsoon_palace.jpg">Fateh Garh Resort</option>
+                  <option value="/hero_udaipur_3.jpg">Radisson Blu</option>
+                  <option value="/hero_udaipur_1.jpg">Bhanwar Singh Palace</option>
+                  <option value="/shiv_niwas.jpg">Ramada Resort</option>
+                  <option value="/jag_mandir.jpg">Bijolai Fort</option>
+                  <option value="/hero_udaipur_2.jpg">Hotel Hilltop Palace</option>
+                  <option value="/oberoi_udaivilas.jpg">The Oberoi Udaivilas</option>
+                  <option value="/taj_lake_palace.jpg">Taj Lake Palace</option>
                 </select>
               </div>
             </div>
@@ -6429,14 +7276,13 @@ export default function AdminDashboard() {
                     isLight ? 'bg-gray-50 border-gray-200 text-gray-900' : 'bg-white/5 border-white/5 text-white'
                   }`}
                 >
-                  <option value="/celebrate_collage1.png">Theme 1</option>
-                  <option value="/celebrate_collage2.png">Theme 2</option>
-                  <option value="/udaipur_palace.png">Udaipur Palace</option>
-                  <option value="/udaipur_palace_light.png">Palace Light</option>
-                  <option value="/services_venues.png">Heritage Service</option>
-                  <option value="/landing_wedding.png">Lawn Decor</option>
-                  <option value="/services_scenarios.png">Resort Backdrop</option>
-                  <option value="/landing_custom.png">Custom Setup</option>
+                  <option value="/hero_udaipur_3.jpg">Apex Sound & Lights</option>
+                  <option value="/shiv_niwas.jpg">Royal Decorators</option>
+                  <option value="/hero_udaipur_2.jpg">Marwar Catering Services</option>
+                  <option value="/jag_mandir.jpg">Lakeside Photography</option>
+                  <option value="/leela_palace.jpg">Udaipur Event Management</option>
+                  <option value="/hero_udaipur_1.jpg">Heritage Travels</option>
+                  <option value="/oberoi_udaivilas.jpg">Aravali Planners</option>
                 </select>
               </div>
             </div>
@@ -6575,14 +7421,13 @@ export default function AdminDashboard() {
                     isLight ? 'bg-gray-50 border-gray-200 text-gray-900' : 'bg-white/5 border-white/5 text-white'
                   }`}
                 >
-                  <option value="/celebrate_collage1.png">Theme 1</option>
-                  <option value="/celebrate_collage2.png">Theme 2</option>
-                  <option value="/udaipur_palace.png">Udaipur Palace</option>
-                  <option value="/udaipur_palace_light.png">Palace Light</option>
-                  <option value="/services_venues.png">Heritage Service</option>
-                  <option value="/landing_wedding.png">Lawn Decor</option>
-                  <option value="/services_scenarios.png">Resort Backdrop</option>
-                  <option value="/landing_custom.png">Custom Setup</option>
+                  <option value="/hero_udaipur_3.jpg">Apex Sound & Lights</option>
+                  <option value="/shiv_niwas.jpg">Royal Decorators</option>
+                  <option value="/hero_udaipur_2.jpg">Marwar Catering Services</option>
+                  <option value="/jag_mandir.jpg">Lakeside Photography</option>
+                  <option value="/leela_palace.jpg">Udaipur Event Management</option>
+                  <option value="/hero_udaipur_1.jpg">Heritage Travels</option>
+                  <option value="/oberoi_udaivilas.jpg">Aravali Planners</option>
                 </select>
               </div>
             </div>
@@ -6605,6 +7450,474 @@ export default function AdminDashboard() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* ADD USER MODAL */}
+      {isAddUserModalOpen && (
+        <div className="fixed inset-0 bg-[#07080a]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <form onSubmit={handleAddUser} className={`w-full max-w-md p-6 rounded-2xl border text-left shadow-2xl flex flex-col gap-4 ${
+            isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d1117] border-white/5 text-white'
+          }`}>
+            <h3 className="text-sm font-bold uppercase tracking-wider border-b border-white/5 pb-2">
+              ➕ Add New User
+            </h3>
+            
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold uppercase text-gray-500">Full Name</label>
+              <input
+                type="text"
+                placeholder="e.g. Rahul Sharma"
+                value={newUserData.name}
+                onChange={e => setNewUserData({ ...newUserData, name: e.target.value })}
+                className={`border rounded-lg text-xs py-2.5 px-3 focus:outline-none focus:border-indigo-500 ${
+                  isLight ? 'bg-gray-50 border-gray-200 text-gray-900' : 'bg-white/5 border-white/5 text-white'
+                }`}
+                required
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold uppercase text-gray-500">Email Address</label>
+              <input
+                type="email"
+                placeholder="e.g. rahul@example.com"
+                value={newUserData.email}
+                onChange={e => setNewUserData({ ...newUserData, email: e.target.value })}
+                className={`border rounded-lg text-xs py-2.5 px-3 focus:outline-none focus:border-indigo-500 ${
+                  isLight ? 'bg-gray-50 border-gray-200 text-gray-900' : 'bg-white/5 border-white/5 text-white'
+                }`}
+                required
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold uppercase text-gray-500">Password</label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={newUserData.password}
+                onChange={e => setNewUserData({ ...newUserData, password: e.target.value })}
+                className={`border rounded-lg text-xs py-2.5 px-3 focus:outline-none focus:border-indigo-500 ${
+                  isLight ? 'bg-gray-50 border-gray-200 text-gray-900' : 'bg-white/5 border-white/5 text-white'
+                }`}
+                required
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold uppercase text-gray-500">System Role</label>
+              <select
+                value={newUserData.role}
+                onChange={e => setNewUserData({ ...newUserData, role: e.target.value })}
+                className={`border rounded-lg text-xs py-2.5 px-3 focus:outline-none focus:border-indigo-500 ${
+                  isLight ? 'bg-gray-50 border-gray-200 text-gray-900' : 'bg-white/5 border-white/5 text-white'
+                }`}
+              >
+                <option value="user">Standard User</option>
+                <option value="vendor">Vendor User</option>
+                <option value="admin">Administrator</option>
+              </select>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setNewUserData({ name: '', email: '', password: '', role: 'user' });
+                  setIsAddUserModalOpen(false);
+                }}
+                className={`px-4 py-2 border rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  isLight ? 'border-gray-200 text-gray-650 hover:bg-gray-50' : 'border-white/10 text-gray-400 hover:bg-white/5 hover:text-white'
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-indigo-600/15 cursor-pointer"
+              >
+                Create User
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* VIEW USER PROFILE DETAIL MODAL */}
+      {viewingUserProfile && (
+        <div className="fixed inset-0 bg-[#07080a]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className={`w-full max-w-md p-6 rounded-2xl border text-left shadow-2xl flex flex-col gap-5 ${
+            isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d1117] border-white/5 text-white'
+          }`}>
+            <div className="flex justify-between items-center border-b border-white/5 pb-2">
+              <h3 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2">
+                👤 User Profile Detail
+              </h3>
+              <span className={`text-[9px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
+                viewingUserProfile.role === 'admin' 
+                  ? 'bg-red-500/10 text-red-500 border border-red-500/20' 
+                  : viewingUserProfile.role === 'vendor' 
+                    ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                    : 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20'
+              }`}>
+                {viewingUserProfile.role}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-4">
+              {viewingUserProfile.avatar ? (
+                <img
+                  src={viewingUserProfile.avatar}
+                  alt={viewingUserProfile.name}
+                  className="w-16 h-16 rounded-full object-cover shrink-0 border-2 border-[#5a2bd4]/30"
+                />
+              ) : (
+                <div className={`w-16 h-16 rounded-full border-2 flex items-center justify-center font-bold text-xl shrink-0 ${
+                  getInitialsColor(getInitials(viewingUserProfile.name))
+                }`}>
+                  {getInitials(viewingUserProfile.name)}
+                </div>
+              )}
+              <div className="flex flex-col min-w-0">
+                <h4 className="text-base font-extrabold truncate">{viewingUserProfile.name}</h4>
+                <p className={`text-xs ${isLight ? 'text-gray-500' : 'text-gray-400'} truncate`}>{viewingUserProfile.email}</p>
+                <p className={`text-[10px] mt-1 font-bold ${
+                  viewingUserProfile.status === 'blocked' ? 'text-rose-500' : 'text-emerald-500'
+                }`}>
+                  {viewingUserProfile.status === 'blocked' ? '● Blocked Account' : '● Active Account'}
+                </p>
+              </div>
+            </div>
+
+            <div className={`p-4 rounded-xl border flex flex-col gap-3.5 text-xs leading-normal ${
+              isLight ? 'bg-gray-50 border-gray-150' : 'bg-white/3 border-white/5'
+            }`}>
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-gray-500">Joined Date</span>
+                <span className="font-semibold">{formatEventDate(viewingUserProfile.created_at)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-gray-500">Contact Number</span>
+                <span className="font-semibold">{viewingUserProfile.phone || 'Not Provided'}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-gray-500">Unique User ID</span>
+                <span className="font-semibold font-mono text-[10px] bg-black/10 dark:bg-white/5 px-2 py-0.5 rounded">
+                  USR-{viewingUserProfile.id || 'N/A'}
+                </span>
+              </div>
+              <div className="flex justify-end mt-2">
+              <button
+                type="button"
+                onClick={() => setViewingUserProfile(null)}
+                className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-2.5 px-4 rounded-xl transition-all cursor-pointer text-center font-semibold"
+              >
+                Close Profile
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
+      {/* VIEW EVENT DETAILS MODAL */}
+      {viewingEventDetails && (
+        <div className="fixed inset-0 bg-[#07080a]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className={`w-full max-w-md p-6 rounded-2xl border text-left shadow-2xl flex flex-col gap-4 ${
+            isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d1117] border-white/5 text-white'
+          }`}>
+            <div className="flex justify-between items-center border-b border-white/5 pb-2">
+              <h3 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2">
+                🎉 Event Details
+              </h3>
+              <span className={`text-[9px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
+                viewingEventDetails.status === 'planning' 
+                  ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' 
+                  : viewingEventDetails.status === 'completed'
+                    ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+                    : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
+              }`}>
+                {viewingEventDetails.status}
+              </span>
+            </div>
+
+            <div className="flex flex-col">
+              <h4 className="text-base font-extrabold">{viewingEventDetails.title}</h4>
+              <p className={`text-xs ${isLight ? 'text-gray-500' : 'text-gray-400'} mt-1 font-semibold flex items-center gap-1`}>
+                Theme: {viewingEventDetails.theme || 'Traditional'}
+              </p>
+            </div>
+
+            <div className={`p-4 rounded-xl border flex flex-col gap-3 text-xs leading-normal ${
+              isLight ? 'bg-gray-50 border-gray-150' : 'bg-white/3 border-white/5'
+            }`}>
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-gray-500">Event ID</span>
+                <span className="font-semibold font-mono">EVT-{viewingEventDetails.id}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-gray-500">Event Type</span>
+                <span className="font-semibold capitalize">{viewingEventDetails.event_type}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-gray-500">Date & Time</span>
+                <span className="font-semibold">{formatEventDate(viewingEventDetails.date)} at {formatEventTime(viewingEventDetails.time) || '12:00 PM'}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-gray-500">Location</span>
+                <span className="font-semibold truncate max-w-[200px]">{viewingEventDetails.location}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-gray-500">Budget</span>
+                <span className="font-semibold text-emerald-500 dark:text-emerald-400 font-bold">₹{parseFloat(viewingEventDetails.budget || 0).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-gray-500">Expected Guests</span>
+                <span className="font-semibold">{viewingEventDetails.guest_count || 100} Guests</span>
+              </div>
+              <div className="flex flex-col gap-1 mt-1">
+                <span className="font-bold text-gray-500">Description</span>
+                <p className={`p-2.5 rounded-lg border text-[11px] leading-relaxed ${
+                  isLight ? 'bg-white border-gray-200' : 'bg-black/10 border-white/5'
+                }`}>
+                  {viewingEventDetails.description || 'No description provided.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end mt-2">
+              <button
+                type="button"
+                onClick={() => setViewingEventDetails(null)}
+                className="w-full bg-[#5a2bd4] hover:bg-[#4c24b5] text-white font-bold text-xs py-2.5 px-4 rounded-xl transition-all cursor-pointer text-center font-semibold"
+              >
+                Close Event Details
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW VENUE DETAILS MODAL */}
+      {viewingVenueDetails && (
+        <div className="fixed inset-0 bg-[#07080a]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className={`w-full max-w-md p-6 rounded-2xl border text-left shadow-2xl flex flex-col gap-4 ${
+            isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d1117] border-white/5 text-white'
+          }`}>
+            <div className="flex justify-between items-center border-b border-white/5 pb-2">
+              <h3 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2">
+                🏛️ Venue Details
+              </h3>
+              <span className={`text-[9px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
+                viewingVenueDetails.status === 'active' 
+                  ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' 
+                  : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
+              }`}>
+                {viewingVenueDetails.status}
+              </span>
+            </div>
+
+            {viewingVenueDetails.image && (
+              <div className="w-full h-40 rounded-xl overflow-hidden relative border border-white/5 shadow-inner">
+                <img
+                  src={viewingVenueDetails.image}
+                  alt={viewingVenueDetails.name}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute top-2 right-2 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#efe9fc] text-[#5a2bd4] shadow-md border border-white/10 flex items-center gap-1">
+                  ⭐ {viewingVenueDetails.rating || '4.5'}
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col">
+              <h4 className="text-base font-extrabold">{viewingVenueDetails.name}</h4>
+              <p className={`text-xs ${isLight ? 'text-gray-500' : 'text-gray-400'} mt-1 font-semibold flex items-center gap-1`}>
+                📍 {viewingVenueDetails.location}
+              </p>
+            </div>
+
+            <div className={`p-4 rounded-xl border flex flex-col gap-3 text-xs leading-normal ${
+              isLight ? 'bg-gray-50 border-gray-150' : 'bg-white/3 border-white/5'
+            }`}>
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-gray-500">Venue Type</span>
+                <span className="font-semibold">{viewingVenueDetails.type || viewingVenueDetails.event_type}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-gray-500">Max Capacity</span>
+                <span className="font-semibold">{viewingVenueDetails.maxCapacity || viewingVenueDetails.guest_count || 300} Guests</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-gray-500">Price Tier</span>
+                <span className="font-semibold text-indigo-500 dark:text-indigo-400 font-bold">{viewingVenueDetails.priceTier || '₹₹₹'}</span>
+              </div>
+              <div className="flex flex-col gap-1 mt-1">
+                <span className="font-bold text-gray-500">Amenities</span>
+                <span className="font-semibold text-[10px] bg-black/10 dark:bg-white/5 px-2.5 py-1.5 rounded-lg border border-white/5 leading-relaxed mt-1 flex flex-wrap gap-1.5">
+                  {viewingVenueDetails.amenities && Array.isArray(viewingVenueDetails.amenities)
+                    ? viewingVenueDetails.amenities.map((a, idx) => (
+                        <span key={idx} className="bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 px-2 py-0.5 rounded border border-indigo-500/20 font-bold uppercase text-[9px]">{a}</span>
+                      ))
+                    : 'AC Hall, Parking, Sound System'}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex justify-end mt-2">
+              <button
+                type="button"
+                onClick={() => setViewingVenueDetails(null)}
+                className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-2.5 px-4 rounded-xl transition-all cursor-pointer text-center font-semibold"
+              >
+                Close Venue Details
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW VENDOR DETAILS MODAL */}
+      {viewingVendorDetails && (
+        <div className="fixed inset-0 bg-[#07080a]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className={`w-full max-w-md p-6 rounded-2xl border text-left shadow-2xl flex flex-col gap-4 ${
+            isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d1117] border-white/5 text-white'
+          }`}>
+            <div className="flex justify-between items-center border-b border-white/5 pb-2">
+              <h3 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2">
+                🤝 Vendor Profile Details
+              </h3>
+              <span className={`text-[9px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
+                viewingVendorDetails.status === 'active' 
+                  ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' 
+                  : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
+              }`}>
+                {viewingVendorDetails.status}
+              </span>
+            </div>
+
+            {viewingVendorDetails.image && (
+              <div className="w-full h-40 rounded-xl overflow-hidden relative border border-white/5 shadow-inner">
+                <img
+                  src={viewingVendorDetails.image}
+                  alt={viewingVendorDetails.name}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute top-2 right-2 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#efe9fc] text-[#5a2bd4] shadow-md border border-white/10">
+                  🏷️ {viewingVendorDetails.category}
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col">
+              <h4 className="text-base font-extrabold">{viewingVendorDetails.name}</h4>
+              <p className={`text-xs ${isLight ? 'text-gray-500' : 'text-gray-400'} mt-1 font-semibold`}>
+                👤 Contact: {viewingVendorDetails.contact_person || 'N/A'}
+              </p>
+            </div>
+
+            <div className={`p-4 rounded-xl border flex flex-col gap-3 text-xs leading-normal ${
+              isLight ? 'bg-gray-50 border-gray-150' : 'bg-white/3 border-white/5'
+            }`}>
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-gray-500">Category Service</span>
+                <span className="font-semibold">{viewingVendorDetails.category}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-gray-500">Contact Number</span>
+                <span className="font-semibold font-mono">{viewingVendorDetails.phone || 'Not Provided'}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-gray-500">Email Address</span>
+                <span className="font-semibold">{viewingVendorDetails.email || 'Not Provided'}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-gray-500">Joined Platform</span>
+                <span className="font-semibold">{formatEventDate(viewingVendorDetails.created_at)}</span>
+              </div>
+            </div>
+
+            <div className="flex justify-end mt-2">
+              <button
+                type="button"
+                onClick={() => setViewingVendorDetails(null)}
+                className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-2.5 px-4 rounded-xl transition-all cursor-pointer text-center font-semibold"
+              >
+                Close Vendor Details
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW FEEDBACK DETAILS MODAL */}
+      {viewingFeedbackDetails && (
+        <div className="fixed inset-0 bg-[#07080a]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className={`w-full max-w-md p-6 rounded-2xl border text-left shadow-2xl flex flex-col gap-5 ${
+            isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d1117] border-white/5 text-white'
+          }`}>
+            <div className="flex justify-between items-center border-b border-white/5 pb-2">
+              <h3 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2">
+                ⭐ Feedback Details
+              </h3>
+              <span className={`text-[9px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
+                viewingFeedbackDetails.rating >= 4
+                  ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+                  : viewingFeedbackDetails.rating === 3
+                    ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                    : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
+              }`}>
+                {viewingFeedbackDetails.rating >= 4 ? 'Positive' : viewingFeedbackDetails.rating === 3 ? 'Neutral' : 'Negative'}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className={`w-12 h-12 rounded-full border flex items-center justify-center font-bold text-sm shrink-0 ${
+                getInitialsColor(getInitials(viewingFeedbackDetails.name))
+              }`}>
+                {getInitials(viewingFeedbackDetails.name)}
+              </div>
+              <div className="flex flex-col min-w-0">
+                <h4 className="text-sm font-extrabold truncate">{viewingFeedbackDetails.name || 'Anonymous User'}</h4>
+                <p className={`text-xs ${isLight ? 'text-gray-500' : 'text-gray-400'} truncate`}>{viewingFeedbackDetails.email || 'no-email@events.com'}</p>
+                <div className="flex items-center gap-0.5 mt-1">
+                  {Array.from({ length: 5 }).map((_, sIdx) => (
+                    <Star
+                      key={sIdx}
+                      className={`w-3.5 h-3.5 ${sIdx < viewingFeedbackDetails.rating ? 'text-amber-400 fill-amber-400' : 'text-gray-600'}`}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className={`p-4 rounded-xl border flex flex-col gap-3 text-xs leading-normal ${
+              isLight ? 'bg-gray-50 border-gray-150' : 'bg-white/3 border-white/5'
+            }`}>
+              <div className="flex flex-col gap-1">
+                <span className="font-bold text-gray-500">Feedback Comment</span>
+                <p className={`text-[11px] leading-relaxed break-words font-medium ${isLight ? 'text-gray-700' : 'text-gray-300'}`}>
+                  "{viewingFeedbackDetails.comment || 'No comment text provided.'}"
+                </p>
+              </div>
+              <div className="border-t border-white/5 my-1" />
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-gray-500">Submitted Date</span>
+                <span className="font-semibold">{formatFeedbackDate(viewingFeedbackDetails.created_at)}</span>
+              </div>
+            </div>
+
+            <div className="flex justify-end mt-2">
+              <button
+                type="button"
+                onClick={() => setViewingFeedbackDetails(null)}
+                className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-2.5 px-4 rounded-xl transition-all cursor-pointer text-center font-semibold"
+              >
+                Close Feedback
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

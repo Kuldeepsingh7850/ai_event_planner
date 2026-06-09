@@ -1,8 +1,57 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 require('dotenv').config();
 
+// Helper to shift timeline relative to user start time
+const shiftTimeline = (timeline, startTimeStr) => {
+  if (!startTimeStr) return timeline;
+  
+  const parts = startTimeStr.split(':');
+  if (parts.length < 2) return timeline;
+  const startHours = parseInt(parts[0]);
+  const startMinutes = parseInt(parts[1]);
+  if (isNaN(startHours) || isNaN(startMinutes)) return timeline;
+
+  const firstEntry = timeline[0];
+  const match = firstEntry.match(/^(\d{2}):(\d{2})\s*(AM|PM)/i);
+  if (!match) return timeline;
+  
+  let origHours = parseInt(match[1]);
+  const origMinutes = parseInt(match[2]);
+  const ampm = match[3].toUpperCase();
+  if (ampm === 'PM' && origHours < 12) origHours += 12;
+  if (ampm === 'AM' && origHours === 12) origHours = 0;
+
+  const diffMinutes = (startHours * 60 + startMinutes) - (origHours * 60 + origMinutes);
+
+  return timeline.map(entry => {
+    return entry.replace(/^(\d{2}):(\d{2})\s*(AM|PM)/i, (full, hh, mm, ap) => {
+      let h = parseInt(hh);
+      let m = parseInt(mm);
+      let a = ap.toUpperCase();
+      if (a === 'PM' && h < 12) h += 12;
+      if (a === 'AM' && h === 12) h = 0;
+
+      let totalMin = h * 60 + m + diffMinutes;
+      totalMin = (totalMin + 1440) % 1440;
+
+      let newH = Math.floor(totalMin / 60);
+      let newM = totalMin % 60;
+      let newAp = 'AM';
+      if (newH >= 12) {
+        newAp = 'PM';
+        if (newH > 12) newH -= 12;
+      }
+      if (newH === 0) newH = 12;
+
+      const newHStr = String(newH).padStart(2, '0');
+      const newMStr = String(newM).padStart(2, '0');
+      return `${newHStr}:${newMStr} ${newAp}`;
+    });
+  });
+};
+
 // Helper to generate dynamic fallback suggestions based on event details
-const generateFallbackSuggestions = (title, eventType, budget, guestCount) => {
+const generateFallbackSuggestions = (title, eventType, budget, guestCount, startTimeStr) => {
   const b = parseFloat(budget) || 50000;
   const guests = parseInt(guestCount) || 100;
   const type = (eventType || 'General').toLowerCase();
@@ -144,7 +193,7 @@ const generateFallbackSuggestions = (title, eventType, budget, guestCount) => {
     themes,
     decorations,
     foods,
-    timeline,
+    timeline: shiftTimeline(timeline, startTimeStr),
     budgetAllocation,
     tips
   };
@@ -193,14 +242,63 @@ const parseJSONResponse = (text) => {
   return JSON.parse(cleaned);
 };
 
+// Helper to normalize budget allocation to sum up to exactly total budget and shift timeline dynamically
+const normalizeSuggestions = (data, budget, startTimeStr) => {
+  if (!data) return data;
+  
+  if (data.budgetAllocation && Array.isArray(data.budgetAllocation)) {
+    const b = parseFloat(budget) || 50000;
+    const totalAllocated = data.budgetAllocation.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+    if (totalAllocated > 0 && Math.abs(totalAllocated - b) > 1) {
+      data.budgetAllocation = data.budgetAllocation.map(item => {
+        const amt = parseFloat(item.amount) || 0;
+        const ratio = amt / totalAllocated;
+        return {
+          ...item,
+          amount: Math.round(b * ratio)
+        };
+      });
+    }
+  }
+
+  // Ensure LLM timeline matches the requested start time (fallback shift if LLM failed to align it)
+  if (data.timeline && Array.isArray(data.timeline) && startTimeStr) {
+    data.timeline = shiftTimeline(data.timeline, startTimeStr);
+  }
+
+  return data;
+};
+
 // @desc    Get AI Suggestions based on event requirements
 // @route   POST /api/ai/suggestions
 // @access  Private
 const getAISuggestions = async (req, res) => {
-  const { title, eventType, budget, guestCount } = req.body;
+  const { title, eventType, budget, guestCount, location, time, specialRequests, description } = req.body;
 
   if (!title || !eventType || !budget || !guestCount) {
     return res.status(400).json({ message: 'Please provide all details: title, eventType, budget, guestCount' });
+  }
+
+  const eventLocation = location || 'Udaipur, Rajasthan';
+  const notes = specialRequests || description || 'None';
+  
+  // Format startTime to 12-hour AM/PM for the LLM prompt to ensure standard output format
+  let startTime = '05:00 PM';
+  if (time) {
+    if (/^\d{2}:\d{2}$/.test(time)) {
+      const parts = time.split(':');
+      let hours = parseInt(parts[0]);
+      const minutes = parts[1];
+      let ampm = 'AM';
+      if (hours >= 12) {
+        ampm = 'PM';
+        if (hours > 12) hours -= 12;
+      }
+      if (hours === 0) hours = 12;
+      startTime = `${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
+    } else {
+      startTime = time;
+    }
   }
 
   const groqKey = process.env.GROQ_API_KEY;
@@ -208,36 +306,80 @@ const getAISuggestions = async (req, res) => {
   const geminiKey = process.env.GEMINI_API_KEY;
 
   const prompt = `
-    You are an expert AI Event Planner & Organizer. Generate professional ideas for an event.
+    You are an expert AI Event Planner & Organizer. Generate professional and highly customized ideas for an event.
     Event Details:
     - Title: "${title}"
     - Type: "${eventType}"
     - Total Budget: ₹${budget}
     - Estimated Guest Count: ${guestCount}
+    - Location: "${eventLocation}"
+    - Event Start Time: "${startTime}"
+    - Special Requests / Context: "${notes}"
 
     Return your output EXACTLY as a valid JSON object. Do not include markdown code block syntax (like \`\`\`json) in your raw response. Ensure it has the following JSON structure:
     {
       "isMock": false,
-      "description": "A professionally written 2-3 sentence overview/summary describing this event, incorporating its category, vibes, and general style.",
+      "description": "A professionally written 2-3 sentence overview/summary describing this event, incorporating its category, vibes, and general style, specifically mentioning that it is set in ${eventLocation}.",
       "themes": ["Theme A", "Theme B", "Theme C"],
       "decorations": ["Decor Detail 1", "Decor Detail 2", "Decor Detail 3"],
       "foods": ["Welcome Drinks details", "Appetizer details", "Main course details", "Dessert details"],
       "timeline": [
-        "09:00 AM - Activity 1",
-        "10:30 AM - Activity 2",
-        "12:00 PM - Activity 3"
+        "05:00 PM - Activity 1 (customized to the title and event details)",
+        "06:30 PM - Activity 2",
+        "08:00 PM - Activity 3"
       ],
       "budgetAllocation": [
-        {"category": "Venue & Catering (40%)", "amount": ${parseFloat(budget) * 0.4}, "description": "Venue rental and catering fees"},
-        {"category": "Decoration & Theme Setup (20%)", "amount": ${parseFloat(budget) * 0.2}, "description": "Stage decor and lighting"},
-        {"category": "Photography & Videography (15%)", "amount": ${parseFloat(budget) * 0.15}, "description": "Media capture and editing"},
-        {"category": "Entertainment & DJ (15%)", "amount": ${parseFloat(budget) * 0.15}, "description": "Sound systems and DJ"},
-        {"category": "Miscellaneous & Contingency (10%)", "amount": ${parseFloat(budget) * 0.1}, "description": "Contingency buffer and invitations"}
+        {"category": "Venue & Catering", "amount": 400000, "description": "Venue rental and catering fees"},
+        {"category": "Decoration & Theme Setup", "amount": 200000, "description": "Stage decor and lighting"},
+        {"category": "Photography & Videography", "amount": 150000, "description": "Media capture and editing"},
+        {"category": "Entertainment & DJ", "amount": 150000, "description": "Sound systems and DJ"},
+        {"category": "Miscellaneous & Contingency", "amount": 100000, "description": "Contingency buffer and invitations"}
+      ],
+      "venues": [
+        {
+          "id": "venue_1",
+          "name": "Name of a real/realistic Venue 1 in ${eventLocation}",
+          "rating": "4.8 ★",
+          "img": "one of these exact strings: /leela_palace.jpg, /monsoon_palace.jpg, /hero_udaipur_3.jpg, /shiv_niwas.jpg, /oberoi_udaivilas.jpg, /taj_lake_palace.jpg, /jag_mandir.jpg",
+          "location": "Specific area / address in ${eventLocation}",
+          "capacity": "Capacity range (e.g. 150 - 300 Guests)",
+          "type": "Venue type (e.g. Luxury Resort, Heritage Hotel, Banquet)",
+          "cost": 400000,
+          "availability": "Available",
+          "desc": "Short description of this venue and why it fits this specific event"
+        },
+        {
+          "id": "venue_2",
+          "name": "Name of Venue 2 in ${eventLocation}",
+          "rating": "4.5 ★",
+          "img": "one of these exact strings: /leela_palace.jpg, /monsoon_palace.jpg, /hero_udaipur_3.jpg, /shiv_niwas.jpg, /oberoi_udaivilas.jpg, /taj_lake_palace.jpg, /jag_mandir.jpg",
+          "location": "Specific area / address in ${eventLocation}",
+          "capacity": "Capacity range",
+          "type": "Venue type",
+          "cost": 300000,
+          "availability": "Available",
+          "desc": "Short description"
+        },
+        {
+          "id": "venue_3",
+          "name": "Name of Venue 3 in ${eventLocation}",
+          "rating": "4.6 ★",
+          "img": "one of these exact strings: /leela_palace.jpg, /monsoon_palace.jpg, /hero_udaipur_3.jpg, /shiv_niwas.jpg, /oberoi_udaivilas.jpg, /taj_lake_palace.jpg, /jag_mandir.jpg",
+          "location": "Specific area / address in ${eventLocation}",
+          "capacity": "Capacity range",
+          "type": "Venue type",
+          "cost": 350000,
+          "availability": "Available",
+          "desc": "Short description"
+        }
       ],
       "tips": ["Tip 1", "Tip 2", "Tip 3", "Tip 4"]
     }
 
-    Provide realistic cost values in budgetAllocation summing up to exactly ₹${budget}. Ensure tips are specific to the type of event "${eventType}".
+    Requirements for values:
+    1. The budgetAllocation category amounts must sum up to exactly ₹${budget}. Let the percentages vary dynamically depending on what fits a "${eventType}" best (e.g., weddings spend more on venues, corporate seminars spend more on AV equipment).
+    2. Generate 3 real or highly realistic venues in "${eventLocation}". Ensure venue 'cost' represents a realistic portion of the total budget (typically 25% to 45% of the total budget). Set the capacity to comfortably accommodate ${guestCount} guests. Choose the image path matching the style of the hotel.
+    3. Generate a realistic timeline customized to a "${eventType}" starting exactly at the event start time "${startTime}".
   `;
 
   // 1. Try Groq if key is present
@@ -252,7 +394,7 @@ const getAISuggestions = async (req, res) => {
       );
       const parsedData = parseJSONResponse(responseText);
       console.log('Groq API recommendations generated successfully!');
-      return res.json(parsedData);
+      return res.json(normalizeSuggestions(parsedData, budget, time));
     } catch (err) {
       console.error('Groq API error, trying next option:', err.message);
     }
@@ -270,7 +412,7 @@ const getAISuggestions = async (req, res) => {
       );
       const parsedData = parseJSONResponse(responseText);
       console.log('xAI Grok API recommendations generated successfully!');
-      return res.json(parsedData);
+      return res.json(normalizeSuggestions(parsedData, budget, time));
     } catch (err) {
       console.error('xAI Grok API error, trying next option:', err.message);
     }
@@ -287,7 +429,7 @@ const getAISuggestions = async (req, res) => {
       let text = response.text();
       const parsedData = parseJSONResponse(text);
       console.log('Gemini API recommendations generated successfully!');
-      return res.json(parsedData);
+      return res.json(normalizeSuggestions(parsedData, budget, time));
     } catch (err) {
       console.error('Gemini API error, falling back to mock:', err.message);
     }
@@ -295,7 +437,7 @@ const getAISuggestions = async (req, res) => {
 
   // 4. Default Fallback
   console.log('Using local fallback for suggestions...');
-  const suggestions = generateFallbackSuggestions(title, eventType, budget, guestCount);
+  const suggestions = generateFallbackSuggestions(title, eventType, budget, guestCount, time);
   return res.json(suggestions);
 };
 

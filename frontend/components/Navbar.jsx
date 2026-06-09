@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
@@ -8,6 +8,7 @@ import {
   Menu, MessageSquare, Search, MapPin, Phone, Mail, ChevronDown 
 } from 'lucide-react';
 import Link from 'next/link';
+import { LogoBrand } from './Logo';
 
 // Local SVG Brand Icons to resolve missing brand exports in lucide-react
 const FacebookIcon = (props) => (
@@ -38,7 +39,7 @@ const LinkedinIcon = (props) => (
   </svg>
 );
 
-export default function Navbar({ onToggleSidebar }) {
+export default function Navbar({ isSidebarOpen, onToggleSidebar }) {
   const router = useRouter();
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -46,37 +47,36 @@ export default function Navbar({ onToggleSidebar }) {
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
 
+  const notificationsRef = useRef(null);
+  const profileRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
+        setShowNotificationsDropdown(prev => {
+          if (prev && unreadCount > 0) {
+            markAllAsRead();
+          }
+          return false;
+        });
+      }
+      if (profileRef.current && !profileRef.current.contains(event.target)) {
+        setShowProfileDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [unreadCount, markAllAsRead]);
+
   if (!user) return null;
 
   const isAdminView = router.pathname.startsWith('/admin') || user?.role === 'admin';
 
   return (
-    <header className={`fixed top-0 right-0 z-40 flex flex-col border-b border-white/5 shadow-md transition-all duration-300 ${isAdminView ? 'left-0 md:left-64' : 'left-0'}`}>
-      {/* 1. Purple Top Info Bar */}
-      {!isAdminView && (
-        <div className="w-full bg-[#5a2bd4] always-white text-[11px] font-medium px-6 py-2 flex justify-between items-center gap-2">
-        <div className="flex items-center gap-1.5">
-          <MapPin className="w-3.5 h-3.5" />
-          <span>Udaipur, Rajasthan, India</span>
-        </div>
-        <div className="flex items-center gap-6">
-          <div className="hidden sm:flex items-center gap-4">
-            <span className="flex items-center gap-1">
-              <Phone className="w-3 h-3" /> +91 98765 43210
-            </span>
-            <span className="flex items-center gap-1">
-              <Mail className="w-3 h-3" /> support@aieventplanner.com
-            </span>
-          </div>
-          <div className="flex items-center gap-3">
-            <a href="#" className="hover:opacity-80 transition-opacity"><FacebookIcon className="w-3.5 h-3.5" /></a>
-            <a href="#" className="hover:opacity-80 transition-opacity"><InstagramIcon className="w-3.5 h-3.5" /></a>
-            <a href="#" className="hover:opacity-80 transition-opacity"><TwitterIcon className="w-3.5 h-3.5" /></a>
-            <a href="#" className="hover:opacity-80 transition-opacity"><LinkedinIcon className="w-3.5 h-3.5" /></a>
-          </div>
-        </div>
-      </div>
-      )}
+    <>
+      <header className={`fixed top-0 right-0 z-40 flex flex-col border-b border-white/5 shadow-md transition-all duration-300 ${isSidebarOpen ? 'left-0 md:left-64' : 'left-0'}`}>
 
       {/* 2. Main Navigation Bar */}
       <div className="w-full h-16 glass-panel px-6 flex items-center justify-between">
@@ -91,58 +91,22 @@ export default function Navbar({ onToggleSidebar }) {
             <Menu className="w-5 h-5" />
           </button>
 
-          <Link href="/dashboard" className={`flex items-center gap-2 ${isAdminView ? 'md:hidden' : ''}`}>
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-              <Calendar className="w-4.5 h-4.5 text-white" />
-            </div>
-            <div className="flex flex-col text-left">
-              <span className="text-xs sm:text-sm font-extrabold tracking-wider leading-tight text-white dark:text-white">
-                JAGAH
-              </span>
-              <span className="text-[9px] sm:text-[10px] text-indigo-400 font-bold uppercase tracking-widest leading-none">
-                Udaipur
-              </span>
-            </div>
+          <Link href="/" className={`flex items-center gap-2 ${isSidebarOpen ? 'md:hidden' : ''}`}>
+            <LogoBrand />
           </Link>
-        </div>
-
-        {/* Center Section: Search Bar with Shortcut (Hidden on small screens) */}
-        <div className="hidden md:flex items-center relative w-full max-w-md mx-6">
-          <Search className="w-4 h-4 text-gray-400 absolute left-3.5 pointer-events-none" />
-          <input
-            type="text"
-            placeholder="Search events, venues, tasks..."
-            className="w-full pl-10 pr-16 py-2 text-xs rounded-xl bg-white/5 border border-white/10 focus:outline-none focus:border-indigo-500 text-gray-200 transition-colors"
-          />
-          <kbd className="absolute right-3 px-1.5 py-0.5 text-[9px] font-sans font-bold text-gray-500 bg-white/5 border border-white/10 rounded">
-            Ctrl + K
-          </kbd>
         </div>
 
         {/* Right Section: Action Utilities + User Profile */}
         <div className="flex items-center gap-3 sm:gap-4">
-          {/* Theme Toggle Button */}
-          <button
-            onClick={toggleTheme}
-            type="button"
-            className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-colors cursor-pointer"
-            aria-label="Toggle Theme"
-          >
-            {theme === 'dark' ? (
-              <Sun className="w-4 h-4 text-amber-400" />
-            ) : (
-              <Moon className="w-4 h-4 text-[#5a2bd4]" />
-            )}
-          </button>
-
-
           {/* Notification Bell */}
-          <div className="relative">
+          <div className="relative" ref={notificationsRef}>
             <button
               onClick={() => {
+                if (showNotificationsDropdown && unreadCount > 0) {
+                  markAllAsRead();
+                }
                 setShowNotificationsDropdown(!showNotificationsDropdown);
                 setShowProfileDropdown(false);
-                if (unreadCount > 0) markAllAsRead();
               }}
               className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-colors relative cursor-pointer"
             >
@@ -161,17 +125,13 @@ export default function Navbar({ onToggleSidebar }) {
                   <span className="text-[10px] text-gray-400 font-semibold">{unreadCount} new</span>
                 </div>
                 <div className="max-h-60 overflow-y-auto mt-2 flex flex-col gap-2">
-                  {notifications.length === 0 ? (
-                    <p className="text-[10px] text-gray-500 text-center py-4">No notifications yet</p>
+                  {notifications.filter(n => n.status === 'unread').length === 0 ? (
+                    <p className="text-[10px] text-gray-500 text-center py-4">No new notifications</p>
                   ) : (
-                    notifications.map((notif) => (
+                    notifications.filter(n => n.status === 'unread').map((notif) => (
                       <div
                         key={notif.id}
-                        className={`p-2 rounded-lg text-[10px] leading-relaxed border ${
-                          notif.status === 'unread'
-                            ? 'bg-indigo-500/5 border-indigo-500/10 text-indigo-200'
-                            : 'bg-white/2 border-white/5 text-gray-400'
-                        }`}
+                        className="p-2 rounded-lg text-[10px] leading-relaxed border bg-indigo-500/5 border-indigo-500/10 text-indigo-200"
                       >
                         {notif.message}
                         <div className="text-[9px] text-gray-500 mt-1">
@@ -186,7 +146,7 @@ export default function Navbar({ onToggleSidebar }) {
           </div>
 
           {/* User Profile Trigger */}
-          <div className="relative">
+          <div className="relative" ref={profileRef}>
             <button
               onClick={() => {
                 setShowProfileDropdown(!showProfileDropdown);
@@ -194,28 +154,32 @@ export default function Navbar({ onToggleSidebar }) {
               }}
               className="flex items-center gap-2 p-1 pr-2 rounded-lg hover:bg-white/5 transition-all text-left cursor-pointer"
             >
-              {isAdminView ? (
-                <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-xs shrink-0 shadow-sm">
-                  A
-                </div>
-              ) : user.avatar ? (
+              {user.avatar ? (
                 <img
                   src={user.avatar}
                   alt={user.name}
-                  className="w-7 h-7 rounded-full object-cover border border-[#5a2bd4]/30"
+                  className={`rounded-full object-cover border border-[#5a2bd4]/30 shrink-0 ${
+                    isAdminView ? 'w-8 h-8' : 'w-7 h-7'
+                  }`}
                 />
+              ) : isAdminView ? (
+                <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-xs shrink-0 shadow-sm">
+                  {user.name ? user.name[0] : 'A'}
+                </div>
               ) : (
-                <div className="w-7 h-7 rounded-full bg-indigo-500/20 border border-[#5a2bd4]/30 flex items-center justify-center text-indigo-400 font-extrabold text-xs uppercase">
+                <div className="w-7 h-7 rounded-full bg-indigo-500/20 border border-[#5a2bd4]/30 flex items-center justify-center text-indigo-400 font-extrabold text-xs uppercase shrink-0">
                   {user.name ? user.name[0] : 'U'}
                 </div>
               )}
               <div className="hidden sm:block">
                 <p className="text-xs font-bold text-gray-200 leading-tight">
-                  {isAdminView ? 'Admin' : (user.name || 'Rahul Sharma')}
+                  {user.name || (isAdminView ? 'System Admin' : 'Rahul Sharma')}
                 </p>
-                <p className="text-[9px] text-[#5a2bd4] font-bold capitalize leading-none mt-0.5">
-                  {isAdminView ? 'Super Admin' : (user.role === 'admin' ? 'Administrator' : 'Premium User')}
-                </p>
+                {(isAdminView || user.role === 'admin') && (
+                  <p className="text-[9px] text-[#5a2bd4] font-bold capitalize leading-none mt-0.5">
+                    {isAdminView ? 'Super Admin' : 'Administrator'}
+                  </p>
+                )}
               </div>
               <ChevronDown className="w-3 h-3 text-gray-400 hidden sm:block shrink-0" />
             </button>
@@ -223,7 +187,7 @@ export default function Navbar({ onToggleSidebar }) {
             {showProfileDropdown && (
               <div className="absolute right-0 mt-2 w-48 glass-panel rounded-xl border border-white/10 shadow-2xl p-2 z-50 animate-scale-up">
                 <Link
-                  href="/profile"
+                  href={isAdminView ? "/admin?tab=settings" : "/profile"}
                   onClick={() => setShowProfileDropdown(false)}
                   className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-gray-300 hover:bg-white/5 hover:text-white transition-all font-semibold"
                 >
@@ -244,5 +208,24 @@ export default function Navbar({ onToggleSidebar }) {
         </div>
       </div>
     </header>
-  );
+
+    {/* Floating Theme Toggle FAB */}
+    <button
+      onClick={toggleTheme}
+      type="button"
+      className={`fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full border shadow-2xl flex items-center justify-center transition-all duration-300 cursor-pointer hover:scale-110 active:scale-95 ${
+        theme === 'light'
+          ? 'bg-white border-indigo-100 text-gray-600 hover:bg-gray-100 shadow-indigo-600/10'
+          : 'bg-[#0d1117]/90 border-white/20 text-gray-300 hover:bg-[#151c2c] backdrop-blur-md shadow-black/50'
+      }`}
+      aria-label="Toggle Theme"
+    >
+      {theme === 'light' ? (
+        <Moon className="w-5 h-5 text-indigo-500" />
+      ) : (
+        <Sun className="w-5 h-5 text-amber-400" />
+      )}
+    </button>
+  </>
+);
 }

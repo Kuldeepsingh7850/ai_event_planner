@@ -35,14 +35,14 @@ export function NotificationProvider({ children }) {
     }
   };
 
-  // Setup polling for alerts (budget limits, reminders) every 30 seconds
+  // Setup polling for alerts (budget limits, reminders) every 5 seconds
   useEffect(() => {
     fetchNotifications();
     if (!user) return;
 
     const interval = setInterval(() => {
       fetchNotifications();
-    }, 30000);
+    }, 5000);
 
     return () => clearInterval(interval);
   }, [user, fetchNotifications]);

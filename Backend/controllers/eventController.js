@@ -5,18 +5,25 @@ const db = require('../config/db');
 // @access  Private
 const getEvents = async (req, res) => {
   try {
-    let events;
     console.log(`[DEBUG] getEvents called by User ID: ${req.user.id}, Email: ${req.user.email}, Role: ${req.user.role}`);
-    if (req.user.role === 'admin') {
-      events = await db.query('SELECT e.*, b.expenses, b.remaining_budget FROM events e LEFT JOIN budget b ON e.id = b.event_id');
-    } else {
-      events = await db.query('SELECT e.*, b.expenses, b.remaining_budget FROM events e LEFT JOIN budget b ON e.id = b.event_id WHERE e.user_id = ?', [req.user.id]);
-    }
+    const events = await db.query('SELECT e.*, b.expenses, b.remaining_budget FROM events e LEFT JOIN budget b ON e.id = b.event_id WHERE e.user_id = ?', [req.user.id]);
     console.log(`[DEBUG] Found ${events.length} events for user ID ${req.user.id}:`, events.map(e => ({ id: e.id, title: e.title })));
     res.json(events);
   } catch (error) {
     console.error('Fetch events error:', error.message);
     res.status(500).json({ message: 'Server error fetching events' });
+  }
+};
+
+const getAdminEvents = async (req, res) => {
+  try {
+    console.log(`[DEBUG] getAdminEvents called by User ID: ${req.user.id}, Email: ${req.user.email}`);
+    const events = await db.query('SELECT e.*, b.expenses, b.remaining_budget FROM events e LEFT JOIN budget b ON e.id = b.event_id');
+    console.log(`[DEBUG] Found ${events.length} events for admin moderation.`);
+    res.json(events);
+  } catch (error) {
+    console.error('Fetch admin events error:', error.message);
+    res.status(500).json({ message: 'Server error fetching admin events' });
   }
 };
 
@@ -50,7 +57,7 @@ const getEventById = async (req, res) => {
 // @route   POST /api/create-event
 // @access  Private
 const createEvent = async (req, res) => {
-  const { title, description, event_type, date, time, location, budget, guest_count } = req.body;
+  const { title, description, event_type, date, time, location, budget, guest_count, theme, timeline, venue } = req.body;
 
   if (!title || !event_type || !date || !time || !location || !budget || !guest_count) {
     return res.status(400).json({ message: 'Please provide all required fields' });
@@ -59,8 +66,8 @@ const createEvent = async (req, res) => {
   try {
     // 1. Insert Event
     const result = await db.query(
-      'INSERT INTO events (user_id, title, description, event_type, date, time, location, budget, guest_count, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [req.user.id, title, description || '', event_type, date, time, location, parseFloat(budget), parseInt(guest_count), 'planning']
+      'INSERT INTO events (user_id, title, description, event_type, date, time, location, budget, guest_count, status, theme) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [req.user.id, title, description || '', event_type, date, time, location, parseFloat(budget), parseInt(guest_count), 'planning', theme || 'Royal / Traditional']
     );
 
     const eventId = result.insertId;
@@ -73,7 +80,25 @@ const createEvent = async (req, res) => {
       );
     }
 
-    // 3. Create Notification
+    // 3. Create AI-suggested timeline tasks if provided
+    if (timeline && Array.isArray(timeline)) {
+      for (const taskItem of timeline) {
+        await db.query(
+          'INSERT INTO tasks (event_id, title, deadline, status) VALUES (?, ?, ?, ?)',
+          [eventId, taskItem, date, 'pending']
+        );
+      }
+    }
+
+    // 4. Create AI-selected venue as a vendor if provided
+    if (venue) {
+      await db.query(
+        'INSERT INTO vendors (event_id, vendor_name, category, contact, cost, status) VALUES (?, ?, ?, ?, ?, ?)',
+        [eventId, venue.name, 'Venue', venue.location || 'Udaipur, Rajasthan', parseFloat(venue.cost) || 0.00, 'hired']
+      );
+    }
+
+    // 5. Create Notification
     await db.query(
       'INSERT INTO notifications (user_id, message, status) VALUES (?, ?, ?)',
       [req.user.id, `Event "${title}" has been successfully created.`, 'unread']
@@ -90,7 +115,8 @@ const createEvent = async (req, res) => {
       location,
       budget,
       guest_count,
-      status: 'planning'
+      status: 'planning',
+      theme: theme || 'Royal / Traditional'
     });
   } catch (error) {
     console.error('Create event error:', error.message);
@@ -103,7 +129,7 @@ const createEvent = async (req, res) => {
 // @access  Private
 const updateEvent = async (req, res) => {
   const eventId = req.params.id;
-  const { title, description, event_type, date, time, location, budget, guest_count, status } = req.body;
+  const { title, description, event_type, date, time, location, budget, guest_count, status, theme } = req.body;
 
   try {
     // Check if event exists
@@ -131,7 +157,7 @@ const updateEvent = async (req, res) => {
 
     // Update event details
     await db.query(
-      'UPDATE events SET title=?, description=?, event_type=?, date=?, time=?, location=?, budget=?, guest_count=?, status=? WHERE id=?',
+      'UPDATE events SET title=?, description=?, event_type=?, date=?, time=?, location=?, budget=?, guest_count=?, status=?, theme=? WHERE id=?',
       [
         title || event.title,
         description !== undefined ? description : event.description,
@@ -142,6 +168,7 @@ const updateEvent = async (req, res) => {
         budget !== undefined ? parseFloat(budget) : event.budget,
         guest_count !== undefined ? parseInt(guest_count) : event.guest_count,
         status || event.status,
+        theme || event.theme,
         eventId
       ]
     );
@@ -196,10 +223,73 @@ const deleteEvent = async (req, res) => {
   }
 };
 
+// @desc    Get landing page public real-time statistics
+// @route   GET /api/public-stats
+// @access  Public
+const getPublicStats = async (req, res) => {
+  try {
+    // 1. Events Planned
+    const eventsPlannedRes = await db.query('SELECT COUNT(*) AS count FROM events');
+    let eventsPlannedCount = 0;
+    if (db.isMock()) {
+      eventsPlannedCount = Array.isArray(eventsPlannedRes) ? eventsPlannedRes.length : 0;
+    } else {
+      eventsPlannedCount = eventsPlannedRes && eventsPlannedRes[0] ? eventsPlannedRes[0].count : 0;
+    }
+
+    // 2. Happy Clients
+    const usersRes = await db.query('SELECT COUNT(*) AS count FROM users');
+    let usersCount = 0;
+    if (db.isMock()) {
+      usersCount = Array.isArray(usersRes) ? usersRes.length : 0;
+    } else {
+      usersCount = usersRes && usersRes[0] ? usersRes[0].count : 0;
+    }
+
+    // 3. Top Venues (Unique venues planned + a base of default venues e.g., 15)
+    let uniqueLocationsCount = 0;
+    if (db.isMock()) {
+      const uniqueLocs = new Set(Array.isArray(eventsPlannedRes) ? eventsPlannedRes.map(e => e.location) : []);
+      uniqueLocationsCount = uniqueLocs.size;
+    } else {
+      const venuesRes = await db.query('SELECT COUNT(DISTINCT location) AS count FROM events');
+      uniqueLocationsCount = venuesRes && venuesRes[0] ? venuesRes[0].count : 0;
+    }
+    const topVenuesCount = 15 + uniqueLocationsCount;
+
+    // 4. Client Rating
+    let averageRating = '4.8';
+    const feedbackRes = await db.query('SELECT AVG(rating) AS avg_rating FROM feedback');
+    if (db.isMock()) {
+      const feedbacks = Array.isArray(feedbackRes) ? feedbackRes : [];
+      if (feedbacks.length > 0) {
+        const sum = feedbacks.reduce((acc, f) => acc + (f.rating || 0), 0);
+        averageRating = (sum / feedbacks.length).toFixed(1);
+      }
+    } else {
+      averageRating = feedbackRes && feedbackRes[0] && feedbackRes[0].avg_rating !== null
+        ? parseFloat(feedbackRes[0].avg_rating).toFixed(1)
+        : '4.8';
+    }
+
+    res.json({
+      eventsPlanned: eventsPlannedCount,
+      happyClients: usersCount,
+      topVenues: topVenuesCount,
+      clientRating: averageRating
+    });
+  } catch (error) {
+    console.error('Fetch public statistics error:', error.message);
+    res.status(500).json({ message: 'Server error fetching public statistics' });
+  }
+};
+
 module.exports = {
   getEvents,
+  getAdminEvents,
   getEventById,
   createEvent,
   updateEvent,
-  deleteEvent
+  deleteEvent,
+  getPublicStats
 };

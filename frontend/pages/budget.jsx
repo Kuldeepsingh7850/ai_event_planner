@@ -45,6 +45,7 @@ export default function BudgetPlanner() {
   const [expenseAmount, setExpenseAmount] = useState('');
   const [expenseCategory, setExpenseCategory] = useState('Venue');
   const [expenseDate, setExpenseDate] = useState('');
+  const [chartMode, setChartMode] = useState('allocated'); // 'allocated' or 'spent'
 
   // Fallback default details if API returns empty
   const fallbackEvent = {
@@ -79,23 +80,23 @@ export default function BudgetPlanner() {
         if (data.length > 0) {
           setSelectedEvent(data[0]);
         } else {
-          // Set fallback if user has no events
-          setSelectedEvent(fallbackEvent);
+          setSelectedEvent(null);
         }
       } else {
-        setSelectedEvent(fallbackEvent);
+        setSelectedEvent(null);
       }
     } catch (err) {
-      setSelectedEvent(fallbackEvent);
+      setSelectedEvent(null);
+    } finally {
+      setLoading(false);
     }
   };
 
   // Fetch budget for selected event
   const fetchBudgetDetails = async (eventId) => {
-    if (!eventId || eventId === 9999) {
-      // Load fallback mock budgets
-      setBudgetSummary(fallbackBudget);
-      setExpenses(fallbackExpenses);
+    if (!eventId) {
+      setBudgetSummary(null);
+      setExpenses([]);
       setLoading(false);
       return;
     }
@@ -106,7 +107,7 @@ export default function BudgetPlanner() {
         const data = await res.json();
         // Calculate committed amount
         const total = parseFloat(data.budget?.total_budget || 0);
-        const committedVal = total * 0.16; // mock committed calculation matches image
+        const committedVal = total * 0.16; // mock committed calculation
         setBudgetSummary({
           total_budget: total,
           expenses: parseFloat(data.budget?.expenses || 0),
@@ -115,12 +116,12 @@ export default function BudgetPlanner() {
         });
         setExpenses(data.expenses || []);
       } else {
-        setBudgetSummary(fallbackBudget);
-        setExpenses(fallbackExpenses);
+        setBudgetSummary(null);
+        setExpenses([]);
       }
     } catch (err) {
-      setBudgetSummary(fallbackBudget);
-      setExpenses(fallbackExpenses);
+      setBudgetSummary(null);
+      setExpenses([]);
     } finally {
       setLoading(false);
     }
@@ -312,9 +313,9 @@ export default function BudgetPlanner() {
   ];
 
   // Dynamic calculations per category based on current selected event's budgets
-  const activeTotalBudget = budgetSummary?.total_budget || 1500000;
+  const activeTotalBudget = budgetSummary?.total_budget || 0;
   const activeTotalSpent = budgetSummary?.expenses || 0;
-  const activeCommittedSum = budgetSummary?.committed || 240000;
+  const activeCommittedSum = budgetSummary?.committed || 0;
 
   const categoriesData = categoriesList.map(cat => {
     const allocatedBudget = activeTotalBudget * cat.percent;
@@ -360,6 +361,30 @@ export default function BudgetPlanner() {
     };
   });
 
+  // Dynamic slices calculation for Donut Chart
+  const donutCircumference = 2 * Math.PI * 40; // ~251.327
+  const donutChartData = categoriesData.map(cat => ({
+    name: cat.name,
+    color: cat.color,
+    value: chartMode === 'allocated' ? cat.budget : cat.spent
+  }));
+  const donutChartTotal = donutChartData.reduce((sum, d) => sum + d.value, 0);
+
+  let cumulativeOffset = 0;
+  const donutSlices = donutChartData.map(slice => {
+    const ratio = donutChartTotal > 0 ? slice.value / donutChartTotal : 0;
+    const dashLength = ratio * donutCircumference;
+    const strokeDasharray = `${dashLength.toFixed(2)} ${donutCircumference.toFixed(2)}`;
+    const strokeDashoffset = `-${cumulativeOffset.toFixed(2)}`;
+    cumulativeOffset += dashLength;
+    return {
+      ...slice,
+      strokeDasharray,
+      strokeDashoffset,
+      ratio
+    };
+  });
+
   const overBudgetCount = categoriesData.filter(c => c.status === 'Over Budget').length;
   const underBudgetCount = categoriesData.filter(c => c.status === 'On Track').length;
 
@@ -373,6 +398,44 @@ export default function BudgetPlanner() {
           ))}
         </div>
         <div className="h-96 bg-white/5 rounded-2xl animate-pulse"></div>
+      </div>
+    );
+  }
+
+  if (events.length === 0) {
+    return (
+      <div className="flex flex-col gap-8 max-w-7xl mx-auto pb-12 font-medium">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white dark:text-white">
+            Budget Planner
+          </h1>
+          <p className="text-xs text-gray-500 mt-1 font-medium">
+            Plan, manage and track your event budget in one place.
+          </p>
+        </div>
+        <div className="glass-panel flex flex-col items-center justify-center py-20 text-center max-w-xl mx-auto gap-4 font-bold border border-white/5 rounded-2xl p-6 w-full">
+          <div className="w-16 h-16 rounded-full bg-[#5a2bd4]/10 border border-[#5a2bd4]/20 flex items-center justify-center text-[#5a2bd4] dark:text-indigo-400">
+            <AlertCircle className="w-8 h-8" />
+          </div>
+          <h2 className="text-lg font-extrabold text-white">No Events Found</h2>
+          <p className="text-xs text-gray-500 max-w-sm leading-relaxed font-medium">
+            You don't have any events created yet. To use the Budget Planner, you must first create an event or generate one using our AI Planner.
+          </p>
+          <div className="flex items-center gap-3.5 mt-2">
+            <Link
+              href="/ai"
+              className="px-4 py-2.5 rounded-xl bg-[#5a2bd4] hover:bg-[#4c24b5] always-white text-xs font-bold shadow-lg shadow-indigo-500/10 transition-all cursor-pointer"
+            >
+              Create Event with AI
+            </Link>
+            <Link
+              href="/events"
+              className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-bold text-gray-300 dark:hover:text-white transition-all cursor-pointer"
+            >
+              View My Events
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
@@ -542,38 +605,72 @@ export default function BudgetPlanner() {
             <h3 className="text-xs font-bold text-gray-200 dark:text-white uppercase tracking-wider">
               Budget Breakdown
             </h3>
-            <span className="text-[9px] text-gray-500 border border-white/10 rounded-lg px-2 py-0.5 font-bold uppercase">By Category</span>
+            <div className="flex items-center bg-white/5 border border-white/10 rounded-lg p-0.5 text-[9px] font-bold uppercase shrink-0">
+              <button
+                type="button"
+                onClick={() => setChartMode('allocated')}
+                className={`px-2.5 py-0.5 rounded-md cursor-pointer transition-all ${chartMode === 'allocated' ? 'bg-[#5a2bd4] text-white' : 'text-gray-500 hover:text-gray-300'}`}
+              >
+                Allocated
+              </button>
+              <button
+                type="button"
+                onClick={() => setChartMode('spent')}
+                className={`px-2.5 py-0.5 rounded-md cursor-pointer transition-all ${chartMode === 'spent' ? 'bg-[#5a2bd4] text-white' : 'text-gray-500 hover:text-gray-300'}`}
+              >
+                Spent
+              </button>
+            </div>
           </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-between gap-6 py-2">
             {/* SVG Donut Chart */}
             <div className="relative w-32 h-32 shrink-0">
               <svg viewBox="0 0 100 100" className="w-32 h-32 transform -rotate-90">
-                <circle cx="50" cy="50" r="40" fill="transparent" stroke="#5a2bd4" strokeWidth="10" strokeDasharray="100.48 251.2" strokeDashoffset="0" />
-                <circle cx="50" cy="50" r="40" fill="transparent" stroke="#10b981" strokeWidth="10" strokeDasharray="75.36 251.2" strokeDashoffset="-100.48" />
-                <circle cx="50" cy="50" r="40" fill="transparent" stroke="#f59e0b" strokeWidth="10" strokeDasharray="37.68 251.2" strokeDashoffset="-175.84" />
-                <circle cx="50" cy="50" r="40" fill="transparent" stroke="#6366f1" strokeWidth="10" strokeDasharray="25.12 251.2" strokeDashoffset="-213.52" />
-                <circle cx="50" cy="50" r="40" fill="transparent" stroke="#f43f5e" strokeWidth="10" strokeDasharray="12.56 251.2" strokeDashoffset="-238.64" />
+                {/* Fallback circle background */}
+                <circle cx="50" cy="50" r="40" fill="transparent" stroke="rgba(255,255,255,0.05)" strokeWidth="10" />
+                {donutChartTotal > 0 && donutSlices.map((slice, idx) => (
+                  <circle
+                    key={idx}
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    fill="transparent"
+                    stroke={slice.color}
+                    strokeWidth="10"
+                    strokeDasharray={slice.strokeDasharray}
+                    strokeDashoffset={slice.strokeDashoffset}
+                    className="transition-all duration-500 ease-in-out"
+                  />
+                ))}
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                 <span className="text-[10px] font-extrabold text-white dark:text-white leading-none">
-                  {formatRupee(activeTotalBudget)}
+                  {formatRupee(chartMode === 'allocated' ? activeTotalBudget : activeTotalSpent)}
                 </span>
-                <span className="text-[8px] text-gray-500 font-bold uppercase mt-1">Total Budget</span>
+                <span className="text-[8px] text-gray-500 font-bold uppercase mt-1">
+                  {chartMode === 'allocated' ? 'Total Budget' : 'Total Spent'}
+                </span>
               </div>
             </div>
 
             {/* Detailed list legend */}
             <div className="flex flex-col gap-2 w-full text-[10px] font-bold text-gray-300">
-              {categoriesData.map(cat => (
-                <div key={cat.name} className="flex justify-between items-center border-b border-white/5 pb-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: cat.color }}></span>
-                    <span>{cat.name} ({getPercentage(cat.budget, activeTotalBudget)}%)</span>
+              {categoriesData.map(cat => {
+                const currentVal = chartMode === 'allocated' ? cat.budget : cat.spent;
+                const currentTotal = chartMode === 'allocated' ? activeTotalBudget : activeTotalSpent;
+                const percentage = getPercentage(currentVal, currentTotal);
+
+                return (
+                  <div key={cat.name} className="flex justify-between items-center border-b border-white/5 pb-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: cat.color }}></span>
+                      <span>{cat.name} ({percentage}%)</span>
+                    </div>
+                    <span className="font-outfit text-gray-400">{formatRupee(currentVal)}</span>
                   </div>
-                  <span className="font-outfit text-gray-400">{formatRupee(cat.budget)}</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 

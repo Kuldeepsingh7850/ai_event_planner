@@ -19,8 +19,8 @@ import {
 } from 'lucide-react';
 
 export default function TasksTimeline() {
-  const { authFetch } = useAuth();
-  const { showToast } = useNotifications();
+  const { user, authFetch } = useAuth();
+  const { fetchNotifications, showToast } = useNotifications();
 
   // General States
   const [events, setEvents] = useState([]);
@@ -43,7 +43,7 @@ export default function TasksTimeline() {
   // Modal / Add Task Form States
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [newTaskAssignee, setNewTaskAssignee] = useState('Rahul Sharma');
+  const [newTaskAssignee, setNewTaskAssignee] = useState('Self');
   const [newTaskDeadline, setNewTaskDeadline] = useState('');
   const [newTaskPriority, setNewTaskPriority] = useState('Medium');
   const [newTaskStatus, setNewTaskStatus] = useState('To Do');
@@ -52,6 +52,7 @@ export default function TasksTimeline() {
 
   // List of standard mock members for event assignment
   const mockTeamMembers = [
+    'Self',
     'Rahul Sharma',
     'Priya Patel',
     'Vikram Singh',
@@ -101,13 +102,15 @@ export default function TasksTimeline() {
         if (data.length > 0) {
           setSelectedEvent(data[0]);
         } else {
-          setSelectedEvent(fallbackEvent);
+          setSelectedEvent(null);
         }
       } else {
-        setSelectedEvent(fallbackEvent);
+        setSelectedEvent(null);
       }
     } catch (err) {
-      setSelectedEvent(fallbackEvent);
+      setSelectedEvent(null);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -157,8 +160,8 @@ export default function TasksTimeline() {
 
   // Fetch tasks for current event
   const fetchTasksList = async (eventId) => {
-    if (!eventId || eventId === 9999) {
-      setTasks(fallbackTasks.map(parseTask));
+    if (!eventId) {
+      setTasks([]);
       setLoading(false);
       return;
     }
@@ -169,10 +172,10 @@ export default function TasksTimeline() {
         const data = await res.json();
         setTasks(data.map(parseTask));
       } else {
-        setTasks(fallbackTasks.map(parseTask));
+        setTasks([]);
       }
     } catch (err) {
-      setTasks(fallbackTasks.map(parseTask));
+      setTasks([]);
     } finally {
       setLoading(false);
     }
@@ -250,6 +253,7 @@ export default function TasksTimeline() {
         setNewTaskTitle('');
         setNewTaskDeadline('');
         fetchTasksList(selectedEvent.id);
+        fetchNotifications();
       } else {
         const data = await res.json();
         showToast(data.message || 'Error creating task', 'error');
@@ -291,6 +295,7 @@ export default function TasksTimeline() {
       if (res.ok) {
         showToast(`Task status updated!`, 'success');
         fetchTasksList(selectedEvent.id);
+        fetchNotifications();
       } else {
         // Rollback on failure
         setTasks(prev => prev.map(t => {
@@ -352,7 +357,8 @@ export default function TasksTimeline() {
   // Filter Tasks List
   const filteredTasks = tasks.filter(t => {
     const matchesSearch = t.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.assigneeName.toLowerCase().includes(searchQuery.toLowerCase());
+      t.assigneeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (t.assigneeName === 'Self' && user?.name && user.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
     const matchesPriority = priorityFilter === 'All' || t.priority === priorityFilter;
 
@@ -371,6 +377,54 @@ export default function TasksTimeline() {
     (currentPage - 1) * pageSize,
     currentPage * pageSize
   );
+
+  if (loading && events.length === 0) {
+    return (
+      <div className="flex flex-col gap-6 max-w-7xl mx-auto animate-pulse">
+        <div className="h-8 bg-white/5 rounded w-1/4 mb-4"></div>
+        <div className="h-10 bg-white/5 rounded-xl"></div>
+        <div className="h-96 bg-white/5 rounded-xl mt-4"></div>
+      </div>
+    );
+  }
+
+  if (events.length === 0) {
+    return (
+      <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-12 font-medium">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white dark:text-white">
+            Tasks & Timeline
+          </h1>
+          <p className="text-xs text-gray-500 mt-1 font-medium">
+            Plan, assign and track all tasks for your event.
+          </p>
+        </div>
+        <div className="glass-panel flex flex-col items-center justify-center py-20 text-center max-w-xl mx-auto gap-4 font-bold border border-white/5 rounded-2xl p-6 w-full">
+          <div className="w-16 h-16 rounded-full bg-[#5a2bd4]/10 border border-[#5a2bd4]/20 flex items-center justify-center text-[#5a2bd4] dark:text-indigo-400">
+            <AlertCircle className="w-8 h-8" />
+          </div>
+          <h2 className="text-lg font-extrabold text-white">No Events Found</h2>
+          <p className="text-xs text-gray-500 max-w-sm leading-relaxed font-medium">
+            You don't have any events created yet. To manage tasks and timelines, you must first create an event or generate one using our AI Planner.
+          </p>
+          <div className="flex items-center gap-3.5 mt-2">
+            <Link
+              href="/ai"
+              className="px-4 py-2.5 rounded-xl bg-[#5a2bd4] hover:bg-[#4c24b5] always-white text-xs font-bold shadow-lg shadow-indigo-500/10 transition-all cursor-pointer"
+            >
+              Create Event with AI
+            </Link>
+            <Link
+              href="/events"
+              className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-bold text-gray-300 dark:hover:text-white transition-all cursor-pointer"
+            >
+              View My Events
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-12 font-medium">
@@ -565,12 +619,16 @@ export default function TasksTimeline() {
                     <td className="py-4 px-3">
                       <div className="flex items-center gap-2.5">
                         <img
-                          src={assigneeAvatars[task.assigneeName] || `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assigneeName)}&background=random`}
+                          src={
+                            task.assigneeName === 'Self' && user?.avatar
+                              ? user.avatar
+                              : assigneeAvatars[task.assigneeName] || `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assigneeName)}&background=random`
+                          }
                           alt={task.assigneeName}
                           className="w-6 h-6 rounded-full border border-white/10 shrink-0 object-cover"
                         />
                         <span className="text-xs text-gray-300 leading-none font-bold">
-                          {task.assigneeName}
+                          {task.assigneeName === 'Self' && user?.name ? `${user.name} (Self)` : task.assigneeName}
                         </span>
                       </div>
                     </td>
@@ -711,17 +769,13 @@ export default function TasksTimeline() {
               {/* Assignee Selection */}
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] text-gray-400 font-bold uppercase">Assigned To</label>
-                <select
+                <input
+                  type="text"
+                  placeholder="e.g. Self, Rahul Sharma, etc."
                   value={newTaskAssignee}
                   onChange={(e) => setNewTaskAssignee(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500 cursor-pointer font-bold"
-                >
-                  {mockTeamMembers.map(member => (
-                    <option key={member} value={member} className="bg-[#151c2c] text-white">
-                      {member}
-                    </option>
-                  ))}
-                </select>
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 font-bold"
+                />
               </div>
 
               {/* Deadline Datepicker */}

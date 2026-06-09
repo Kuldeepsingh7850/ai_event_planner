@@ -28,7 +28,7 @@ const getGuests = async (req, res) => {
 // @route   POST /api/guest/add
 // @access  Private
 const addGuest = async (req, res) => {
-  const { eventId, guest_name, email, status } = req.body;
+  const { eventId, guest_name, email, phone, status } = req.body;
 
   if (!eventId || !guest_name || !email) {
     return res.status(400).json({ message: 'Please provide eventId, guest name, and email' });
@@ -46,8 +46,18 @@ const addGuest = async (req, res) => {
 
     // Insert guest
     const result = await db.query(
-      'INSERT INTO guests (event_id, guest_name, email, status) VALUES (?, ?, ?, ?)',
-      [eventId, guest_name, email, status || 'pending']
+      'INSERT INTO guests (event_id, guest_name, email, phone, status) VALUES (?, ?, ?, ?, ?)',
+      [eventId, guest_name, email, phone || null, status || 'pending']
+    );
+
+    // Send guest added notification
+    await db.query(
+      'INSERT INTO notifications (user_id, message, status) VALUES (?, ?, ?)',
+      [
+        events[0].user_id,
+        `"${guest_name}" has been added to the guest list for "${events[0].title}".`,
+        'unread'
+      ]
     );
 
     res.status(201).json({
@@ -55,6 +65,7 @@ const addGuest = async (req, res) => {
       event_id: eventId,
       guest_name,
       email,
+      phone: phone || null,
       status: status || 'pending'
     });
   } catch (error) {
@@ -68,7 +79,7 @@ const addGuest = async (req, res) => {
 // @access  Private
 const updateGuest = async (req, res) => {
   const guestId = req.params.id;
-  const { guest_name, email, status } = req.body;
+  const { guest_name, email, phone, status } = req.body;
 
   try {
     // Find guest
@@ -91,8 +102,14 @@ const updateGuest = async (req, res) => {
 
     // Update guest
     await db.query(
-      'UPDATE guests SET guest_name = ?, email = ?, status = ? WHERE id = ?',
-      [guest_name || guest.guest_name, email || guest.email, status || guest.status, guestId]
+      'UPDATE guests SET guest_name = ?, email = ?, phone = ?, status = ? WHERE id = ?',
+      [
+        guest_name || guest.guest_name,
+        email || guest.email,
+        phone !== undefined ? phone : guest.phone,
+        status || guest.status,
+        guestId
+      ]
     );
 
     res.json({ message: 'Guest details updated successfully' });

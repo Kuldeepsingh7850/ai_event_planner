@@ -11,7 +11,7 @@ const mockDb = {
     { id: 2, name: 'John Doe', email: 'john@gmail.com', password: '$2a$10$m0GWB4B8r/XXzJ0tusxemOiFmlLRZUUmUf73wIETwvwYWIkZEktV.', role: 'user', status: 'active', avatar: null, created_at: new Date() }
   ],
   events: [
-    { id: 1, user_id: 2, title: 'Annual College Farewell 2026', description: 'Farewell party for the graduating computer science batch.', event_type: 'Farewell', date: '2026-06-15', time: '16:00:00', location: 'Main Campus Auditorium', budget: 50000.00, guest_count: 200, status: 'planning', created_at: new Date() }
+    { id: 1, user_id: 2, title: 'Annual College Farewell 2026', description: 'Farewell party for the graduating computer science batch.', event_type: 'Farewell', date: '2026-06-15', time: '16:00:00', location: 'Main Campus Auditorium', budget: 50000.00, guest_count: 200, status: 'planning', theme: 'Royal / Traditional', created_at: new Date() }
   ],
   guests: [
     { id: 1, event_id: 1, guest_name: 'Prof. Alan Turing', email: 'turing@univ.edu', status: 'confirmed', created_at: new Date() },
@@ -79,6 +79,50 @@ const initDb = async () => {
     // Test the connection
     const conn = await pool.getConnection();
     console.log('✅ Connected to MySQL database successfully!');
+    
+    // Auto-update schema to support reset token
+    try {
+      const [columns] = await conn.query("SHOW COLUMNS FROM `users` LIKE 'reset_token'");
+      if (columns.length === 0) {
+        await conn.query("ALTER TABLE `users` ADD COLUMN `reset_token` VARCHAR(255) DEFAULT NULL");
+        await conn.query("ALTER TABLE `users` ADD COLUMN `reset_token_expiry` TIMESTAMP NULL DEFAULT NULL");
+        console.log("✅ Successfully updated users table schema for password resets");
+      }
+    } catch (schemaErr) {
+      console.warn("⚠️ Could not auto-verify or alter users table schema:", schemaErr.message);
+    }
+
+    // Auto-update schema to support phone number on users
+    try {
+      const [columns] = await conn.query("SHOW COLUMNS FROM `users` LIKE 'phone'");
+      if (columns.length === 0) {
+        await conn.query("ALTER TABLE `users` ADD COLUMN `phone` VARCHAR(50) DEFAULT NULL");
+        console.log("✅ Successfully updated users table schema for phone contact");
+      }
+    } catch (schemaErr) {
+      console.warn("⚠️ Could not auto-verify or alter users table schema for phone:", schemaErr.message);
+    }
+
+    try {
+      const [columns] = await conn.query("SHOW COLUMNS FROM `guests` LIKE 'phone'");
+      if (columns.length === 0) {
+        await conn.query("ALTER TABLE `guests` ADD COLUMN `phone` VARCHAR(50) DEFAULT NULL");
+        console.log("✅ Successfully updated guests table schema for phone contact");
+      }
+    } catch (schemaErr) {
+      console.warn("⚠️ Could not auto-verify or alter guests table schema:", schemaErr.message);
+    }
+
+    try {
+      const [columns] = await conn.query("SHOW COLUMNS FROM `events` LIKE 'theme'");
+      if (columns.length === 0) {
+        await conn.query("ALTER TABLE `events` ADD COLUMN `theme` VARCHAR(255) DEFAULT 'Royal / Traditional'");
+        console.log("✅ Successfully updated events table schema for theme column");
+      }
+    } catch (schemaErr) {
+      console.warn("⚠️ Could not auto-verify or alter events table schema:", schemaErr.message);
+    }
+    
     conn.release();
   } catch (error) {
     console.warn('⚠️ Failed to connect to MySQL database:', error.message);
@@ -120,6 +164,11 @@ const handleMockQuery = (sql, params) => {
         const user = mockDb.users.find(u => u.id === id);
         return user ? [user] : [];
       }
+      if (normalizedSql.includes('where reset_token = ?')) {
+        const token = params[0];
+        const user = mockDb.users.find(u => u.reset_token === token);
+        return user ? [user] : [];
+      }
       return mockDb.users;
     }
 
@@ -133,7 +182,7 @@ const handleMockQuery = (sql, params) => {
           remaining_budget: b ? parseFloat(b.remaining_budget) : parseFloat(e.budget)
         };
       };
-      if (normalizedSql.includes('where user_id = ?')) {
+      if (normalizedSql.includes('user_id = ?')) {
         const userId = parseInt(params[0]);
         return mockDb.events.filter(e => e.user_id === userId).map(getEnhancedEvent);
       }
@@ -206,7 +255,7 @@ const handleMockQuery = (sql, params) => {
 
     // NOTIFICATIONS select
     if (normalizedSql.includes('from notifications')) {
-      if (normalizedSql.includes('where user_id = ?')) {
+      if (normalizedSql.includes('user_id = ?')) {
         const userId = parseInt(params[0]);
         return mockDb.notifications
           .filter(n => n.user_id === userId)
@@ -248,6 +297,7 @@ const handleMockQuery = (sql, params) => {
         budget: parseFloat(params[7]),
         guest_count: parseInt(params[8]),
         status: params[9] || 'planning',
+        theme: params[10] || 'Royal / Traditional',
         created_at: new Date()
       };
       mockDb.events.push(newEvent);
@@ -272,7 +322,8 @@ const handleMockQuery = (sql, params) => {
         event_id: parseInt(params[0]),
         guest_name: params[1],
         email: params[2],
-        status: params[3] || 'pending',
+        phone: params[3] || null,
+        status: params[4] || 'pending',
         created_at: new Date()
       };
       mockDb.guests.push(newGuest);
@@ -410,9 +461,75 @@ const handleMockQuery = (sql, params) => {
       }
       return { affectedRows: 0 };
     }
+
+    // USERS reset token update
+    if (normalizedSql.includes('update users set reset_token = ?, reset_token_expiry = ?')) {
+      const reset_token = params[0];
+      const reset_token_expiry = params[1];
+      const id = parseInt(params[2]);
+      const idx = mockDb.users.findIndex(u => u.id === id);
+      if (idx !== -1) {
+        mockDb.users[idx].reset_token = reset_token;
+        mockDb.users[idx].reset_token_expiry = reset_token_expiry;
+        return { affectedRows: 1 };
+      }
+      return { affectedRows: 0 };
+    }
+
+    // USERS password update from reset token
+    if (normalizedSql.includes('update users set password = ?, reset_token = null, reset_token_expiry = null')) {
+      const password = params[0];
+      const id = parseInt(params[1]);
+      const idx = mockDb.users.findIndex(u => u.id === id);
+      if (idx !== -1) {
+        mockDb.users[idx].password = password;
+        mockDb.users[idx].reset_token = null;
+        mockDb.users[idx].reset_token_expiry = null;
+        return { affectedRows: 1 };
+      }
+      return { affectedRows: 0 };
+    }
+
+    // USERS profile update (name and phone)
+    if (normalizedSql.includes('update users set name = ?, phone = ?')) {
+      const name = params[0];
+      const phone = params[1];
+      const id = parseInt(params[2]);
+      const idx = mockDb.users.findIndex(u => u.id === id);
+      if (idx !== -1) {
+        mockDb.users[idx].name = name;
+        mockDb.users[idx].phone = phone;
+        return { affectedRows: 1 };
+      }
+      return { affectedRows: 0 };
+    }
+
+    // USERS profile update (name only)
+    if (normalizedSql.includes('update users set name = ? where id = ?')) {
+      const name = params[0];
+      const id = parseInt(params[1]);
+      const idx = mockDb.users.findIndex(u => u.id === id);
+      if (idx !== -1) {
+        mockDb.users[idx].name = name;
+        return { affectedRows: 1 };
+      }
+      return { affectedRows: 0 };
+    }
+
+    // USERS password update (profile password update)
+    if (normalizedSql.includes('update users set password = ? where id = ?')) {
+      const password = params[0];
+      const id = parseInt(params[1]);
+      const idx = mockDb.users.findIndex(u => u.id === id);
+      if (idx !== -1) {
+        mockDb.users[idx].password = password;
+        return { affectedRows: 1 };
+      }
+      return { affectedRows: 0 };
+    }
     // EVENTS update
     if (normalizedSql.includes('update events')) {
-      // UPDATE events SET title=?, description=?, event_type=?, date=?, time=?, location=?, budget=?, guest_count=?, status=? WHERE id=?
+      // UPDATE events SET title=?, description=?, event_type=?, date=?, time=?, location=?, budget=?, guest_count=?, status=?, theme=? WHERE id=?
       const title = params[0];
       const description = params[1];
       const event_type = params[2];
@@ -422,13 +539,14 @@ const handleMockQuery = (sql, params) => {
       const budget = parseFloat(params[6]);
       const guest_count = parseInt(params[7]);
       const status = params[8];
-      const id = parseInt(params[9]);
+      const theme = params[9];
+      const id = parseInt(params[10]);
 
       const idx = mockDb.events.findIndex(e => e.id === id);
       if (idx !== -1) {
         mockDb.events[idx] = {
           ...mockDb.events[idx],
-          title, description, event_type, date, time, location, budget, guest_count, status
+          title, description, event_type, date, time, location, budget, guest_count, status, theme
         };
         // Update total budget in budget table too
         const bIdx = mockDb.budget.findIndex(b => b.event_id === id);
@@ -443,14 +561,24 @@ const handleMockQuery = (sql, params) => {
 
     // GUESTS update
     if (normalizedSql.includes('update guests')) {
-      const guest_name = params[0];
-      const email = params[1];
-      const status = params[2];
-      const id = parseInt(params[3]);
-
-      const idx = mockDb.guests.findIndex(g => g.id === id);
+      const idx = mockDb.guests.findIndex(g => g.id === parseInt(params[params.length - 1]));
       if (idx !== -1) {
-        mockDb.guests[idx] = { ...mockDb.guests[idx], guest_name, email, status };
+        if (params.length === 5) {
+          mockDb.guests[idx] = {
+            ...mockDb.guests[idx],
+            guest_name: params[0],
+            email: params[1],
+            phone: params[2],
+            status: params[3]
+          };
+        } else {
+          mockDb.guests[idx] = {
+            ...mockDb.guests[idx],
+            guest_name: params[0],
+            email: params[1],
+            status: params[2]
+          };
+        }
         return { affectedRows: 1 };
       }
       return { affectedRows: 0 };

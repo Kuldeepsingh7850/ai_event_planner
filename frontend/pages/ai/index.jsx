@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
+import { LogoBrand } from '../../components/Logo';
 import {
   Sparkles,
   Users,
@@ -29,12 +30,13 @@ export default function AIEventPlannerIntermediate() {
 
   // --- Form Input States ---
   const [eventTitle, setEventTitle] = useState('');
-  const [category, setCategory] = useState('Wedding');
+  const [category, setCategory] = useState('');
   const [location, setLocation] = useState('Udaipur, Rajasthan');
   const [eventDate, setEventDate] = useState('');
-  const [guestCount, setGuestCount] = useState(200);
-  const [budget, setBudget] = useState(500000); // 5 Lakhs default
-  const [specialRequests, setSpecialRequests] = useState('Royal theme, lake view venue options');
+  const [eventTime, setEventTime] = useState('17:00');
+  const [guestCount, setGuestCount] = useState('');
+  const [budget, setBudget] = useState('');
+  const [specialRequests, setSpecialRequests] = useState('');
 
   // --- UI States ---
   const [loading, setLoading] = useState(false);
@@ -42,17 +44,22 @@ export default function AIEventPlannerIntermediate() {
   const [chosenVenue, setChosenVenue] = useState(null); // Selected venue card state
   const [selectedVenue, setSelectedVenue] = useState(null); // venue details modal state
 
-  // Set default event Date as next month on mount
-  useEffect(() => {
-    const defaultDate = new Date();
-    defaultDate.setDate(defaultDate.getDate() + 30);
-    setEventDate(defaultDate.toISOString().split('T')[0]);
-  }, []);
-
   const handleGenerate = async (e) => {
     e.preventDefault();
     if (!eventTitle.trim()) {
       return showToast('Please fill out the event title', 'warning');
+    }
+    if (!category) {
+      return showToast('Please select an event category', 'warning');
+    }
+    if (!eventDate) {
+      return showToast('Please select an event date', 'warning');
+    }
+    if (!guestCount) {
+      return showToast('Please enter estimated guest count', 'warning');
+    }
+    if (!budget) {
+      return showToast('Please enter target budget', 'warning');
     }
 
     setLoading(true);
@@ -71,14 +78,17 @@ export default function AIEventPlannerIntermediate() {
           eventType: category,
           budget: budget,
           guestCount: guestCount,
+          location: location,
+          time: eventTime,
+          specialRequests: specialRequests,
           description: notesBlock
         })
       });
 
       if (res.ok) {
         const data = await res.json();
-        // Append local venue recommendations for Udaipur
-        data.venues = getUdaipurVenues(budget, guestCount);
+        // Use AI suggested venues if present, otherwise append local Udaipur venues
+        data.venues = data.venues || getUdaipurVenues(budget, guestCount);
         setSuggestions(data);
         showToast('Suggestions generated successfully!', 'success');
       } else {
@@ -104,13 +114,13 @@ export default function AIEventPlannerIntermediate() {
             'Main Buffet: Choice of North Indian dishes, Rajasthani specialties, Dal Makhani, Paneer butter masala, Butter rotis, and Jeera Rice.',
             'Desserts: Warm Gulab Jamun with ice cream.'
           ],
-          timeline: [
+          timeline: shiftTimeline([
             '05:00 PM - Guest Welcoming & Welcome Drinks',
             '06:30 PM - Main Ceremony / Event Presentation',
             '08:00 PM - Opening of Dining Buffet',
             '09:30 PM - Musical session / Speeches',
             '10:30 PM - Event wrap up & return gifts'
-          ],
+          ], eventTime),
           budgetAllocation: [
             { category: 'Venue & Catering (40%)', amount: budget * 0.40, description: 'Venue rental and catering package.' },
             { category: 'Decoration & Theme (20%)', amount: budget * 0.20, description: 'Stage decor, flowers, and lighting setup.' },
@@ -131,13 +141,105 @@ export default function AIEventPlannerIntermediate() {
     }
   };
 
+  const shiftTimeline = (timeline, startTimeStr) => {
+    if (!timeline || !Array.isArray(timeline) || timeline.length === 0 || !startTimeStr) return timeline;
+    
+    const parts = startTimeStr.split(':');
+    if (parts.length < 2) return timeline;
+    const startHours = parseInt(parts[0]);
+    const startMinutes = parseInt(parts[1]);
+    if (isNaN(startHours) || isNaN(startMinutes)) return timeline;
+
+    const getEntryText = (entry) => {
+      if (!entry) return '';
+      if (typeof entry === 'object') {
+        return entry.name || entry.description || entry.time || JSON.stringify(entry);
+      }
+      return String(entry);
+    };
+
+    const firstEntry = timeline[0];
+    const firstEntryText = getEntryText(firstEntry);
+    const match = firstEntryText.match(/^(\d{2}):(\d{2})\s*(AM|PM)/i);
+    if (!match) return timeline;
+    
+    let origHours = parseInt(match[1]);
+    const origMinutes = parseInt(match[2]);
+    const ampm = match[3].toUpperCase();
+    if (ampm === 'PM' && origHours < 12) origHours += 12;
+    if (ampm === 'AM' && origHours === 12) origHours = 0;
+
+    const diffMinutes = (startHours * 60 + startMinutes) - (origHours * 60 + origMinutes);
+
+    return timeline.map(entry => {
+      if (typeof entry === 'object') {
+        const keysToTry = ['time', 'name', 'description'];
+        let shiftedEntry = { ...entry };
+        for (const key of keysToTry) {
+          if (typeof entry[key] === 'string') {
+            shiftedEntry[key] = entry[key].replace(/^(\d{2}):(\d{2})\s*(AM|PM)/i, (full, hh, mm, ap) => {
+              let h = parseInt(hh);
+              let m = parseInt(mm);
+              let a = ap.toUpperCase();
+              if (a === 'PM' && h < 12) h += 12;
+              if (a === 'AM' && h === 12) h = 0;
+
+              let totalMin = h * 60 + m + diffMinutes;
+              totalMin = (totalMin + 1440) % 1440;
+
+              let newH = Math.floor(totalMin / 60);
+              let newM = totalMin % 60;
+              let newAp = 'AM';
+              if (newH >= 12) {
+                newAp = 'PM';
+                if (newH > 12) newH -= 12;
+              }
+              if (newH === 0) newH = 12;
+
+              const newHStr = String(newH).padStart(2, '0');
+              const newMStr = String(newM).padStart(2, '0');
+              return `${newHStr}:${newMStr} ${newAp}`;
+            });
+          }
+        }
+        return shiftedEntry;
+      }
+
+      if (typeof entry !== 'string') return entry;
+
+      return entry.replace(/^(\d{2}):(\d{2})\s*(AM|PM)/i, (full, hh, mm, ap) => {
+        let h = parseInt(hh);
+        let m = parseInt(mm);
+        let a = ap.toUpperCase();
+        if (a === 'PM' && h < 12) h += 12;
+        if (a === 'AM' && h === 12) h = 0;
+
+        let totalMin = h * 60 + m + diffMinutes;
+        totalMin = (totalMin + 1440) % 1440;
+
+        let newH = Math.floor(totalMin / 60);
+        let newM = totalMin % 60;
+        let newAp = 'AM';
+        if (newH >= 12) {
+          newAp = 'PM';
+          if (newH > 12) newH -= 12;
+        }
+        if (newH === 0) newH = 12;
+
+        const newHStr = String(newH).padStart(2, '0');
+        const newMStr = String(newM).padStart(2, '0');
+        return `${newHStr}:${newMStr} ${newAp}`;
+      });
+    });
+  };
+
   const getUdaipurVenues = (b, guests) => {
     return [
       {
         id: 'leela',
         name: 'The Leela Palace Udaipur',
         rating: '4.8 ★',
-        img: '/udaipur_palace.png',
+        img: '/leela_palace.jpg',
         location: 'Lake Pichola, Udaipur',
         capacity: `${Math.round(guests * 0.8)} - ${Math.round(guests * 1.5)} Guests`,
         type: 'Luxury Palace Hotel',
@@ -149,7 +251,7 @@ export default function AIEventPlannerIntermediate() {
         id: 'fateh',
         name: 'Fateh Garh Resort',
         rating: '4.5 ★',
-        img: '/services_venues.png',
+        img: '/monsoon_palace.jpg',
         location: 'Sajjangarh, Udaipur',
         capacity: `${Math.round(guests * 0.7)} - ${Math.round(guests * 1.2)} Guests`,
         type: 'Heritage Fort Resort',
@@ -161,7 +263,7 @@ export default function AIEventPlannerIntermediate() {
         id: 'radisson',
         name: 'Radisson Blu Udaipur',
         rating: '4.5 ★',
-        img: '/udaipur_palace_light.png',
+        img: '/hero_udaipur_3.jpg',
         location: 'Rani Road, Udaipur',
         capacity: `${Math.round(guests * 0.5)} - ${Math.round(guests * 1.8)} Guests`,
         type: 'Luxury Hotel',
@@ -184,10 +286,13 @@ export default function AIEventPlannerIntermediate() {
           description: summaryDesc,
           event_type: category,
           date: eventDate,
-          time: '18:00',
+          time: eventTime,
           location: chosenVenue ? `${chosenVenue.name}, Udaipur` : location,
           budget: budget,
-          guest_count: guestCount
+          guest_count: guestCount,
+          theme: suggestions && suggestions.themes ? (typeof suggestions.themes[0] === 'object' ? (suggestions.themes[0].name || suggestions.themes[0].description || JSON.stringify(suggestions.themes[0])) : suggestions.themes[0]) : 'Royal / Traditional',
+          timeline: suggestions ? (Array.isArray(suggestions.timeline) ? suggestions.timeline.map(item => typeof item === 'object' ? (item.time && item.description ? `${item.time} - ${item.description}` : item.name || item.description || JSON.stringify(item)) : String(item)) : []) : [],
+          venue: chosenVenue || null
         })
       });
 
@@ -213,14 +318,29 @@ export default function AIEventPlannerIntermediate() {
     }).format(value);
   };
 
+  const renderItemSafely = (item) => {
+    if (!item) return '';
+    if (typeof item === 'object') {
+      if (item.name && (item.description || item.desc)) {
+        return (
+          <>
+            <strong className="text-gray-200">{item.name}:</strong>{' '}
+            {item.description || item.desc}
+          </>
+        );
+      }
+      return item.description || item.desc || item.name || JSON.stringify(item);
+    }
+    return item;
+  };
+
   return (
     <div className="max-w-6xl mx-auto flex flex-col gap-6 font-sans">
       
       {/* Page Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-          <Sparkles className="w-6 h-6 text-indigo-400 font-extrabold" />
-          JAGAH
+      <div className="flex flex-col gap-1.5 items-start">
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white dark:text-white">
+          AI Event Planner
         </h1>
         <p className="text-xs text-gray-400 mt-1">
           Configure your details on the left to generate customized planning ideas, catering plans, and budget estimations instantly.
@@ -259,25 +379,43 @@ export default function AIEventPlannerIntermediate() {
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
                   className="w-full bg-white/3 border border-white/5 rounded-xl px-3 py-2 text-xs text-gray-200 focus:outline-none focus:border-indigo-500/50 transition-all cursor-pointer font-semibold"
+                  required
                 >
+                  <option value="" disabled className="bg-[#151c2c] text-gray-400">Select Event Category</option>
                   {['Wedding', 'Birthday', 'Farewell', 'Corporate', 'Seminar', 'Conference', 'Gala', 'Festival', 'Other'].map(cat => (
                     <option key={cat} value={cat} className="bg-[#151c2c] text-white">{cat}</option>
                   ))}
                 </select>
               </div>
 
-              {/* Date Block */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Date</label>
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-2.5 w-3.5 h-3.5 text-gray-500" />
-                  <input
-                    type="date"
-                    value={eventDate}
-                    onChange={(e) => setEventDate(e.target.value)}
-                    className="w-full bg-white/3 border border-white/5 rounded-xl pl-9 pr-2 py-2 text-xs text-white focus:outline-none focus:border-indigo-500/50 transition-all cursor-pointer font-medium"
-                    required
-                  />
+              {/* Date & Start Time Grid */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Date</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-2.5 w-3.5 h-3.5 text-gray-500" />
+                    <input
+                      type="date"
+                      value={eventDate}
+                      onChange={(e) => setEventDate(e.target.value)}
+                      className="w-full bg-white/3 border border-white/5 rounded-xl pl-9 pr-2 py-2 text-xs text-white focus:outline-none focus:border-indigo-500/50 transition-all cursor-pointer font-medium"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Start Time</label>
+                  <div className="relative">
+                    <Clock className="absolute left-3 top-2.5 w-3.5 h-3.5 text-gray-500" />
+                    <input
+                      type="time"
+                      value={eventTime}
+                      onChange={(e) => setEventTime(e.target.value)}
+                      className="w-full bg-white/3 border border-white/5 rounded-xl pl-9 pr-2 py-2 text-xs text-white focus:outline-none focus:border-indigo-500/50 transition-all cursor-pointer font-medium"
+                      required
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -290,9 +428,10 @@ export default function AIEventPlannerIntermediate() {
                     <input
                       type="number"
                       value={guestCount}
-                      onChange={(e) => setGuestCount(Math.max(1, parseInt(e.target.value) || 0))}
+                      onChange={(e) => setGuestCount(e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value) || 0))}
                       className="w-full bg-white/3 border border-white/5 rounded-xl pl-9 pr-2 py-2 text-xs text-white focus:outline-none focus:border-indigo-500/50 transition-all font-medium"
                       min="1"
+                      placeholder="e.g. 200"
                       required
                     />
                   </div>
@@ -305,8 +444,9 @@ export default function AIEventPlannerIntermediate() {
                     <input
                       type="number"
                       value={budget}
-                      onChange={(e) => setBudget(Math.max(1, parseInt(e.target.value) || 0))}
+                      onChange={(e) => setBudget(e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value) || 0))}
                       className="w-full bg-white/3 border border-white/5 rounded-xl pl-8 pr-2 py-2 text-xs text-white focus:outline-none focus:border-indigo-500/50 transition-all font-medium"
+                      placeholder="e.g. 500000"
                       required
                     />
                   </div>
@@ -383,7 +523,7 @@ export default function AIEventPlannerIntermediate() {
                   AI Suggested Overview
                 </h3>
                 <p className="text-xs text-gray-300 leading-relaxed bg-white/2 p-3 rounded-xl border border-white/5 italic">
-                  "{suggestions.description}"
+                  "{renderItemSafely(suggestions.description)}"
                 </p>
               </div>
 
@@ -462,18 +602,18 @@ export default function AIEventPlannerIntermediate() {
                   
                   {/* Theme badges */}
                   <div className="flex flex-wrap gap-1.5 mb-1">
-                    {suggestions.themes.map((t, idx) => (
+                    {suggestions.themes && suggestions.themes.map((t, idx) => (
                       <span key={idx} className="bg-purple-500/5 border border-purple-500/10 text-purple-300 font-bold px-2 py-0.5 rounded-lg text-[9px] uppercase tracking-wide">
-                        {t}
+                        {renderItemSafely(t)}
                       </span>
                     ))}
                   </div>
 
                   <ul className="flex flex-col gap-2 border-t border-white/5 pt-2">
-                    {suggestions.decorations.map((decor, idx) => (
+                    {suggestions.decorations && suggestions.decorations.map((decor, idx) => (
                       <li key={idx} className="text-[10px] text-gray-400 flex items-start gap-2 leading-relaxed">
                         <span className="text-purple-400 font-extrabold shrink-0">•</span>
-                        {decor}
+                        {renderItemSafely(decor)}
                       </li>
                     ))}
                   </ul>
@@ -486,10 +626,10 @@ export default function AIEventPlannerIntermediate() {
                     Dining & Food Plan
                   </h4>
                   <ul className="flex flex-col gap-2">
-                    {suggestions.foods.map((food, idx) => (
+                    {suggestions.foods && suggestions.foods.map((food, idx) => (
                       <li key={idx} className="text-[10px] text-gray-400 flex items-start gap-2 leading-relaxed">
                         <span className="text-emerald-400 font-extrabold shrink-0">•</span>
-                        {food}
+                        {renderItemSafely(food)}
                       </li>
                     ))}
                   </ul>
@@ -540,10 +680,10 @@ export default function AIEventPlannerIntermediate() {
                 </h3>
                 
                 <div className="flex flex-col gap-3 mt-1.5 pl-3.5 border-l border-indigo-500/20">
-                  {suggestions.timeline.map((timeRow, idx) => (
+                  {suggestions.timeline && suggestions.timeline.map((timeRow, idx) => (
                     <div key={idx} className="relative flex items-center gap-3">
                       <span className="absolute left-[-20px] w-2 h-2 rounded-full bg-indigo-500 border border-[#0d0f14]"></span>
-                      <p className="text-[10px] text-gray-300 font-medium">{timeRow}</p>
+                      <p className="text-[10px] text-gray-300 font-medium">{renderItemSafely(timeRow)}</p>
                     </div>
                   ))}
                 </div>
@@ -556,10 +696,10 @@ export default function AIEventPlannerIntermediate() {
                   AI Coordinator Planning Tips
                 </h3>
                 <ul className="flex flex-col gap-2.5">
-                  {suggestions.tips.map((tip, idx) => (
+                  {suggestions.tips && suggestions.tips.map((tip, idx) => (
                     <li key={idx} className="text-[10px] text-gray-400 flex items-start gap-2 leading-relaxed">
                       <span className="text-emerald-400 font-extrabold shrink-0 mt-0.5">✓</span>
-                      {tip}
+                      {renderItemSafely(tip)}
                     </li>
                   ))}
                 </ul>

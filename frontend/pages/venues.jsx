@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import {
@@ -25,8 +26,9 @@ import {
 } from 'lucide-react';
 
 export default function VenuesCatalog() {
-  const { user } = useAuth();
+  const { user, authFetch } = useAuth();
   const { showToast } = useNotifications();
+  const router = useRouter();
 
   // Venue dataset
   const initialVenues = [
@@ -34,141 +36,241 @@ export default function VenuesCatalog() {
       id: 1,
       name: 'The Leela Palace Udaipur',
       type: 'Luxury Hotel',
-      location: 'Udaipur',
+      event_type: 'hotel',
+      location: 'Lake Pichola, Udaipur',
       minCapacity: 200,
       maxCapacity: 500,
+      guest_count: 500,
       priceTier: '₹₹₹₹',
       priceNum: 4,
       rating: 4.8,
-      image: '/udaipur_palace.png',
+      image: '/leela_palace.jpg',
       amenities: ['Pool', 'AC Hall', 'Parking', 'Bar', 'Stage'],
-      description: 'A majestic palace hotel located on the banks of Lake Pichola, offering signature luxury services and exquisite dining setups for royal weddings.'
+      description: 'A majestic palace hotel located on the banks of Lake Pichola, offering signature luxury services and exquisite dining setups for royal weddings.',
+      status: 'active',
+      created_at: '2024-04-10T10:00:00.000Z',
+      gallery: [
+        '/leela_palace.jpg',
+        'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=600&q=80',
+        'https://images.unsplash.com/photo-1582719508461-905c673771fd?auto=format&fit=crop&w=600&q=80',
+        'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80'
+      ]
     },
     {
       id: 2,
       name: 'Fateh Garh Resort',
       type: 'Heritage Resort',
-      location: 'Udaipur',
+      event_type: 'resort',
+      location: 'Sajjangarh, Udaipur',
       minCapacity: 100,
       maxCapacity: 300,
+      guest_count: 300,
       priceTier: '₹₹₹',
       priceNum: 3,
       rating: 4.6,
-      image: '/udaipur_palace_light.png',
+      image: '/monsoon_palace.jpg',
       amenities: ['AC Hall', 'Parking', 'Stage', 'Sound System'],
-      description: 'Perched on a hill offering panoramic views of the Aravalli ranges, Fateh Garh is a heritage resort perfect for authentic cultural themes and grand receptions.'
+      description: 'Perched on a hill offering panoramic views of the Aravalli ranges, Fateh Garh is a heritage resort perfect for authentic cultural themes and grand receptions.',
+      status: 'active',
+      created_at: '2024-04-12T10:00:00.000Z',
+      gallery: [
+        '/monsoon_palace.jpg',
+        'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80',
+        'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=600&q=80',
+        'https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=600&q=80'
+      ]
     },
     {
       id: 3,
       name: 'Radisson Blu Udaipur',
       type: 'Hotel',
-      location: 'Udaipur',
+      event_type: 'hotel',
+      location: 'Rani Road, Udaipur',
       minCapacity: 100,
       maxCapacity: 600,
+      guest_count: 600,
       priceTier: '₹₹₹',
       priceNum: 3,
       rating: 4.4,
-      image: '/services_venues.png',
+      image: '/hero_udaipur_3.jpg',
       amenities: ['Pool', 'AC Hall', 'Parking', 'Bar'],
-      description: 'Overlooking Lake Fateh Sagar, this resort features spacious indoor halls and a grand pool deck suitable for corporate fests and engagement parties.'
+      description: 'Overlooking Lake Fateh Sagar, this resort features spacious indoor halls and a grand pool deck suitable for corporate fests and engagement parties.',
+      status: 'active',
+      created_at: '2024-04-15T10:00:00.000Z',
+      gallery: [
+        '/hero_udaipur_3.jpg',
+        'https://images.unsplash.com/photo-1445019980597-93fa8acb246c?auto=format&fit=crop&w=600&q=80',
+        'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&w=600&q=80',
+        'https://images.unsplash.com/photo-1564507592333-c60657eea523?auto=format&fit=crop&w=600&q=80'
+      ]
     },
     {
       id: 4,
-      name: 'Bhanwar Singh Palace',
+      name: 'Bhanwar Singh Palace Udaipur',
       type: 'Palace',
-      location: 'Jaipur',
+      event_type: 'palace',
+      location: 'Udaipur',
       minCapacity: 250,
       maxCapacity: 800,
+      guest_count: 800,
       priceTier: '₹₹₹₹',
       priceNum: 4,
       rating: 4.7,
-      image: '/services_scenarios.png',
+      image: '/hero_udaipur_1.jpg',
       amenities: ['Pool', 'AC Hall', 'Parking', 'Stage', 'Sound System'],
-      description: 'A luxurious palace resort featuring expansive lawns and royal architecture, offering an ideal setting for destination weddings.'
+      description: 'A luxurious palace resort featuring expansive lawns and royal architecture, offering an ideal setting for destination weddings in Udaipur.',
+      status: 'active',
+      created_at: '2024-04-18T10:00:00.000Z',
+      gallery: [
+        '/hero_udaipur_1.jpg',
+        'https://images.unsplash.com/photo-1605538032432-a9f0c8d9ba5e?auto=format&fit=crop&w=600&q=80',
+        'https://images.unsplash.com/photo-1613553507747-5f8d62ad5904?auto=format&fit=crop&w=600&q=80',
+        'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=600&q=80'
+      ]
     },
     {
       id: 5,
       name: 'Ramada Resort Udaipur',
       type: 'Resort',
-      location: 'Udaipur',
+      event_type: 'resort',
+      location: 'Rampura, Udaipur',
       minCapacity: 100,
       maxCapacity: 300,
+      guest_count: 300,
       priceTier: '₹₹',
       priceNum: 2,
       rating: 4.5,
-      image: '/services_unforgettable.png',
+      image: '/shiv_niwas.jpg',
       amenities: ['Pool', 'AC Hall', 'Parking', 'Bar'],
-      description: 'Ramada Resort & Spa features stone walls and traditional architecture, offering multi-tiered lawns and modern banquet halls.'
+      description: 'Ramada Resort & Spa features stone walls and traditional architecture, offering multi-tiered lawns and modern banquet halls.',
+      status: 'active',
+      created_at: '2024-04-20T10:00:00.000Z',
+      gallery: [
+        '/shiv_niwas.jpg',
+        'https://images.unsplash.com/photo-1596394516093-501ba68a0ba6?auto=format&fit=crop&w=600&q=80',
+        'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=600&q=80',
+        'https://images.unsplash.com/photo-1498503182468-3b51cbb6cb24?auto=format&fit=crop&w=600&q=80'
+      ]
     },
     {
       id: 6,
-      name: 'Bijolai Fort',
+      name: 'Bijolai Fort Udaipur',
       type: 'Heritage Venue',
-      location: 'Jodhpur',
+      event_type: 'resort',
+      location: 'Udaipur',
       minCapacity: 50,
       maxCapacity: 200,
+      guest_count: 200,
       priceTier: '₹₹',
       priceNum: 2,
       rating: 4.4,
-      image: '/celebrate_collage1.png',
+      image: '/jag_mandir.jpg',
       amenities: ['AC Hall', 'Parking', 'Stage'],
-      description: 'Constructed in the 19th century beside a lake, this fort features heritage courtyards perfect for close-knit traditional functions.'
+      description: 'Constructed in the 19th century beside a lake, this fort features heritage courtyards perfect for close-knit traditional functions in Udaipur.',
+      status: 'active',
+      created_at: '2024-04-22T10:00:00.000Z',
+      gallery: [
+        '/jag_mandir.jpg',
+        'https://images.unsplash.com/photo-1585983224974-084a8e065e76?auto=format&fit=crop&w=600&q=80',
+        'https://images.unsplash.com/photo-1590001155093-a3c66ab0c3ff?auto=format&fit=crop&w=600&q=80',
+        'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=600&q=80'
+      ]
     },
     {
       id: 7,
       name: 'Hotel Hilltop Palace',
       type: 'Hotel',
-      location: 'Udaipur',
+      event_type: 'hotel',
+      location: 'Ambavgarh, Udaipur',
       minCapacity: 100,
       maxCapacity: 400,
+      guest_count: 400,
       priceTier: '₹₹',
       priceNum: 2,
       rating: 4.3,
-      image: '/celebrate_collage2.png',
+      image: '/hero_udaipur_2.jpg',
       amenities: ['AC Hall', 'Parking', 'Bar'],
-      description: 'Located atop the highest point in Udaipur, this hotel offers stunning lake views and classical Rajasthani hospitality packages.'
+      description: 'Located atop the highest point in Udaipur, this hotel offers stunning lake views and classical Rajasthani hospitality packages.',
+      status: 'active',
+      created_at: '2024-04-25T10:00:00.000Z',
+      gallery: [
+        '/hero_udaipur_2.jpg',
+        'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=600&q=80',
+        'https://images.unsplash.com/photo-1598977123418-45f04b01f4ac?auto=format&fit=crop&w=600&q=80',
+        'https://images.unsplash.com/photo-1568495248636-6432b97bd949?auto=format&fit=crop&w=600&q=80'
+      ]
     },
     {
       id: 8,
       name: 'Aravali Lawn',
       type: 'Lawn',
+      event_type: 'banquet',
       location: 'Udaipur',
       minCapacity: 150,
       maxCapacity: 600,
+      guest_count: 600,
       priceTier: '₹₹',
       priceNum: 2,
       rating: 4.2,
-      image: '/landing_wedding.png',
+      image: 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=600&q=80',
       amenities: ['Parking', 'Stage', 'Sound System'],
-      description: 'A spacious lush green open lawn nestled near the foothills, offering an open-air starlight dining experience for massive gatherings.'
+      description: 'A spacious lush green open lawn nestled near the foothills, offering an open-air starlight dining experience for massive gatherings.',
+      status: 'active',
+      created_at: '2024-04-28T10:00:00.000Z',
+      gallery: [
+        'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=600&q=80',
+        'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?auto=format&fit=crop&w=600&q=80',
+        'https://images.unsplash.com/photo-1533105079780-92b9be482077?auto=format&fit=crop&w=600&q=80',
+        'https://images.unsplash.com/photo-1473163928189-364b2c4e1135?auto=format&fit=crop&w=600&q=80'
+      ]
     },
     {
       id: 9,
       name: 'The Oberoi Udaivilas',
       type: 'Luxury Hotel',
-      location: 'Udaipur',
+      event_type: 'hotel',
+      location: 'Haridasji Ki Magri, Udaipur',
       minCapacity: 150,
       maxCapacity: 450,
+      guest_count: 450,
       priceTier: '₹₹₹₹',
       priceNum: 4,
       rating: 4.9,
-      image: '/landing_private.png',
+      image: '/oberoi_udaivilas.jpg',
       amenities: ['Pool', 'AC Hall', 'Parking', 'Bar', 'Stage', 'Sound System'],
-      description: 'Famed for its grand architecture and lake-front pools, Udaivilas offers a royal fairytale wedding experience with flawless service standards.'
+      description: 'Famed for its grand architecture and lake-front pools, Udaivilas offers a royal fairytale wedding experience with flawless service standards.',
+      status: 'active',
+      created_at: '2024-05-01T10:00:00.000Z',
+      gallery: [
+        '/oberoi_udaivilas.jpg',
+        'https://images.unsplash.com/photo-1549294413-26f195afcbce?auto=format&fit=crop&w=600&q=80',
+        'https://images.unsplash.com/photo-1621293954908-907141447fc9?auto=format&fit=crop&w=600&q=80',
+        'https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=600&q=80'
+      ]
     },
     {
       id: 10,
       name: 'Taj Lake Palace',
       type: 'Luxury Hotel',
-      location: 'Udaipur',
+      event_type: 'hotel',
+      location: 'Lake Pichola, Udaipur',
       minCapacity: 80,
       maxCapacity: 250,
+      guest_count: 250,
       priceTier: '₹₹₹₹',
       priceNum: 4,
       rating: 4.9,
-      image: '/landing_custom.png',
+      image: '/taj_lake_palace.jpg',
       amenities: ['Pool', 'AC Hall', 'Parking', 'Bar', 'Stage'],
-      description: 'An iconic white marble floating palace on Lake Pichola, Taj Lake Palace offers complete island isolation for high-profile celebrations.'
+      description: 'An iconic white marble floating palace on Lake Pichola, Taj Lake Palace offers complete island isolation for high-profile celebrations.',
+      status: 'active',
+      created_at: '2024-05-03T10:00:00.000Z',
+      gallery: [
+        '/taj_lake_palace.jpg',
+        'https://images.unsplash.com/photo-1504609773096-104ff2c73ba4?auto=format&fit=crop&w=600&q=80',
+        'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=600&q=80',
+        'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=600&q=80'
+      ]
     }
   ];
 
@@ -188,7 +290,54 @@ export default function VenuesCatalog() {
   // Modal States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedVenueDetail, setSelectedVenueDetail] = useState(null);
+  const [activeGalleryImage, setActiveGalleryImage] = useState(null);
   const [isBookingSuccess, setIsBookingSuccess] = useState(false);
+
+  // Get dynamic gallery images for the venue card details popup
+  const getVenueGallery = (venue) => {
+    if (!venue) return [];
+    if (venue.gallery && venue.gallery.length > 0) {
+      return venue.gallery;
+    }
+    const primary = venue.image || '/leela_palace.jpg';
+    
+    // Category-specific high-quality Unsplash fallbacks for custom/added venues
+    const type = (venue.type || '').toLowerCase();
+    let fallbacks = [];
+    if (type.includes('lawn') || type.includes('garden') || type.includes('banquet') || type.includes('open')) {
+      fallbacks = [
+        'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=600&q=80',
+        'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?auto=format&fit=crop&w=600&q=80',
+        'https://images.unsplash.com/photo-1533105079780-92b9be482077?auto=format&fit=crop&w=600&q=80'
+      ];
+    } else if (type.includes('palace') || type.includes('fort') || type.includes('heritage')) {
+      fallbacks = [
+        'https://images.unsplash.com/photo-1508672019048-805c876b67e2?auto=format&fit=crop&w=600&q=80',
+        'https://images.unsplash.com/photo-1585983224974-084a8e065e76?auto=format&fit=crop&w=600&q=80',
+        'https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=600&q=80'
+      ];
+    } else { // resort / hotel
+      fallbacks = [
+        'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=600&q=80',
+        'https://images.unsplash.com/photo-1582719508461-905c673771fd?auto=format&fit=crop&w=600&q=80',
+        'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80'
+      ];
+    }
+    
+    const filtered = fallbacks.filter(img => img !== primary).slice(0, 3);
+    while (filtered.length < 3) {
+      filtered.push('https://images.unsplash.com/photo-1582719508461-905c673771fd?auto=format&fit=crop&w=600&q=80');
+    }
+    return [primary, ...filtered];
+  };
+
+  useEffect(() => {
+    if (selectedVenueDetail) {
+      setActiveGalleryImage(selectedVenueDetail.image);
+    } else {
+      setActiveGalleryImage(null);
+    }
+  }, [selectedVenueDetail]);
 
   // Add Venue Form States
   const [newVenueName, setNewVenueName] = useState('');
@@ -204,6 +353,91 @@ export default function VenuesCatalog() {
   // Booking Form States
   const [bookingDate, setBookingDate] = useState('');
   const [bookingGuests, setBookingGuests] = useState('150');
+  const [events, setEvents] = useState([]);
+  const [selectedEventId, setSelectedEventId] = useState('');
+
+  // Fetch events for selection
+  useEffect(() => {
+    const fetchUserEvents = async () => {
+      try {
+        const res = await authFetch('/events');
+        if (res.ok) {
+          const data = await res.json();
+          setEvents(data);
+          if (data.length > 0) {
+            setSelectedEventId(data[0].id.toString());
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching events for venue booking:', err);
+      }
+    };
+    if (user) {
+      fetchUserEvents();
+    }
+  }, [user]);
+
+  // Load venues from localStorage on mount to stay in sync with Admin changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('venues_data');
+      let parsed = null;
+      if (stored) {
+        try {
+          parsed = JSON.parse(stored);
+        } catch (e) {
+          parsed = null;
+        }
+      }
+
+      // Force reset if storage has placeholder images
+      const hasAIPlaceholder = parsed && parsed.some(v => 
+        v.image && v.image.endsWith('.png') && !v.image.includes('logo.png')
+      );
+
+      if (!parsed || hasAIPlaceholder) {
+        setVenues(initialVenues);
+        localStorage.setItem('venues_data', JSON.stringify(initialVenues));
+      } else {
+        const sanitized = parsed.map(v => {
+          const event_type = v.event_type || (v.type ? (v.type.toLowerCase().includes('resort') ? 'resort' : v.type.toLowerCase().includes('palace') ? 'palace' : v.type.toLowerCase().includes('lawn') ? 'banquet' : 'hotel') : 'hotel');
+          const type = v.type || (event_type.charAt(0).toUpperCase() + event_type.slice(1) + ' Venue');
+          const defaultVenue = initialVenues.find(dv => dv.id.toString() === v.id.toString());
+          const gallery = (defaultVenue && defaultVenue.id <= 10)
+            ? defaultVenue.gallery
+            : (v.gallery || (defaultVenue ? defaultVenue.gallery : []));
+          const image = (defaultVenue && defaultVenue.id <= 10)
+            ? defaultVenue.image
+            : (v.image || '/leela_palace.jpg');
+          return {
+            ...v,
+            image,
+            event_type,
+            type,
+            status: v.status || 'active',
+            maxCapacity: v.maxCapacity || v.guest_count || 300,
+            guest_count: v.guest_count || v.maxCapacity || 300,
+            location: v.location || 'Udaipur',
+            gallery
+          };
+        });
+        setVenues(sanitized);
+        localStorage.setItem('venues_data', JSON.stringify(sanitized));
+      }
+    }
+  }, []);
+
+  // Open venue detail modal from URL query parameter
+  useEffect(() => {
+    if (router.isReady && router.query.id && venues.length > 0) {
+      const venueId = parseInt(router.query.id);
+      const found = venues.find(v => v.id === venueId);
+      if (found) {
+        setSelectedVenueDetail(found);
+        setIsBookingSuccess(false);
+      }
+    }
+  }, [router.isReady, router.query.id, venues]);
 
   // Handle Likes
   const toggleLike = (venueId, venueName, e) => {
@@ -241,8 +475,9 @@ export default function VenuesCatalog() {
     const matchesCap = v.minCapacity <= capacityRange;
     const matchesPrice = priceTierFilter === 'All' || v.priceTier === priceTierFilter;
     const matchesAmenity = selectedAmenity === 'All' || v.amenities.includes(selectedAmenity);
+    const matchesStatus = v.status !== 'inactive';
 
-    return matchesSearch && matchesLoc && matchesType && matchesCap && matchesPrice && matchesAmenity;
+    return matchesSearch && matchesLoc && matchesType && matchesCap && matchesPrice && matchesAmenity && matchesStatus;
   });
 
   // Sort Logic
@@ -277,7 +512,7 @@ export default function VenuesCatalog() {
       priceTier: newVenuePrice,
       priceNum: priceNumMapping[newVenuePrice] || 3,
       rating: parseFloat(newVenueRating) || 4.5,
-      image: '/landing_custom.png',
+      image: '/leela_palace.jpg',
       amenities: newVenueAmenities.length > 0 ? newVenueAmenities : ['Parking', 'AC Hall'],
       description: newVenueDesc
     };
@@ -293,14 +528,72 @@ export default function VenuesCatalog() {
   };
 
   // Submit Mock Booking
-  const handleBookingSubmit = (e) => {
+  const handleBookingSubmit = async (e) => {
     e.preventDefault();
     if (!bookingDate) {
       showToast('Please select a date for booking', 'error');
       return;
     }
-    setIsBookingSuccess(true);
-    showToast(`Venue booked successfully for ${bookingDate}!`, 'success');
+    if (events.length > 0 && !selectedEventId) {
+      showToast('Please select an event for booking', 'error');
+      return;
+    }
+    if (!selectedVenueDetail) {
+      showToast('No venue selected', 'error');
+      return;
+    }
+
+    const selectedEvent = events.find(ev => ev.id.toString() === selectedEventId);
+    const eventName = selectedEvent ? selectedEvent.title : 'your event';
+
+    try {
+      // 1. Fetch current vendors for this event
+      const vendorsRes = await authFetch(`/vendors/${selectedEventId}`);
+      if (vendorsRes.ok) {
+        const currentVendors = await vendorsRes.json();
+        // 2. Find and delete existing venue category vendor to avoid duplicates
+        const existingVenue = currentVendors.find(v => v.category.toLowerCase() === 'venue');
+        if (existingVenue) {
+          await authFetch(`/vendor/${existingVenue.id}`, { method: 'DELETE' });
+        }
+      }
+
+      // 3. Calculate dynamic venue vendor cost
+      let calculatedCost = 50000;
+      if (selectedEvent && selectedEvent.budget) {
+        const pct = selectedVenueDetail.priceNum 
+          ? (selectedVenueDetail.priceNum === 4 ? 0.40 : selectedVenueDetail.priceNum === 3 ? 0.30 : selectedVenueDetail.priceNum === 2 ? 0.20 : 0.15) 
+          : 0.35;
+        calculatedCost = selectedEvent.budget * pct;
+      } else {
+        calculatedCost = selectedVenueDetail.priceNum 
+          ? (selectedVenueDetail.priceNum === 4 ? 250000 : selectedVenueDetail.priceNum === 3 ? 150000 : selectedVenueDetail.priceNum === 2 ? 80000 : 30000) 
+          : 50000;
+      }
+
+      // 4. Add new venue vendor
+      const addRes = await authFetch('/vendor/add', {
+        method: 'POST',
+        body: JSON.stringify({
+          eventId: selectedEventId,
+          vendor_name: selectedVenueDetail.name,
+          category: 'Venue',
+          contact: selectedVenueDetail.location || 'Udaipur, Rajasthan',
+          cost: parseFloat(calculatedCost),
+          status: 'hired'
+        })
+      });
+
+      if (addRes.ok) {
+        setIsBookingSuccess(true);
+        showToast(`Venue booked successfully for "${eventName}" on ${bookingDate}!`, 'success');
+      } else {
+        const errData = await addRes.json();
+        throw new Error(errData.message || 'Error booking venue');
+      }
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
   };
 
   // Toggle Amenity Selection in Add form
@@ -386,8 +679,6 @@ export default function VenuesCatalog() {
               >
                 <option value="All" className="bg-[#151c2c]">All Locations</option>
                 <option value="Udaipur" className="bg-[#151c2c]">Udaipur</option>
-                <option value="Jaipur" className="bg-[#151c2c]">Jaipur</option>
-                <option value="Jodhpur" className="bg-[#151c2c]">Jodhpur</option>
               </select>
             </div>
 
@@ -735,8 +1026,6 @@ export default function VenuesCatalog() {
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500 cursor-pointer"
                   >
                     <option value="Udaipur" className="bg-[#151c2c]">Udaipur</option>
-                    <option value="Jaipur" className="bg-[#151c2c]">Jaipur</option>
-                    <option value="Jodhpur" className="bg-[#151c2c]">Jodhpur</option>
                   </select>
                 </div>
               </div>
@@ -859,18 +1148,40 @@ export default function VenuesCatalog() {
 
             {/* Left side: Photo and Description details */}
             <div className="flex-1 flex flex-col gap-4">
-              <img
-                src={selectedVenueDetail.image}
-                alt={selectedVenueDetail.name}
-                className="w-full h-44 object-cover rounded-xl border border-white/5 shrink-0"
-              />
+              <div className="flex flex-col gap-2">
+                <div className="w-full h-44 rounded-xl overflow-hidden border border-white/5 shrink-0 relative bg-slate-800">
+                  <img
+                    src={activeGalleryImage || selectedVenueDetail.image}
+                    alt={selectedVenueDetail.name}
+                    className="w-full h-full object-cover transition-all duration-300"
+                  />
+                </div>
+                {/* Thumbnails row */}
+                <div className="flex gap-2">
+                  {getVenueGallery(selectedVenueDetail).map((imgUrl, idx) => {
+                    const isActive = (activeGalleryImage || selectedVenueDetail.image) === imgUrl;
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setActiveGalleryImage(imgUrl)}
+                        className={`w-12 h-10 rounded-lg overflow-hidden border transition-all cursor-pointer ${
+                          isActive ? 'border-[#5a2bd4] scale-105 shadow-md shadow-indigo-600/10' : 'border-white/5 hover:border-white/20'
+                        }`}
+                      >
+                        <img src={imgUrl} alt="gallery thumbnail" className="w-full h-full object-cover" />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] text-indigo-400 font-extrabold uppercase">{selectedVenueDetail.type}</span>
                 <h3 className="text-base font-bold text-white leading-tight">
                   {selectedVenueDetail.name}
                 </h3>
               </div>
-              <p className="text-[11px] text-gray-400 leading-relaxed font-semibold h-24 overflow-y-auto">
+              <p className="text-[11px] text-gray-400 leading-relaxed font-semibold h-20 overflow-y-auto">
                 {selectedVenueDetail.description}
               </p>
 
@@ -887,6 +1198,21 @@ export default function VenuesCatalog() {
                       {amenity}
                     </span>
                   ))}
+                </div>
+              </div>
+
+              {/* Interactive Venue Map */}
+              <div className="flex flex-col gap-1.5 border-t border-white/5 pt-3">
+                <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Interactive Venue Map</span>
+                <div className="w-full h-32 rounded-xl overflow-hidden border border-white/5 shadow-inner">
+                  <iframe
+                    width="100%"
+                    height="100%"
+                    style={{ border: 0, filter: 'invert(0.9) hue-rotate(180deg) contrast(1.2) grayscale(0.2)' }}
+                    loading="lazy"
+                    allowFullScreen
+                    src={`https://maps.google.com/maps?q=${encodeURIComponent(selectedVenueDetail.name + ', Udaipur')}&t=&z=14&ie=UTF8&iwloc=&output=embed`}
+                  ></iframe>
                 </div>
               </div>
             </div>
@@ -926,13 +1252,41 @@ export default function VenuesCatalog() {
                   Schedule Event Booking
                 </span>
 
-                {isBookingSuccess ? (
+                {user?.role === 'admin' ? (
+                  <div className="text-[10px] text-indigo-400 font-bold bg-indigo-500/10 border border-indigo-500/20 p-3 rounded-xl flex flex-col gap-1 text-center font-semibold">
+                    <span>Venue booking is only available for User accounts.</span>
+                  </div>
+                ) : isBookingSuccess ? (
                   <div className="p-3 bg-emerald-500/10 border border-emerald-500/25 rounded-xl text-[10px] text-emerald-400 text-center font-bold flex flex-col items-center gap-1.5">
                     <Check className="w-6 h-6 animate-bounce" />
-                    <span>Venue Reserved Successfully!</span>
+                    <span>Venue Reserved Successfully for "{events.find(ev => ev.id.toString() === selectedEventId)?.title || 'your event'}"!</span>
                   </div>
                 ) : (
                   <form onSubmit={handleBookingSubmit} className="flex flex-col gap-2.5">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[9px] text-gray-500 uppercase font-bold">Select Event</label>
+                      {events.length > 0 ? (
+                        <select
+                          required
+                          value={selectedEventId}
+                          onChange={(e) => setSelectedEventId(e.target.value)}
+                          className="w-full bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 text-[10px] text-gray-300 focus:outline-none cursor-pointer font-bold"
+                        >
+                          {events.map(ev => (
+                            <option key={ev.id} value={ev.id} className="bg-[#151c2c] text-white">
+                              {ev.title}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="text-[10px] text-amber-400 font-bold bg-amber-500/10 border border-amber-500/25 p-2 rounded-lg flex flex-col gap-1.5">
+                          <span>You have no active events to book for.</span>
+                          <Link href="/ai" className="text-[#5a2bd4] dark:text-indigo-400 hover:underline">
+                            Create Event first &rarr;
+                          </Link>
+                        </div>
+                      )}
+                    </div>
                     <div className="flex flex-col gap-1">
                       <label className="text-[9px] text-gray-500 uppercase font-bold">Select Date</label>
                       <input
@@ -955,7 +1309,8 @@ export default function VenuesCatalog() {
                     </div>
                     <button
                       type="submit"
-                      className="w-full py-2 bg-[#5a2bd4] hover:bg-[#4c24b5] always-white text-[10px] font-extrabold rounded-xl transition-all shadow-md uppercase tracking-wider cursor-pointer"
+                      disabled={events.length === 0}
+                      className="w-full py-2 bg-[#5a2bd4] hover:bg-[#4c24b5] disabled:opacity-40 disabled:pointer-events-none always-white text-[10px] font-extrabold rounded-xl transition-all shadow-md uppercase tracking-wider cursor-pointer"
                     >
                       Book Venue
                     </button>

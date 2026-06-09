@@ -18,7 +18,9 @@ import {
   CheckSquare,
   ChevronRight,
   CheckCircle2,
-  Activity
+  Activity,
+  UserPlus,
+  MessageSquare
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -42,17 +44,84 @@ export default function Dashboard() {
   const [selectedBudgetExpenses, setSelectedBudgetExpenses] = useState([]);
   const [loadingExpenses, setLoadingExpenses] = useState(false);
 
-  const fetchUserData = async () => {
+  // Dynamic user stats states
+  const [totalGuestsCount, setTotalGuestsCount] = useState(0);
+  const [tasksCompletedCount, setTasksCompletedCount] = useState(0);
+  const [tasksPendingCount, setTasksPendingCount] = useState(0);
+  const [tasksInProgressCount, setTasksInProgressCount] = useState(0);
+  const [tasksOverdueCount, setTasksOverdueCount] = useState(0);
+  const [totalTasksCount, setTotalTasksCount] = useState(0);
+
+  const fetchUserData = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await authFetch('/events');
       if (res.ok) {
         const data = await res.json();
         setEvents(data);
+
+        if (data && data.length > 0) {
+          const guestPromises = data.map(event => authFetch(`/guests/${event.id}`).then(r => r.ok ? r.json() : []));
+          const taskPromises = data.map(event => authFetch(`/tasks/${event.id}`).then(r => r.ok ? r.json() : []));
+
+          const guestsLists = await Promise.all(guestPromises);
+          const tasksLists = await Promise.all(taskPromises);
+
+          const allGuests = guestsLists.flat();
+          setTotalGuestsCount(allGuests.length);
+
+          const allTasks = tasksLists.flat();
+          setTotalTasksCount(allTasks.length);
+
+          let completed = 0;
+          let pending = 0;
+          let inProgress = 0;
+          let overdue = 0;
+
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+
+          allTasks.forEach((task, index) => {
+            const parts = task.title.split(' || ');
+            const visualStatus = parts[3] || (index % 2 === 0 ? 'To Do' : 'In Progress');
+
+            let finalStatus = task.status === 'completed' ? 'Completed' : visualStatus;
+
+            if (task.status === 'pending' && task.deadline) {
+              const deadlineDate = new Date(task.deadline);
+              if (deadlineDate < today) {
+                finalStatus = 'Overdue';
+              }
+            }
+
+            if (finalStatus === 'Completed') {
+              completed++;
+            } else if (finalStatus === 'In Progress') {
+              inProgress++;
+            } else if (finalStatus === 'Overdue') {
+              overdue++;
+            } else {
+              pending++;
+            }
+          });
+
+          setTasksCompletedCount(completed);
+          setTasksInProgressCount(inProgress);
+          setTasksPendingCount(pending);
+          setTasksOverdueCount(overdue);
+        } else {
+          setTotalGuestsCount(0);
+          setTotalTasksCount(0);
+          setTasksCompletedCount(0);
+          setTasksInProgressCount(0);
+          setTasksPendingCount(0);
+          setTasksOverdueCount(0);
+        }
       }
     } catch (err) {
-      showToast(err.message || 'Error loading dashboard statistics', 'error');
+      if (!silent) showToast(err.message || 'Error loading dashboard statistics', 'error');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -60,7 +129,7 @@ export default function Dashboard() {
     try {
       const [uRes, eRes, fRes] = await Promise.all([
         authFetch('/admin/users'),
-        authFetch('/events'),
+        authFetch('/admin/events'),
         authFetch('/feedback')
       ]);
 
@@ -88,6 +157,24 @@ export default function Dashboard() {
       }
     }
   }, [user, router]);
+
+  useEffect(() => {
+    if (user && user.role !== 'admin') {
+      const interval = setInterval(() => {
+        fetchUserData(true);
+      }, 5000);
+
+      const handleFocus = () => {
+        fetchUserData(true);
+      };
+      window.addEventListener('focus', handleFocus);
+
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener('focus', handleFocus);
+      };
+    }
+  }, [user]);
 
   // Fetch expenses for a selected event dynamically
   useEffect(() => {
@@ -1128,18 +1215,159 @@ export default function Dashboard() {
   // Cover image mapping helper
   const getEventCover = (category) => {
     const cat = (category || '').toLowerCase();
-    if (cat.includes('wed')) return '/landing_wedding.png';
-    if (cat.includes('birth')) return '/landing_birthday.png';
-    if (cat.includes('corp') || cat.includes('conf')) return '/landing_corporate.png';
-    if (cat.includes('coll') || cat.includes('fest')) return '/landing_college.png';
-    if (cat.includes('priv') || cat.includes('party')) return '/landing_private.png';
-    return '/landing_custom.png';
+    if (cat.includes('wed')) return '/leela_palace.jpg';
+    if (cat.includes('birth')) return '/hero_udaipur_3.jpg';
+    if (cat.includes('corp') || cat.includes('conf')) return '/oberoi_udaivilas.jpg';
+    if (cat.includes('coll') || cat.includes('fest')) return '/monsoon_palace.jpg';
+    if (cat.includes('priv') || cat.includes('party')) return '/jag_mandir.jpg';
+    return '/hero_udaipur_1.jpg';
   };
 
-  // Mock stats fallback if empty
-  const displayBudget = totalBudget > 0 ? totalBudget : 1500000;
-  const displayGuests = totalGuests > 0 ? totalGuests : 450;
-  const displayUpcomingCount = upcomingEvents.length > 0 ? upcomingEvents.length : 3;
+  // Dynamic stats mapping
+  const displayBudget = totalBudget;
+  const displayGuests = totalGuestsCount;
+  const displayUpcomingCount = upcomingEvents.length;
+
+  // Real-time notifications processing & fallback mockup data
+  const fallbackNotifications = [
+    {
+      id: 'f1',
+      message: 'Your booking for The Leela Palace, Udaipur on 25 Dec 2024 is confirmed.',
+      status: 'unread',
+      created_at: new Date(Date.now() - 25 * 60000).toISOString()
+    },
+    {
+      id: 'f2',
+      message: 'Priya Patel has been added to the guest list for Rahul & Priya Wedding.',
+      status: 'unread',
+      created_at: new Date(Date.now() - 17 * 3600000).toISOString()
+    },
+    {
+      id: 'f3',
+      message: '"Catering Finalization" task is due tomorrow. Don\'t forget to update.',
+      status: 'unread',
+      created_at: new Date(Date.now() - 25 * 3600000).toISOString()
+    },
+    {
+      id: 'f4',
+      message: 'You have a new message from Harshita Events.',
+      status: 'unread',
+      created_at: new Date('2024-05-23T18:15:00').toISOString()
+    },
+    {
+      id: 'f5',
+      message: 'Payment of ₹50,000 for The Leela Palace is due in 3 days.',
+      status: 'read',
+      created_at: new Date('2024-05-23T11:30:00').toISOString()
+    },
+    {
+      id: 'f6',
+      message: 'Your event budget has been updated successfully.',
+      status: 'read',
+      created_at: new Date('2024-05-22T19:20:00').toISOString()
+    },
+    {
+      id: 'f7',
+      message: '"Send Invitations" task has been marked as completed.',
+      status: 'read',
+      created_at: new Date('2024-05-22T15:10:00').toISOString()
+    },
+    {
+      id: 'f8',
+      message: 'New features have been added to improve your experience.',
+      status: 'read',
+      created_at: new Date('2024-05-21T10:00:00').toISOString()
+    }
+  ];
+
+  const parseNotification = (notif) => {
+    const msg = notif.message.toLowerCase();
+    let title = "System Update";
+    let iconName = "settings";
+    let colorClass = "bg-slate-500/10 text-slate-500 dark:text-slate-400";
+    let text = notif.message;
+
+    if (msg.includes("booking") || msg.includes("venue")) {
+      title = "Venue Booking Confirmed";
+      iconName = "calendar";
+      colorClass = "bg-purple-500/10 text-[#5a2bd4] dark:text-purple-400";
+    } else if (msg.includes("guest") || msg.includes("invited")) {
+      title = "New Guest Added";
+      iconName = "user-plus";
+      colorClass = "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+    } else if (msg.includes("due tomorrow") || msg.includes("task is due")) {
+      title = "Task Due Tomorrow";
+      iconName = "clock";
+      colorClass = "bg-amber-500/10 text-amber-600 dark:text-amber-400";
+    } else if (msg.includes("message") || msg.includes("chat")) {
+      title = "New Message Received";
+      iconName = "message-square";
+      colorClass = "bg-blue-500/10 text-blue-600 dark:text-blue-400";
+    } else if (msg.includes("payment") || msg.includes("rupees") || msg.includes("rs.") || msg.includes("₹")) {
+      title = "Payment Reminder";
+      iconName = "alert-circle";
+      colorClass = "bg-rose-500/10 text-rose-600 dark:text-rose-400";
+    } else if (msg.includes("budget") || msg.includes("expense")) {
+      title = "Budget Updated";
+      iconName = "receipt";
+      colorClass = "bg-[#efe9fc] text-[#5a2bd4] dark:bg-indigo-500/10 dark:text-indigo-400";
+    } else if (msg.includes("completed") || msg.includes("marked completed")) {
+      title = "Task Completed";
+      iconName = "check-circle";
+      colorClass = "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+    }
+
+    return {
+      ...notif,
+      title,
+      iconName,
+      colorClass,
+      text
+    };
+  };
+
+  const formatRelativeTime = (dateString) => {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} ${diffMins === 1 ? 'minute' : 'minutes'} ago`;
+    if (diffHours < 24) return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
+    if (diffDays < 7) return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`;
+    
+    const days = date.getDate();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${days} ${months[date.getMonth()]}`;
+  };
+
+  const renderNotificationIcon = (name) => {
+    switch (name) {
+      case 'calendar':
+        return <Calendar className="w-3.5 h-3.5" />;
+      case 'user-plus':
+        return <UserPlus className="w-3.5 h-3.5" />;
+      case 'clock':
+        return <Clock className="w-3.5 h-3.5" />;
+      case 'message-square':
+        return <MessageSquare className="w-3.5 h-3.5" />;
+      case 'alert-circle':
+        return <AlertCircle className="w-3.5 h-3.5" />;
+      case 'receipt':
+        return <Receipt className="w-3.5 h-3.5" />;
+      case 'check-circle':
+        return <CheckCircle2 className="w-3.5 h-3.5" />;
+      default:
+        return <Activity className="w-3.5 h-3.5" />;
+    }
+  };
+
+  const allNotifications = (notifications.length > 0 ? notifications : fallbackNotifications).map(parseNotification);
+  const displayNotifications = allNotifications.slice(0, 3);
 
   return (
     <div className="flex flex-col gap-8 max-w-7xl mx-auto pb-12">
@@ -1183,7 +1411,7 @@ export default function Dashboard() {
           <div className="flex flex-col gap-1">
             <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total Budget</span>
             <span className="text-2xl font-extrabold text-white dark:text-white">{formatRupee(displayBudget)}</span>
-            <Link href="/dashboard?tab=budget" className="text-[10px] text-[#5a2bd4] dark:text-indigo-400 font-bold hover:underline mt-1 inline-flex items-center gap-0.5">
+            <Link href="/budget" className="text-[10px] text-[#5a2bd4] dark:text-indigo-400 font-bold hover:underline mt-1 inline-flex items-center gap-0.5">
               View budget &rarr;
             </Link>
           </div>
@@ -1197,7 +1425,7 @@ export default function Dashboard() {
           <div className="flex flex-col gap-1">
             <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total Guests</span>
             <span className="text-2xl font-extrabold text-white dark:text-white">{displayGuests}</span>
-            <Link href="/dashboard?tab=guests" className="text-[10px] text-[#5a2bd4] dark:text-indigo-400 font-bold hover:underline mt-1 inline-flex items-center gap-0.5">
+            <Link href="/guests" className="text-[10px] text-[#5a2bd4] dark:text-indigo-400 font-bold hover:underline mt-1 inline-flex items-center gap-0.5">
               View guests &rarr;
             </Link>
           </div>
@@ -1210,8 +1438,10 @@ export default function Dashboard() {
         <div className="glass-card p-5 rounded-2xl flex items-center justify-between border border-white/5 shadow-sm">
           <div className="flex flex-col gap-1">
             <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Tasks Completed</span>
-            <span className="text-2xl font-extrabold text-white dark:text-white">65%</span>
-            <Link href="/dashboard?tab=tasks" className="text-[10px] text-[#5a2bd4] dark:text-indigo-400 font-bold hover:underline mt-1 inline-flex items-center gap-0.5">
+            <span className="text-2xl font-extrabold text-white dark:text-white">
+              {totalTasksCount > 0 ? `${Math.round((tasksCompletedCount / totalTasksCount) * 100)}%` : '0%'}
+            </span>
+            <Link href="/tasks" className="text-[10px] text-[#5a2bd4] dark:text-indigo-400 font-bold hover:underline mt-1 inline-flex items-center gap-0.5">
               View tasks &rarr;
             </Link>
           </div>
@@ -1310,7 +1540,7 @@ export default function Dashboard() {
               <h3 className="text-xs font-bold text-gray-200 dark:text-white uppercase tracking-wider">
                 Task Overview
               </h3>
-              <Link href="/dashboard?tab=tasks" className="text-[10px] text-[#5a2bd4] dark:text-indigo-400 font-bold hover:underline">
+              <Link href="/tasks" className="text-[10px] text-[#5a2bd4] dark:text-indigo-400 font-bold hover:underline">
                 View All Tasks
               </Link>
             </div>
@@ -1319,10 +1549,10 @@ export default function Dashboard() {
             <div className="flex flex-col gap-2">
               <div className="flex justify-between items-center text-xs font-bold text-gray-300">
                 <span>Overall Progress</span>
-                <span>65%</span>
+                <span>{totalTasksCount > 0 ? `${Math.round((tasksCompletedCount / totalTasksCount) * 100)}%` : '0%'}</span>
               </div>
               <div className="w-full h-2.5 bg-white/5 rounded-full overflow-hidden border border-white/5">
-                <div className="h-full bg-[#5a2bd4] rounded-full" style={{ width: '65%' }}></div>
+                <div className="h-full bg-[#5a2bd4] rounded-full" style={{ width: totalTasksCount > 0 ? `${Math.round((tasksCompletedCount / totalTasksCount) * 100)}%` : '0%' }}></div>
               </div>
             </div>
 
@@ -1334,7 +1564,7 @@ export default function Dashboard() {
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[9px] text-gray-500 uppercase">Completed</span>
-                  <span className="text-sm text-white dark:text-white">13</span>
+                  <span className="text-sm text-white dark:text-white">{tasksCompletedCount}</span>
                 </div>
               </div>
 
@@ -1344,7 +1574,7 @@ export default function Dashboard() {
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[9px] text-gray-500 uppercase">In Progress</span>
-                  <span className="text-sm text-white dark:text-white">7</span>
+                  <span className="text-sm text-white dark:text-white">{tasksInProgressCount}</span>
                 </div>
               </div>
 
@@ -1354,7 +1584,7 @@ export default function Dashboard() {
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[9px] text-gray-500 uppercase">Pending</span>
-                  <span className="text-sm text-white dark:text-white">5</span>
+                  <span className="text-sm text-white dark:text-white">{tasksPendingCount}</span>
                 </div>
               </div>
 
@@ -1364,7 +1594,7 @@ export default function Dashboard() {
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[9px] text-gray-500 uppercase">Overdue</span>
-                  <span className="text-sm text-white dark:text-white">2</span>
+                  <span className="text-sm text-white dark:text-white">{tasksOverdueCount}</span>
                 </div>
               </div>
             </div>
@@ -1379,7 +1609,7 @@ export default function Dashboard() {
               <h3 className="text-xs font-bold text-gray-200 dark:text-white uppercase tracking-wider">
                 Budget Overview
               </h3>
-              <Link href="/dashboard?tab=budget" className="text-[10px] text-[#5a2bd4] dark:text-indigo-400 font-bold hover:underline">
+              <Link href="/budget" className="text-[10px] text-[#5a2bd4] dark:text-indigo-400 font-bold hover:underline">
                 View Details
               </Link>
             </div>
@@ -1495,23 +1725,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* AI Recommendation Card */}
-          <div className="p-5 rounded-2xl bg-gradient-to-br from-[#5a2bd4] to-[#a855f7] border border-white/10 relative overflow-hidden flex flex-col gap-3 shadow-lg shadow-purple-500/10">
-            <div className="flex items-center gap-1.5 always-white font-extrabold text-xs uppercase tracking-wider">
-              <Sparkles className="w-4.5 h-4.5 text-amber-300 fill-amber-300" />
-              <span>AI Recommendation</span>
-            </div>
-            <p className="text-[11px] always-gray-200 leading-relaxed font-medium">
-              Based on your event type and budget, we found some amazing suggestions for you.
-            </p>
-            <button
-              onClick={() => setIsAiModalOpen(true)}
-              className="w-full py-2 bg-white hover:bg-gray-100 text-[#5a2bd4] text-[10px] font-extrabold rounded-xl transition-all shadow-md uppercase tracking-wider cursor-pointer inline-flex items-center justify-center gap-1.5"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              Get AI Suggestions
-            </button>
-          </div>
 
           {/* Notifications List */}
           <div className="glass-panel p-6 rounded-2xl border border-white/5 flex flex-col gap-4">
@@ -1519,41 +1732,38 @@ export default function Dashboard() {
               <h3 className="text-xs font-bold text-gray-200 dark:text-white uppercase tracking-wider">
                 Notifications
               </h3>
-              <Link href="/dashboard?tab=notifications" className="text-[10px] text-[#5a2bd4] dark:text-indigo-400 font-bold hover:underline">
+              <Link href="/notifications" className="text-[10px] text-[#5a2bd4] dark:text-indigo-400 font-bold hover:underline">
                 View All
               </Link>
             </div>
 
             <div className="flex flex-col gap-3.5 font-semibold text-[10.5px]">
-              <div className="flex gap-3 items-start border-b border-white/3 pb-2.5">
-                <div className="w-6 h-6 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0 mt-0.5">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
+              {displayNotifications.length === 0 ? (
+                <div className="py-6 text-center text-gray-500 font-bold">
+                  No notifications.
                 </div>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-gray-200 dark:text-white leading-snug">Venue booking confirmed for The Leela Palace</span>
-                  <span className="text-[9px] text-gray-500">2 hours ago</span>
-                </div>
-              </div>
-
-              <div className="flex gap-3 items-start border-b border-white/3 pb-2.5">
-                <div className="w-6 h-6 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0 mt-0.5">
-                  <Receipt className="w-3.5 h-3.5" />
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-gray-200 dark:text-white leading-snug">Payment of {formatRupee(150000)} is due in 3 days</span>
-                  <span className="text-[9px] text-gray-500">5 hours ago</span>
-                </div>
-              </div>
-
-              <div className="flex gap-3 items-start">
-                <div className="w-6 h-6 rounded-full bg-purple-500/10 text-purple-500 flex items-center justify-center shrink-0 mt-0.5">
-                  <Users className="w-3.5 h-3.5" />
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-gray-200 dark:text-white leading-snug">Meeting with decorator scheduled tomorrow</span>
-                  <span className="text-[9px] text-gray-500">1 day ago</span>
-                </div>
-              </div>
+              ) : (
+                displayNotifications.map((notif, idx) => (
+                  <div
+                    key={notif.id}
+                    className={`flex gap-3 items-start ${
+                      idx < displayNotifications.length - 1 ? 'border-b border-white/3 pb-2.5' : ''
+                    }`}
+                  >
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${notif.colorClass}`}>
+                      {renderNotificationIcon(notif.iconName)}
+                    </div>
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <span className="text-gray-200 dark:text-white leading-snug break-words">
+                        {notif.message}
+                      </span>
+                      <span className="text-[9px] text-gray-500">
+                        {formatRelativeTime(notif.created_at)}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

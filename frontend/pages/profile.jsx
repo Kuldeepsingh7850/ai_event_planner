@@ -10,11 +10,13 @@ import {
   MapPin,
   Globe,
   Loader2,
-  Check
+  Check,
+  Star,
+  Lock
 } from 'lucide-react';
 
 export default function Profile() {
-  const { user, authFetch, updateUserAvatar } = useAuth();
+  const { user, authFetch, updateUserAvatar, updateUserName } = useAuth();
   const { showToast } = useNotifications();
 
   // Active Tab: 'Profile Information', 'Account Settings', 'Password & Security', 'Preferences'
@@ -34,6 +36,43 @@ export default function Profile() {
   const [submitLoading, setSubmitLoading] = useState(false);
   const [uploadLoading, setUploadLoading] = useState(false);
 
+  // Password Update States
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
+
+  // Feedback States
+  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [feedbackComment, setFeedbackComment] = useState('');
+  const [feedbackSubmitLoading, setFeedbackSubmitLoading] = useState(false);
+
+  const handleSubmitFeedback = async (e) => {
+    e.preventDefault();
+    setFeedbackSubmitLoading(true);
+    try {
+      const res = await authFetch('/feedback/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rating: feedbackRating,
+          comment: feedbackComment
+        })
+      });
+      if (res.ok) {
+        showToast('Thank you for your feedback!', 'success');
+        setFeedbackComment('');
+        setFeedbackRating(5);
+      } else {
+        const errData = await res.json();
+        showToast(errData.message || 'Failed to submit feedback', 'error');
+      }
+    } catch (err) {
+      showToast(err.message || 'Error submitting feedback', 'error');
+    } finally {
+      setFeedbackSubmitLoading(false);
+    }
+  };
+
   // Load profile data from API and merge with localStorage edits
   useEffect(() => {
     const fetchProfile = async () => {
@@ -41,36 +80,39 @@ export default function Profile() {
         const res = await authFetch('/profile');
         let dbName = '';
         let dbEmail = '';
-        let dbAvatar = '';
 
         if (res.ok) {
           const dbData = await res.json();
           dbName = dbData.name;
           dbEmail = dbData.email;
-          dbAvatar = dbData.avatar;
           setAvatar(dbData.avatar || '');
-        }
 
-        // Retrieve localStorage overrides
-        const localSettings = localStorage.getItem('profile_settings');
-        if (localSettings) {
-          const parsed = JSON.parse(localSettings);
-          setFullName(parsed.fullName || dbName || 'Rahul Sharma');
-          setEmailAddress(parsed.emailAddress || dbEmail || 'rahul.sharma@email.com');
-          setPhoneNumber(parsed.phoneNumber || '+91 98765 43210');
-          setDesignation(parsed.designation || 'Event Planner & Organizer');
-          setLocation(parsed.location || 'Udaipur, Rajasthan');
-          setWebsite(parsed.website || 'www.rahulevents.com');
-          setBio(parsed.bio || 'Passionate event planner with 8+ years of experience in organizing memorable events and creating exceptional experiences.');
-        } else {
-          // Default fallbacks matching the mockup
-          setFullName(dbName || 'Rahul Sharma');
-          setEmailAddress(dbEmail || 'rahul.sharma@email.com');
-          setPhoneNumber('+91 98765 43210');
-          setDesignation('Event Planner & Organizer');
-          setLocation('Udaipur, Rajasthan');
-          setWebsite('www.rahulevents.com');
-          setBio('Passionate event planner with 8+ years of experience in organizing memorable events and creating exceptional experiences.');
+          // Retrieve user-scoped localStorage overrides
+          const localKey = `profile_settings_${dbData.id}`;
+          const localSettings = localStorage.getItem(localKey);
+          
+          setFullName(dbName || '');
+          setEmailAddress(dbEmail || '');
+          setPhoneNumber(dbData.phone || '');
+
+          if (localSettings) {
+            const parsed = JSON.parse(localSettings);
+            if (!dbData.phone) {
+              setPhoneNumber(parsed.phoneNumber || '');
+            }
+            setDesignation(parsed.designation || '');
+            setLocation(parsed.location || '');
+            setWebsite(parsed.website || '');
+            setBio(parsed.bio || '');
+          } else {
+            if (!dbData.phone) {
+              setPhoneNumber('');
+            }
+            setDesignation('');
+            setLocation('');
+            setWebsite('');
+            setBio('');
+          }
         }
       } catch (err) {
         showToast(err.message || 'Error loading profile details', 'error');
@@ -128,6 +170,7 @@ export default function Profile() {
     setSubmitLoading(true);
 
     try {
+      // 1. Save locally to persist the extra fields using user-scoped key
       const profileObj = {
         fullName,
         emailAddress,
@@ -137,14 +180,68 @@ export default function Profile() {
         website,
         bio
       };
+      const localKey = user ? `profile_settings_${user.id}` : 'profile_settings';
+      localStorage.setItem(localKey, JSON.stringify(profileObj));
 
-      // Save locally to persist the extra fields
-      localStorage.setItem('profile_settings', JSON.stringify(profileObj));
+      // 2. Call API to update full name and phone in DB
+      const res = await authFetch('/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: fullName, phone: phoneNumber })
+      });
+      
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Failed to update name in database');
+      }
+
+      // 3. Sync changes to global AuthContext state
+      updateUserName(fullName);
+
       showToast('Changes saved successfully!', 'success');
     } catch (err) {
       showToast(err.message || 'Error saving changes', 'error');
     } finally {
       setSubmitLoading(false);
+    }
+  };
+
+  // Handle Password Update
+  const handleUpdatePassword = async (e) => {
+    e.preventDefault();
+    if (!newPassword || !confirmPassword) {
+      return showToast('Please enter both password fields', 'warning');
+    }
+    if (newPassword !== confirmPassword) {
+      return showToast('Passwords do not match', 'error');
+    }
+    if (newPassword.length < 6) {
+      return showToast('Password must be at least 6 characters long', 'warning');
+    }
+
+    setPasswordLoading(true);
+    try {
+      const res = await authFetch('/profile/password', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          newPassword,
+          confirmPassword
+        })
+      });
+
+      if (res.ok) {
+        showToast('Password updated successfully!', 'success');
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        const errData = await res.json();
+        showToast(errData.message || 'Failed to update password', 'error');
+      }
+    } catch (err) {
+      showToast(err.message || 'Error updating password', 'error');
+    } finally {
+      setPasswordLoading(false);
     }
   };
 
@@ -173,15 +270,8 @@ export default function Profile() {
         </p>
       </div>
 
-      {/* 2. Horizontal navigation Tab selectors */}
-      <div className="flex gap-6 overflow-x-auto text-[13px] font-bold text-gray-500 border-b border-white/5 pb-2 scrollbar-none">
-        <span className="pb-3 relative whitespace-nowrap text-[#5a2bd4] dark:text-indigo-400 font-extrabold border-b-2 border-[#5a2bd4] dark:border-indigo-400">
-          Profile Information
-        </span>
-      </div>
-
-      {/* 3. Main Form Segment (All tabs currently route to Profile Info for visual simplicity) */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start mt-2">
+      {/* 2. Main Form Segment */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start mt-4">
         {/* Left Side: Avatar Card */}
         <div className="lg:col-span-1 glass-panel p-6 rounded-2xl border border-white/5 flex flex-col items-center justify-center text-center gap-4">
           <div className="relative group w-32 h-32 rounded-full overflow-hidden border-4 border-indigo-500/20 hover:border-indigo-500 transition-all shadow-xl bg-slate-800">
@@ -221,102 +311,221 @@ export default function Profile() {
           </span>
         </div>
 
-        {/* Right Side: Form Inputs */}
-        <div className="lg:col-span-3 glass-panel p-6 sm:p-8 rounded-2xl border border-white/5 flex flex-col gap-6">
-          <h3 className="text-xs font-bold text-gray-200 dark:text-white uppercase tracking-wider border-b border-white/5 pb-3">
-            Personal Information
-          </h3>
+        {/* Right Side: Form Inputs & Feedback */}
+        <div className="lg:col-span-3 flex flex-col gap-8">
+          {/* Personal Information card */}
+          <div className="glass-panel p-6 sm:p-8 rounded-2xl border border-white/5 flex flex-col gap-6">
+            <h3 className="text-xs font-bold text-gray-200 dark:text-white uppercase tracking-wider border-b border-white/5 pb-3">
+              Personal Information
+            </h3>
 
-          <form onSubmit={handleSaveChanges} className="flex flex-col gap-5 text-xs font-bold">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              {/* Full Name */}
+            <form onSubmit={handleSaveChanges} className="flex flex-col gap-5 text-xs font-bold">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                {/* Full Name */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] text-gray-400 uppercase tracking-wider">Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                {/* Email Address */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] text-gray-400 uppercase tracking-wider">Email Address</label>
+                  <input
+                    type="email"
+                    required
+                    readOnly
+                    value={emailAddress}
+                    className="w-full bg-white/3 border border-white/5 rounded-xl px-4 py-3 text-xs text-gray-400 cursor-not-allowed focus:outline-none opacity-60"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                {/* Phone Number */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] text-gray-400 uppercase tracking-wider">Phone Number</label>
+                  <input
+                    type="text"
+                    required
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                {/* Designation */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] text-gray-400 uppercase tracking-wider">Designation</label>
+                  <input
+                    type="text"
+                    required
+                    value={designation}
+                    onChange={(e) => setDesignation(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              {/* Location */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] text-gray-400 uppercase tracking-wider">Full Name</label>
+                <label className="text-[10px] text-gray-400 uppercase tracking-wider">Location</label>
                 <input
                   type="text"
                   required
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-indigo-500"
                 />
               </div>
 
-              {/* Email Address */}
+              {/* Bio Area */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] text-gray-400 uppercase tracking-wider">Email Address</label>
-                <input
-                  type="email"
-                  required
-                  value={emailAddress}
-                  onChange={(e) => setEmailAddress(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-indigo-500"
+                <label className="text-[10px] text-gray-400 uppercase tracking-wider">Bio</label>
+                <textarea
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  rows={4}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-indigo-500 resize-none leading-relaxed font-semibold"
                 />
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              {/* Phone Number */}
+              {/* Save Changes CTA Button */}
+              <button
+                type="submit"
+                disabled={submitLoading}
+                className="px-5 py-3 bg-[#5a2bd4] hover:bg-[#4c24b5] disabled:opacity-40 disabled:pointer-events-none always-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-indigo-600/10 cursor-pointer self-start"
+              >
+                {submitLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Check className="w-4 h-4" />
+                )}
+                Save Changes
+              </button>
+            </form>
+          </div>
+
+          {/* Change Password Card */}
+          <div className="glass-panel p-6 sm:p-8 rounded-2xl border border-white/5 flex flex-col gap-6">
+            <h3 className="text-xs font-bold text-gray-200 dark:text-white uppercase tracking-wider border-b border-white/5 pb-3">
+              Change Password
+            </h3>
+
+            <form onSubmit={handleUpdatePassword} className="flex flex-col gap-5 text-xs font-bold">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                {/* New Password */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] text-gray-400 uppercase tracking-wider">New Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="password"
+                      required
+                      placeholder="Min 6 characters"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl pl-11 pr-4 py-3 text-xs text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Confirm New Password */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] text-gray-400 uppercase tracking-wider">Confirm New Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="password"
+                      required
+                      placeholder="Re-enter password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl pl-11 pr-4 py-3 text-xs text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Update Password Button */}
+              <button
+                type="submit"
+                disabled={passwordLoading}
+                className="px-5 py-3 bg-[#5a2bd4] hover:bg-[#4c24b5] disabled:opacity-40 disabled:pointer-events-none always-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-indigo-600/10 cursor-pointer self-start"
+              >
+                {passwordLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Check className="w-4 h-4" />
+                )}
+                Update Password
+              </button>
+            </form>
+          </div>
+
+          {/* Share Platform Feedback card */}
+          <div className="glass-panel p-6 sm:p-8 rounded-2xl border border-white/5 flex flex-col gap-6">
+            <h3 className="text-xs font-bold text-gray-200 dark:text-white uppercase tracking-wider border-b border-white/5 pb-3">
+              Share Platform Feedback
+            </h3>
+
+            <form onSubmit={handleSubmitFeedback} className="flex flex-col gap-5 text-xs font-bold">
+              {/* Rating Star Selection */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] text-gray-400 uppercase tracking-wider">Phone Number</label>
-                <input
-                  type="text"
-                  required
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-indigo-500"
-                />
+                <label className="text-[10px] text-gray-400 uppercase tracking-wider">Overall Rating</label>
+                <div className="flex gap-1.5 mt-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setFeedbackRating(star)}
+                      className="transition-all hover:scale-110 cursor-pointer"
+                    >
+                      <Star
+                        className={`w-6 h-6 ${
+                          star <= feedbackRating
+                            ? 'text-amber-400 fill-amber-400'
+                            : 'text-gray-600'
+                        }`}
+                      />
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              {/* Designation */}
+              {/* Feedback Comment */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] text-gray-400 uppercase tracking-wider">Designation</label>
-                <input
-                  type="text"
+                <label className="text-[10px] text-gray-400 uppercase tracking-wider">Your Comments</label>
+                <textarea
                   required
-                  value={designation}
-                  onChange={(e) => setDesignation(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-indigo-500"
+                  placeholder="Tell us what you think of the platform..."
+                  value={feedbackComment}
+                  onChange={(e) => setFeedbackComment(e.target.value)}
+                  rows={4}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-indigo-500 resize-none leading-relaxed font-semibold"
                 />
               </div>
-            </div>
 
-            {/* Location */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] text-gray-400 uppercase tracking-wider">Location</label>
-              <input
-                type="text"
-                required
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-indigo-500"
-              />
-            </div>
-
-            {/* Bio Area */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] text-gray-400 uppercase tracking-wider">Bio</label>
-              <textarea
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                rows={4}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-indigo-500 resize-none leading-relaxed font-semibold"
-              />
-            </div>
-
-            {/* Save Changes CTA Button */}
-            <button
-              type="submit"
-              disabled={submitLoading}
-              className="px-5 py-3 bg-[#5a2bd4] hover:bg-[#4c24b5] disabled:opacity-40 disabled:pointer-events-none always-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-indigo-600/10 cursor-pointer self-start"
-            >
-              {submitLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Check className="w-4 h-4" />
-              )}
-              Save Changes
-            </button>
-          </form>
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={feedbackSubmitLoading}
+                className="px-5 py-3 bg-[#5a2bd4] hover:bg-[#4c24b5] disabled:opacity-40 disabled:pointer-events-none always-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-indigo-600/10 cursor-pointer self-start"
+              >
+                {feedbackSubmitLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Check className="w-4 h-4" />
+                )}
+                Submit Feedback
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </div>

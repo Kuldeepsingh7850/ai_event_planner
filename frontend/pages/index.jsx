@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   Calendar, Sparkles, Shield, Receipt, Users, CheckSquare, PhoneCall, 
-  ChevronRight, Sun, Moon, Check, ArrowRight, Tag, MapPin, Mail, 
+  ChevronRight, ChevronLeft, Sun, Moon, Check, ArrowRight, Tag, MapPin, Mail, 
   Search, Play, Heart, Cake, Building, GraduationCap, Wine, Star, MoreHorizontal,
   Phone, ChefHat, Palette
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, API_BASE_URL } from '../context/AuthContext';
+import { LogoBrand } from '../components/Logo';
 
 // Local SVG Brand Icons to resolve missing brand exports in lucide-react
 const FacebookIcon = (props) => (
@@ -43,36 +44,103 @@ export default function LandingPage() {
   const { theme, toggleTheme } = useTheme();
   const isLight = theme === 'light';
 
+  const handleScrollTo = (e, id) => {
+    e.preventDefault();
+    const element = document.getElementById(id);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
   // Filters State
   const [selectedVenueCat, setSelectedVenueCat] = useState('All Types');
-  const [selectedEventCat, setSelectedEventCat] = useState('All Events');
   const [activeNav, setActiveNav] = useState('Home');
+
+  const [stats, setStats] = useState({
+    eventsPlanned: '500+',
+    happyClients: '1000+',
+    topVenues: '50+',
+    clientRating: '4.8/5'
+  });
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL || 'http://localhost:5000/api'}/public-stats`);
+        if (res.ok) {
+          const data = await res.json();
+          setStats({
+            eventsPlanned: data.eventsPlanned ? `${data.eventsPlanned}+` : '0+',
+            happyClients: data.happyClients ? `${data.happyClients}+` : '0+',
+            topVenues: data.topVenues ? `${data.topVenues}+` : '15+',
+            clientRating: data.clientRating ? `${data.clientRating}/5` : '4.8/5'
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching landing page statistics:', err);
+      }
+    };
+    fetchStats();
+  }, []);
 
   // Venues Data
   const venuesList = [
-    { name: 'The Leela Palace', type: 'Luxury Hotel', location: 'Lake Pichola, Udaipur', capacity: '300 - 500', rating: '4.8', img: '/udaipur_palace.png', categories: ['Wedding', 'Conference'] },
-    { name: 'Fateh Garh Resort', type: 'Heritage Resort', location: 'Sajjangarh, Udaipur', capacity: '50 - 300', rating: '4.5', img: '/services_venues.png', categories: ['Wedding', 'Party'] },
-    { name: 'Radisson Blu', type: 'Luxury Hotel', location: 'Rani Road, Udaipur', capacity: '100 - 400', rating: '4.5', img: '/udaipur_palace_light.png', categories: ['Corporate', 'Conference'] },
-    { name: 'Taj Fateh Prakash Palace', type: 'Heritage Palace', location: 'City Palace Complex, Udaipur', capacity: '80 - 350', rating: '4.7', img: '/landing_wedding.png', categories: ['Wedding'] },
-    { name: 'Shiv Niwas Palace', type: 'Heritage Hotel', location: 'City Palace, Udaipur', capacity: '100 - 350', rating: '4.6', img: '/services_unforgettable.png', categories: ['Corporate'] },
-    { name: 'Ananta Resort', type: 'Luxury Resort', location: 'Kodiyat Road, Udaipur', capacity: '50 - 300', rating: '4.4', img: '/services_scenarios.png', categories: ['Party'] }
+    { id: 1, name: 'The Leela Palace', type: 'Luxury Hotel', location: 'Lake Pichola, Udaipur', capacity: '300 - 500', rating: '4.8', img: '/leela_palace.jpg', categories: ['Wedding', 'Conference'] },
+    { id: 2, name: 'Fateh Garh Resort', type: 'Heritage Resort', location: 'Sajjangarh, Udaipur', capacity: '50 - 300', rating: '4.5', img: '/monsoon_palace.jpg', categories: ['Wedding', 'Party'] },
+    { id: 3, name: 'Radisson Blu', type: 'Luxury Hotel', location: 'Rani Road, Udaipur', capacity: '100 - 400', rating: '4.5', img: '/services_venues.png', categories: ['Corporate', 'Conference'] },
+    { id: 10, name: 'Taj Fateh Prakash Palace', type: 'Heritage Palace', location: 'City Palace Complex, Udaipur', capacity: '80 - 350', rating: '4.7', img: '/hero_udaipur_3.jpg', categories: ['Wedding'] },
+    { id: 5, name: 'Shiv Niwas Palace', type: 'Heritage Hotel', location: 'City Palace, Udaipur', capacity: '100 - 350', rating: '4.6', img: '/shiv_niwas.jpg', categories: ['Corporate'] },
+    { id: 6, name: 'Ananta Resort', type: 'Luxury Resort', location: 'Kodiyat Road, Udaipur', capacity: '50 - 300', rating: '4.4', img: '/services_scenarios.png', categories: ['Party'] }
   ];
 
-  // Events Data
-  const eventsList = [
-    { title: 'Anisha & Piyush Wedding', category: 'Wedding', date: '24 May 2024', location: 'The Leela Palace, Udaipur', img: '/landing_wedding.png' },
-    { title: 'Corporate Meet 2024', category: 'Corporate', date: '10 Jun 2024', location: 'Radisson Blu, Udaipur', img: '/landing_corporate.png' },
-    { title: 'Summer Pool Party', category: 'Party', date: '15 Jun 2024', location: 'Fateh Garh Resort, Udaipur', img: '/landing_birthday.png' },
-    { title: 'TechNova Conference', category: 'Conference', date: '15 Jul 2024', location: 'Hotel Lakend, Udaipur', img: '/landing_college.png' }
+  // Event Categories
+  const eventCategories = [
+    {
+      title: 'Wedding Events',
+      desc: 'Make your dream wedding unforgettable.',
+      img: '/landing_wedding.png',
+      icon: Heart,
+      color: 'text-pink-500 bg-pink-500/10 border-pink-500/20 dark:bg-pink-500/10 dark:text-pink-400'
+    },
+    {
+      title: 'Birthday Parties',
+      desc: 'Plan perfect birthday parties with ease.',
+      img: '/landing_birthday.png',
+      icon: Cake,
+      color: 'text-purple-500 bg-purple-500/10 border-purple-500/20 dark:bg-purple-500/10 dark:text-purple-400'
+    },
+    {
+      title: 'Corporate Events',
+      desc: 'Organize professional corporate events seamlessly.',
+      img: '/landing_corporate.png',
+      icon: Building,
+      color: 'text-blue-500 bg-blue-500/10 border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-400'
+    },
+    {
+      title: 'College Festivals',
+      desc: 'Plan and manage amazing college fests.',
+      img: '/landing_college.png',
+      icon: GraduationCap,
+      color: 'text-amber-500 bg-amber-500/10 border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-400'
+    },
+    {
+      title: 'Private Parties',
+      desc: 'Host intimate gatherings and celebrations.',
+      img: '/landing_private.png',
+      icon: Wine,
+      color: 'text-indigo-500 bg-indigo-500/10 border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-400'
+    },
+    {
+      title: 'Custom Events',
+      desc: 'Tailored event planning for any special occasion.',
+      img: '/landing_custom.png',
+      icon: Sparkles,
+      color: 'text-rose-500 bg-rose-500/10 border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-400'
+    }
   ];
 
   const filteredVenues = selectedVenueCat === 'All Types'
     ? venuesList
     : venuesList.filter(v => v.categories.includes(selectedVenueCat));
-
-  const filteredEvents = selectedEventCat === 'All Events'
-    ? eventsList
-    : eventsList.filter(e => e.category === selectedEventCat);
 
   return (
     <div className={`min-h-screen flex flex-col justify-between transition-colors duration-300 ${
@@ -85,15 +153,9 @@ export default function LandingPage() {
         <nav className={`w-full px-6 py-4 flex justify-between items-center transition-colors duration-300 border-b ${
           isLight ? 'bg-white/95 border-gray-100 shadow-sm' : 'bg-[#090b0f]/95 border-white/5 shadow-md'
         } backdrop-blur-md`}>
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-              <Calendar className="w-4.5 h-4.5 always-white" />
-            </div>
-            <div className="flex flex-col text-left">
-              <span className="text-sm font-extrabold tracking-wider leading-tight">JAGAH</span>
-              <span className="text-[10px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest">Udaipur</span>
-            </div>
-          </div>
+          <Link href="/" className="cursor-pointer">
+            <LogoBrand isDarkTheme={!isLight} />
+          </Link>
 
           {/* Menu Items (matching image navbar with active highlight) */}
           <div className="hidden md:flex items-center gap-6 text-xs font-bold">
@@ -126,7 +188,10 @@ export default function LandingPage() {
                 <a
                   key={item.name}
                   href={item.href}
-                  onClick={() => setActiveNav(item.name)}
+                  onClick={(e) => {
+                    setActiveNav(item.name);
+                    handleScrollTo(e, item.href.substring(1));
+                  }}
                   className={colorClass}
                 >
                   {item.name}
@@ -137,81 +202,92 @@ export default function LandingPage() {
 
           {/* Right CTA / Auth Controls */}
           <div className="flex gap-3.5 items-center">
-            {/* Theme Toggle */}
-            <button
-              onClick={toggleTheme}
-              type="button"
-              className={`p-2 rounded-xl border transition-colors cursor-pointer ${
-                isLight 
-                  ? 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100' 
-                  : 'bg-white/5 border-white/5 text-gray-400 hover:bg-white/10'
-              }`}
-              aria-label="Toggle Theme"
-            >
-              {isLight ? <Moon className="w-4 h-4 text-indigo-500" /> : <Sun className="w-4 h-4 text-amber-400" />}
-            </button>
-
             {user ? (
               <div className="flex items-center gap-3">
                 <span className="hidden sm:inline text-xs font-semibold">Welcome, <strong className="text-[#5a2bd4] dark:text-indigo-400">{user.name}</strong></span>
                 <Link
                   href="/dashboard"
-                  className="px-4.5 py-2 text-xs font-bold rounded-xl bg-[#5a2bd4] hover:bg-[#4b22b5] always-white shadow-md transition-all animate-fade-in"
+                  className={`px-5 py-2.5 text-xs font-bold rounded-xl border transition-all ${
+                    isLight 
+                      ? 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-sm' 
+                      : 'bg-transparent border-white/10 hover:bg-white/5 text-slate-300 hover:text-white'
+                  }`}
                 >
                   Go to Dashboard
                 </Link>
+                {user.role !== 'admin' && (
+                  <Link
+                    href="/ai"
+                    className="px-5 py-2.5 text-xs font-bold rounded-xl bg-[#5a2bd4] hover:bg-[#4b22b5] always-white transition-all"
+                  >
+                    Create Event
+                  </Link>
+                )}
               </div>
             ) : (
-              <Link
-                href="/login"
-                className="px-4.5 py-2 text-xs font-bold rounded-xl bg-[#5a2bd4] hover:bg-[#4b22b5] always-white shadow-md transition-all"
-              >
-                Sign In
-              </Link>
+              <div className="flex items-center gap-3">
+                <Link
+                  href="/login"
+                  className={`px-5 py-2.5 text-xs font-bold rounded-xl border transition-all ${
+                    isLight 
+                      ? 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-sm' 
+                      : 'bg-transparent border-white/10 hover:bg-white/5 text-slate-300 hover:text-white'
+                  }`}
+                >
+                  Login
+                </Link>
+                <Link
+                  href="/register"
+                  className="px-5 py-2.5 text-xs font-bold rounded-xl bg-[#5a2bd4] hover:bg-[#4b22b5] always-white transition-all"
+                >
+                  Sign Up
+                </Link>
+              </div>
             )}
           </div>
         </nav>
       </header>
 
-      {/* 3. Hero Section (Lake Pichola Cover with sunset image) */}
-      <div className="relative min-h-[500px] md:min-h-[560px] flex items-center overflow-hidden pt-[72px]">
+      {/* 3. Hero Section (Udaipur City Palace Cover Sunset) */}
+      <div className="relative min-h-[500px] md:min-h-[560px] flex items-center overflow-hidden pt-[72px] group/hero">
         <img
           src="/udaipur_palace.png"
-          alt="Udaipur City Palace at Sunset"
-          className="absolute inset-0 w-full h-full object-cover brightness-[1.1] contrast-[1.02]"
+          alt="Udaipur City Palace Sunset"
+          className="absolute inset-0 w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/55 via-black/25 to-transparent"></div>
-        <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/30 to-transparent z-10"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent z-10"></div>
 
         {/* Hero Content */}
-        <div className="relative max-w-7xl w-full mx-auto px-6 py-20 z-10 text-left flex flex-col justify-center animate-fade-in">
-          {/* Tag badge overlay */}
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/20 border border-white/10 text-indigo-300 text-[10px] font-bold uppercase tracking-wider mb-5 w-fit">
-            <Sparkles className="w-3 h-3" />
-            Plan Smarter, Celebrate Better
+        <div className="relative max-w-7xl w-full mx-auto px-6 py-20 z-20 text-left flex flex-col justify-center animate-fade-in">
+          {/* Pill Badge overlay */}
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#5a2bd4]/20 border border-[#5a2bd4]/30 always-indigo-200 text-[10px] font-semibold tracking-wide mb-5 w-fit">
+            Made for Udaipur, Powered by AI ✨
           </div>
 
           <h1 className="text-4xl md:text-5.5xl font-extrabold tracking-tight leading-[1.1] max-w-3xl mb-4 always-white">
-            AI-Powered Event Planning <br />in <span className="text-[#818cf8]">Udaipur</span>
+            Plan Your Perfect Event <br />in <span className="bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">Udaipur</span>
           </h1>
 
           <p className="always-gray-200 text-xs md:text-sm max-w-xl leading-relaxed mb-8 font-medium">
-            From venues to vendors, we plan everything so you can enjoy every moment.
+            AI-powered event planning to make your special moments seamless, memorable and extraordinary.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 items-center w-fit">
             <Link
               href={user ? '/dashboard' : '/login'}
-              className="px-6 py-3.5 text-xs font-bold rounded-xl bg-[#5a2bd4] hover:bg-[#4b22b5] always-white shadow-xl shadow-indigo-600/20 transition-all flex items-center gap-1.5 group"
+              className="px-6 py-3.5 text-xs font-bold rounded-xl bg-[#5a2bd4] hover:bg-[#4b22b5] always-white shadow-xl shadow-indigo-600/20 transition-all flex items-center gap-1.5 group cursor-pointer"
             >
-              Plan Your Event
+              Plan Your Event Now
               <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
             </Link>
             <a
-              href="#venues"
-              className="px-6 py-3.5 text-xs font-bold rounded-xl bg-white/5 border border-white/20 hover:bg-white/10 always-white transition-all text-center shrink-0"
+              href="#about"
+              onClick={(e) => handleScrollTo(e, 'about')}
+              className="px-6 py-3.5 text-xs font-bold rounded-xl bg-white/5 border border-white/20 hover:bg-white/10 always-white transition-all text-center flex items-center gap-2 cursor-pointer"
             >
-              Explore Venues
+              <Play className="w-4 h-4 fill-white text-white shrink-0" />
+              How It Works
             </a>
           </div>
         </div>
@@ -223,12 +299,7 @@ export default function LandingPage() {
       }`}>
         <div className="max-w-7xl mx-auto px-6">
           
-          {/* Breadcrumb bread crumbs */}
-          <div className="flex items-center gap-1.5 text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-2.5">
-            <Link href="/" className="hover:text-[#5a2bd4]">Home</Link>
-            <ChevronRight className="w-3 h-3 text-gray-400" />
-            <span className="text-[#5a2bd4]">About Us</span>
-          </div>
+
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center mb-16">
             
@@ -368,11 +439,7 @@ export default function LandingPage() {
       }`}>
         <div className="max-w-7xl mx-auto px-6 text-center">
           
-          <div className="flex items-center gap-1.5 text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-2.5 justify-center">
-            <Link href="/" className="hover:text-[#5a2bd4]">Home</Link>
-            <ChevronRight className="w-3 h-3 text-gray-400" />
-            <span className="text-[#5a2bd4]">Services</span>
-          </div>
+
 
           <div className="max-w-2xl mx-auto mb-12 flex flex-col items-center">
             <h2 className="text-2xl md:text-3.5xl font-extrabold tracking-tight mb-2 text-gray-900 dark:text-white">Our Services</h2>
@@ -422,11 +489,7 @@ export default function LandingPage() {
       }`}>
         <div className="max-w-7xl mx-auto px-6 text-center">
           
-          <div className="flex items-center gap-1.5 text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-2.5 justify-center">
-            <Link href="/" className="hover:text-[#5a2bd4]">Home</Link>
-            <ChevronRight className="w-3 h-3 text-gray-400" />
-            <span className="text-[#5a2bd4]">Venues</span>
-          </div>
+
 
           <div className="max-w-2xl mx-auto mb-8 flex flex-col items-center">
             <h2 className="text-2xl md:text-3.5xl font-extrabold tracking-tight mb-2 text-gray-900 dark:text-white">Our Venues</h2>
@@ -489,12 +552,21 @@ export default function LandingPage() {
                     </div>
                   </div>
 
-                  <Link
-                    href={user ? '/venues' : '/login'}
-                    className="w-full py-2.5 border border-[#5a2bd4]/20 hover:border-[#5a2bd4] bg-[#5a2bd4]/5 hover:bg-[#5a2bd4] text-[#5a2bd4] hover:text-white font-bold text-[10px] rounded-xl text-center cursor-pointer transition-all uppercase tracking-wider mt-2"
-                  >
-                    Book Venue
-                  </Link>
+                  {user?.role === 'admin' ? (
+                    <Link
+                      href={`/venues?id=${venue.id}`}
+                      className="w-full py-2.5 border border-[#5a2bd4]/20 hover:border-[#5a2bd4] bg-[#5a2bd4]/5 hover:bg-[#5a2bd4] text-[#5a2bd4] hover:text-white font-bold text-[10px] rounded-xl text-center cursor-pointer transition-all uppercase tracking-wider mt-2"
+                    >
+                      View Details
+                    </Link>
+                  ) : (
+                    <Link
+                      href={user ? `/venues?id=${venue.id}` : '/login'}
+                      className="w-full py-2.5 border border-[#5a2bd4]/20 hover:border-[#5a2bd4] bg-[#5a2bd4]/5 hover:bg-[#5a2bd4] text-[#5a2bd4] hover:text-white font-bold text-[10px] rounded-xl text-center cursor-pointer transition-all uppercase tracking-wider mt-2"
+                    >
+                      Book Venue
+                    </Link>
+                  )}
                 </div>
               </div>
             ))}
@@ -508,78 +580,52 @@ export default function LandingPage() {
         isLight ? 'bg-white border-gray-100' : 'bg-[#090b0f] border-white/5'
       }`}>
         <div className="max-w-7xl mx-auto px-6 text-center">
-          
-          <div className="flex items-center gap-1.5 text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-2.5 justify-center">
-            <Link href="/" className="hover:text-[#5a2bd4]">Home</Link>
-            <ChevronRight className="w-3 h-3 text-gray-400" />
-            <span className="text-[#5a2bd4]">Events</span>
-          </div>
 
-          <div className="max-w-2xl mx-auto mb-8 flex flex-col items-center">
-            <h2 className="text-2xl md:text-3.5xl font-extrabold tracking-tight mb-2 text-gray-900 dark:text-white">Events</h2>
+          <div className="max-w-2xl mx-auto mb-12 flex flex-col items-center">
+            <h2 className="text-2xl md:text-3.5xl font-extrabold tracking-tight mb-2 text-gray-900 dark:text-white">
+              Explore Event Categories
+            </h2>
             <p className={`text-xs md:text-sm font-semibold ${isLight ? 'text-gray-500' : 'text-gray-400'}`}>
-              Discover and explore amazing events in Udaipur.
+              Find the perfect category tailored for your celebration in Udaipur.
             </p>
             <div className="w-12 h-1 bg-[#5a2bd4] mx-auto rounded-full mt-4"></div>
           </div>
 
-          {/* Category filtering events list */}
-          <div className="flex justify-center flex-wrap gap-2 mb-10 text-xs font-bold">
-            {['All Events', 'Wedding', 'Corporate', 'Party', 'Conference'].map((category) => (
-              <button
-                key={category}
-                onClick={() => setSelectedEventCat(category)}
-                className={`px-4 py-2 rounded-xl transition-all cursor-pointer border ${
-                  selectedEventCat === category
-                    ? 'bg-[#5a2bd4] border-[#5a2bd4] text-white shadow-md'
-                    : isLight
-                    ? 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                    : 'bg-white/5 border-white/5 text-gray-300 hover:bg-white/10'
-                }`}
-              >
-                {category}
-              </button>
-            ))}
-          </div>
-
-          {/* Events cards rows */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left max-w-4xl mx-auto">
-            {filteredEvents.map((evt, idx) => (
-              <div
-                key={idx}
-                className={`rounded-2xl border p-4 flex gap-4 transition-all duration-300 hover:shadow-md ${
-                  isLight
-                    ? 'bg-gray-50 border-gray-100 hover:bg-white'
-                    : 'bg-[#0d1117]/65 border-white/5 hover:bg-[#0d1117]/95'
-                }`}
-              >
-                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden shrink-0 border border-white/5">
-                  <img src={evt.img} alt={evt.title} className="w-full h-full object-cover" />
-                </div>
-
-                <div className="flex-1 flex flex-col justify-between py-0.5">
-                  <div className="flex flex-col gap-1">
-                    <div className="flex justify-between items-start gap-2">
-                      <h3 className="text-xs sm:text-sm font-extrabold text-gray-900 dark:text-white leading-tight">{evt.title}</h3>
-                      <span className="bg-[#5a2bd4]/10 text-[#5a2bd4] border border-[#5a2bd4]/10 px-2 py-0.5 rounded text-[8px] font-black uppercase">
-                        {evt.category}
-                      </span>
-                    </div>
-                    <div className="flex flex-col gap-1 text-[10px] text-gray-500 dark:text-gray-400 font-semibold mt-1">
-                      <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-[#5a2bd4] shrink-0" /> {evt.date}</span>
-                      <span className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-[#5a2bd4] shrink-0" /> {evt.location}</span>
-                    </div>
+          {/* Event Categories Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            {eventCategories.map((cat, idx) => {
+              const Icon = cat.icon;
+              return (
+                <div
+                  key={idx}
+                  className={`rounded-[24px] overflow-hidden border flex flex-col h-full transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl ${
+                    isLight
+                      ? 'bg-white border-gray-100 shadow-md'
+                      : 'bg-[#0d1117]/60 border-white/5 shadow-lg'
+                  }`}
+                >
+                  {/* Top Image */}
+                  <div className="relative aspect-[16/10] w-full overflow-hidden border-b border-white/5">
+                    <img src={cat.img} alt={cat.title} className="w-full h-full object-cover" />
                   </div>
 
-                  <Link
-                    href={user ? `/events` : '/login'}
-                    className="text-[10px] font-bold text-[#5a2bd4] hover:text-[#4b22b5] transition-colors flex items-center gap-0.5 uppercase tracking-wider w-fit"
-                  >
-                    View Details <ChevronRight className="w-3.5 h-3.5" />
-                  </Link>
+                  {/* Bottom details content */}
+                  <div className="p-5 flex items-start gap-4 text-left flex-1">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 border ${cat.color}`}>
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <div className="flex flex-col justify-center min-w-0">
+                      <h3 className="text-sm font-extrabold text-gray-800 dark:text-white leading-tight mb-1.5 truncate">
+                        {cat.title}
+                      </h3>
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400 font-semibold leading-relaxed">
+                        {cat.desc}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
         </div>
@@ -593,10 +639,10 @@ export default function LandingPage() {
       }`}>
         <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8">
           {[
-            { label: 'Events Planned', value: '500+', icon: Calendar },
-            { label: 'Happy Clients', value: '1000+', icon: Users },
-            { label: 'Top Venues', value: '50+', icon: MapPin },
-            { label: 'Client Rating', value: '4.8/5', icon: Star }
+            { label: 'Events Planned', value: stats.eventsPlanned, icon: Calendar },
+            { label: 'Happy Clients', value: stats.happyClients, icon: Users },
+            { label: 'Top Venues', value: stats.topVenues, icon: MapPin },
+            { label: 'Client Rating', value: stats.clientRating, icon: Star }
           ].map((stat, idx) => {
             const Icon = stat.icon;
             return (
@@ -622,15 +668,9 @@ export default function LandingPage() {
           
           {/* Logo & Intro */}
           <div className="md:col-span-2 flex flex-col gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center">
-                <Calendar className="w-4.5 h-4.5 always-white" />
-              </div>
-              <div className="flex flex-col text-left">
-                <span className="text-sm font-bold always-white leading-tight">JAGAH</span>
-                <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">Udaipur</span>
-              </div>
-            </div>
+            <Link href="/" className="cursor-pointer">
+              <LogoBrand isDarkTheme={true} boxSize="w-8 h-8" />
+            </Link>
             <p className="text-[11px] text-gray-500 leading-relaxed max-w-sm">
               AI-powered event planning platform helping you create unforgettable memories in the beautiful city of Udaipur.
             </p>
@@ -647,10 +687,10 @@ export default function LandingPage() {
             <h4 className="text-[11px] font-bold always-white uppercase tracking-wider">Quick Links</h4>
             <div className="flex flex-col gap-2.5 text-[11px] text-gray-500 font-semibold">
               <Link href="/" className="hover:text-white transition-colors">Home</Link>
-              <a href="#about" className="hover:text-white transition-colors">About Us</a>
-              <a href="#services" className="hover:text-white transition-colors">Services</a>
-              <a href="#venues" className="hover:text-white transition-colors">Venues</a>
-              <a href="#events" className="hover:text-white transition-colors">Events</a>
+              <a href="#about" onClick={(e) => handleScrollTo(e, 'about')} className="hover:text-white transition-colors">About Us</a>
+              <a href="#services" onClick={(e) => handleScrollTo(e, 'services')} className="hover:text-white transition-colors">Services</a>
+              <a href="#venues" onClick={(e) => handleScrollTo(e, 'venues')} className="hover:text-white transition-colors">Venues</a>
+              <a href="#events" onClick={(e) => handleScrollTo(e, 'events')} className="hover:text-white transition-colors">Events</a>
             </div>
           </div>
 
@@ -658,12 +698,12 @@ export default function LandingPage() {
           <div className="flex flex-col gap-3">
             <h4 className="text-[11px] font-bold always-white uppercase tracking-wider">Services</h4>
             <div className="flex flex-col gap-2.5 text-[11px] text-gray-500 font-semibold">
-              <a href="#events" className="hover:text-white transition-colors">Wedding Planning</a>
-              <a href="#events" className="hover:text-white transition-colors">Birthday Parties</a>
-              <a href="#events" className="hover:text-white transition-colors">Corporate Events</a>
-              <a href="#events" className="hover:text-white transition-colors">College Events</a>
-              <a href="#events" className="hover:text-white transition-colors">Private Parties</a>
-              <a href="#events" className="hover:text-white transition-colors">Custom Events</a>
+              <a href="#events" onClick={(e) => handleScrollTo(e, 'events')} className="hover:text-white transition-colors">Wedding Planning</a>
+              <a href="#events" onClick={(e) => handleScrollTo(e, 'events')} className="hover:text-white transition-colors">Birthday Parties</a>
+              <a href="#events" onClick={(e) => handleScrollTo(e, 'events')} className="hover:text-white transition-colors">Corporate Events</a>
+              <a href="#events" onClick={(e) => handleScrollTo(e, 'events')} className="hover:text-white transition-colors">College Events</a>
+              <a href="#events" onClick={(e) => handleScrollTo(e, 'events')} className="hover:text-white transition-colors">Private Parties</a>
+              <a href="#events" onClick={(e) => handleScrollTo(e, 'events')} className="hover:text-white transition-colors">Custom Events</a>
             </div>
           </div>
 
@@ -691,10 +731,24 @@ export default function LandingPage() {
 
         {/* Bottom copyright details */}
         <div className="max-w-7xl mx-auto px-6 pt-4 text-center text-gray-600 flex flex-col sm:flex-row justify-between items-center gap-2 text-[10px] font-semibold">
-          <p>© 2024 JAGAH Udaipur. All Rights Reserved.</p>
+          <p>© {new Date().getFullYear()} JAGAH Udaipur. All Rights Reserved.</p>
           <p>Made with ❤️ in Udaipur</p>
         </div>
       </footer>
+
+      {/* Floating Theme Toggle FAB */}
+      <button
+        onClick={toggleTheme}
+        type="button"
+        className={`fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full border shadow-2xl flex items-center justify-center transition-all duration-300 cursor-pointer hover:scale-110 active:scale-95 ${
+          isLight 
+            ? 'bg-white border-indigo-100 text-gray-600 hover:bg-gray-100 shadow-indigo-600/10' 
+            : 'bg-[#0d1117]/90 border-white/20 text-gray-300 hover:bg-[#151c2c] backdrop-blur-md shadow-black/50'
+        }`}
+        aria-label="Toggle Theme"
+      >
+        {isLight ? <Moon className="w-5 h-5 text-indigo-500" /> : <Sun className="w-5 h-5 text-amber-400" />}
+      </button>
     </div>
   );
 }
