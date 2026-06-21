@@ -71,7 +71,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   // Login handler
-  const login = async (email, password) => {
+  const login = async (email, password, requiredRole = null) => {
     try {
       const res = await fetch(`${API_BASE_URL}/login`, {
         method: 'POST',
@@ -85,6 +85,15 @@ export function AuthProvider({ children }) {
 
       if (!res.ok) {
         throw new Error(data.message || 'Login failed');
+      }
+
+      if (requiredRole) {
+        if (requiredRole === 'admin' && data.role !== 'admin') {
+          throw new Error('Access denied. Only administrators are allowed to access the Admin Portal.');
+        }
+        if (requiredRole === 'user' && data.role === 'admin') {
+          throw new Error('Admins must switch to the Admin Portal tab to sign in.');
+        }
       }
 
       // Save token & user in local storage
@@ -103,7 +112,7 @@ export function AuthProvider({ children }) {
   };
 
   // Login with Google handler
-  const loginWithGoogle = async (idToken) => {
+  const loginWithGoogle = async (idToken, requiredRole = null) => {
     try {
       const res = await fetch(`${API_BASE_URL}/login/google`, {
         method: 'POST',
@@ -117,6 +126,15 @@ export function AuthProvider({ children }) {
 
       if (!res.ok) {
         throw new Error(data.message || 'Google login failed');
+      }
+
+      if (requiredRole) {
+        if (requiredRole === 'admin' && data.role !== 'admin') {
+          throw new Error('Access denied. Only administrators are allowed to access the Admin Portal.');
+        }
+        if (requiredRole === 'user' && data.role === 'admin') {
+          throw new Error('Admins must switch to the Admin Portal tab to sign in.');
+        }
       }
 
       // Save token & user in local storage

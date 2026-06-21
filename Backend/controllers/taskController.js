@@ -98,11 +98,18 @@ const updateTask = async (req, res) => {
 
     // Send task notifications if completed
     if (status === 'completed') {
+      const isTimeline = /^\d{1,2}:\d{2}\s*(AM|PM)/i.test(task.title || '');
+      let displayTitle = task.title || '';
+      if (displayTitle.includes(' || ')) {
+        displayTitle = displayTitle.split(' || ')[0];
+      }
+      const typeLabel = isTimeline ? 'Timeline' : 'Task';
+
       await db.query(
         'INSERT INTO notifications (user_id, message, status) VALUES (?, ?, ?)',
         [
           req.user.id,
-          `Task "${task.title}" for event "${events[0].title}" has been completed.`,
+          `${typeLabel} "${displayTitle}" for event "${events[0].title}" has been completed.`,
           'unread'
         ]
       );

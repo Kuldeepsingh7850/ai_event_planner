@@ -170,7 +170,11 @@ export default function TasksTimeline() {
       const res = await authFetch(`/tasks/${eventId}`);
       if (res.ok) {
         const data = await res.json();
-        setTasks(data.map(parseTask));
+        // Exclude timeline items (which start with a time format like "09:30 PM")
+        const filtered = data
+          .map(parseTask)
+          .filter(t => !/^\d{1,2}:\d{2}\s*(AM|PM)/i.test(t.title || ''));
+        setTasks(filtered);
       } else {
         setTasks([]);
       }
@@ -281,7 +285,10 @@ export default function TasksTimeline() {
     }));
 
     if (selectedEvent.id === 9999) {
-      showToast(`Task marked as ${newStatus === 'completed' ? 'completed' : 'pending'}`, 'success');
+      const isTimeline = /^\d{1,2}:\d{2}\s*(AM|PM)/i.test(taskObj.title || '');
+      if (!isTimeline) {
+        showToast(`Task marked as ${newStatus === 'completed' ? 'completed' : 'pending'}`, 'success');
+      }
       return;
     }
 
@@ -293,7 +300,10 @@ export default function TasksTimeline() {
       });
 
       if (res.ok) {
-        showToast(`Task status updated!`, 'success');
+        const isTimeline = /^\d{1,2}:\d{2}\s*(AM|PM)/i.test(taskObj.title || '');
+        if (!isTimeline) {
+          showToast(`Task status updated!`, 'success');
+        }
         fetchTasksList(selectedEvent.id);
         fetchNotifications();
       } else {
@@ -393,24 +403,24 @@ export default function TasksTimeline() {
       <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-12 font-medium">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white dark:text-white">
-            Tasks & Timeline
+            Tasks
           </h1>
           <p className="text-xs text-gray-500 mt-1 font-medium">
             Plan, assign and track all tasks for your event.
           </p>
         </div>
         <div className="glass-panel flex flex-col items-center justify-center py-20 text-center max-w-xl mx-auto gap-4 font-bold border border-white/5 rounded-2xl p-6 w-full">
-          <div className="w-16 h-16 rounded-full bg-[#5a2bd4]/10 border border-[#5a2bd4]/20 flex items-center justify-center text-[#5a2bd4] dark:text-indigo-400">
+          <div className="w-16 h-16 rounded-full bg-[#1d4ed8]/10 border border-[#1d4ed8]/20 flex items-center justify-center text-[#1d4ed8] dark:text-indigo-400">
             <AlertCircle className="w-8 h-8" />
           </div>
           <h2 className="text-lg font-extrabold text-white">No Events Found</h2>
           <p className="text-xs text-gray-500 max-w-sm leading-relaxed font-medium">
-            You don't have any events created yet. To manage tasks and timelines, you must first create an event or generate one using our AI Planner.
+            You don't have any events created yet. To manage tasks, you must first create an event or generate one using our AI Planner.
           </p>
           <div className="flex items-center gap-3.5 mt-2">
             <Link
               href="/ai"
-              className="px-4 py-2.5 rounded-xl bg-[#5a2bd4] hover:bg-[#4c24b5] always-white text-xs font-bold shadow-lg shadow-indigo-500/10 transition-all cursor-pointer"
+              className="px-4 py-2.5 rounded-xl bg-[#1d4ed8] hover:bg-[#1e3a8a] always-white text-xs font-bold shadow-lg shadow-indigo-500/10 transition-all cursor-pointer"
             >
               Create Event with AI
             </Link>
@@ -432,7 +442,7 @@ export default function TasksTimeline() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white dark:text-white">
-            Tasks & Timeline
+            Tasks
           </h1>
           <p className="text-xs text-gray-500 mt-1 font-medium">
             Plan, assign and track all tasks for your event.
@@ -440,7 +450,7 @@ export default function TasksTimeline() {
         </div>
         <button
           onClick={() => setIsAddTaskOpen(true)}
-          className="px-4 py-2.5 rounded-xl bg-[#5a2bd4] hover:bg-[#4c24b5] always-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-indigo-500/10 transition-all transform hover:-translate-y-0.5 cursor-pointer"
+          className="px-4 py-2.5 rounded-xl bg-[#1d4ed8] hover:bg-[#1e3a8a] always-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-indigo-500/10 transition-all transform hover:-translate-y-0.5 cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           Add New Task
@@ -465,7 +475,7 @@ export default function TasksTimeline() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`pb-3 relative cursor-pointer whitespace-nowrap transition-colors ${
                   isActive
-                    ? 'text-[#5a2bd4] dark:text-indigo-400 font-extrabold border-b-2 border-[#5a2bd4] dark:border-indigo-400'
+                    ? 'text-[#1d4ed8] dark:text-indigo-400 font-extrabold border-b-2 border-[#1d4ed8] dark:border-indigo-400'
                     : 'hover:text-gray-800 dark:hover:text-white'
                 }`}
               >
@@ -510,7 +520,7 @@ export default function TasksTimeline() {
                     }}
                     className={`w-full text-left p-1.5 rounded-lg transition-all ${
                       priorityFilter === p
-                        ? 'bg-[#5a2bd4] text-white'
+                        ? 'bg-[#1d4ed8] text-white'
                         : 'text-gray-300 hover:bg-white/5'
                     }`}
                   >
@@ -571,7 +581,7 @@ export default function TasksTimeline() {
             <thead>
               <tr className="border-b border-white/5 text-gray-400 font-extrabold uppercase tracking-wider bg-white/[0.005]">
                 <th className="py-4 px-4 w-12">
-                  <input type="checkbox" className="rounded bg-white/5 border-white/10 text-[#5a2bd4] cursor-pointer" disabled />
+                  <input type="checkbox" className="rounded bg-white/5 border-white/10 text-[#1d4ed8] cursor-pointer" disabled />
                 </th>
                 <th className="py-4 px-3">Task Name</th>
                 <th className="py-4 px-3">Assigned To</th>
@@ -606,7 +616,7 @@ export default function TasksTimeline() {
                         type="checkbox"
                         checked={task.status === 'completed'}
                         onChange={() => handleToggleTaskStatus(task)}
-                        className="rounded border-white/10 bg-white/5 text-[#5a2bd4] focus:ring-[#5a2bd4] h-4 w-4 cursor-pointer"
+                        className="rounded border-white/10 bg-white/5 text-[#1d4ed8] focus:ring-[#1d4ed8] h-4 w-4 cursor-pointer"
                       />
                     </td>
                     <td className="py-4 px-3">
@@ -715,7 +725,7 @@ export default function TasksTimeline() {
                     onClick={() => setCurrentPage(pNum)}
                     className={`w-6 h-6 rounded-lg text-[10px] font-bold transition-all flex items-center justify-center cursor-pointer ${
                       currentPage === pNum
-                        ? 'bg-[#5a2bd4] text-white font-extrabold shadow-sm shadow-indigo-600/10'
+                        ? 'bg-[#1d4ed8] text-white font-extrabold shadow-sm shadow-indigo-600/10'
                         : 'bg-white/3 border border-white/5 text-gray-400 hover:text-white hover:bg-white/5'
                     }`}
                   >
@@ -821,7 +831,7 @@ export default function TasksTimeline() {
               {/* Submit CTA */}
               <button
                 type="submit"
-                className="w-full py-2.5 rounded-xl bg-[#5a2bd4] hover:bg-[#4c24b5] always-white font-bold text-center mt-2 cursor-pointer shadow-md transition-all uppercase tracking-wider"
+                className="w-full py-2.5 rounded-xl bg-[#1d4ed8] hover:bg-[#1e3a8a] always-white font-bold text-center mt-2 cursor-pointer shadow-md transition-all uppercase tracking-wider"
               >
                 Add Task
               </button>

@@ -21,6 +21,7 @@ export default function Login() {
   const [resetSuccess, setResetSuccess] = useState(null);
   const [resetLoading, setResetLoading] = useState(false);
   const [etherealUrl, setEtherealUrl] = useState(null);
+  const [localResetLink, setLocalResetLink] = useState(null);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -39,15 +40,7 @@ export default function Login() {
     setLoading(true);
     showToast('Signing in with Google...', 'info');
     try {
-      const data = await loginWithGoogle(response.credential);
-      if (activeTab === 'admin' && data.role !== 'admin') {
-        logout();
-        throw new Error('Access denied. Only administrators are allowed to access the Admin Portal.');
-      }
-      if (activeTab === 'user' && data.role === 'admin') {
-        logout();
-        throw new Error('Admins must switch to the Admin Portal tab to sign in.');
-      }
+      await loginWithGoogle(response.credential, activeTab);
       showToast('Logged in successfully with Google!', 'success');
     } catch (err) {
       setError(err.message || 'Google authentication failed');
@@ -112,15 +105,7 @@ export default function Login() {
     setError(null);
     setLoading(true);
     try {
-      const data = await login(email, password);
-      if (activeTab === 'admin' && data.role !== 'admin') {
-        logout();
-        throw new Error('Access denied. Only administrators are allowed to access the Admin Portal.');
-      }
-      if (activeTab === 'user' && data.role === 'admin') {
-        logout();
-        throw new Error('Admins must switch to the Admin Portal tab to sign in.');
-      }
+      await login(email, password, activeTab);
     } catch (err) {
       setError(err.message || 'Invalid email or password');
       // Show the Forgot Password link ONLY on wrong ID or password credentials error
@@ -139,6 +124,7 @@ export default function Login() {
     setError(null);
     setResetSuccess(null);
     setEtherealUrl(null);
+    setLocalResetLink(null);
     setResetLoading(true);
     try {
       const res = await requestPasswordReset(email);
@@ -146,7 +132,11 @@ export default function Login() {
       showToast('Password reset link sent.', 'success');
       if (res.etherealUrl) {
         setEtherealUrl(res.etherealUrl);
-      } else {
+      }
+      if (res.localFallback && res.resetLink) {
+        setLocalResetLink(res.resetLink);
+      }
+      if (!res.etherealUrl && !res.localFallback) {
         setTimeout(() => {
           setIsResetMode(false);
           setResetSuccess(null);
@@ -183,28 +173,26 @@ export default function Login() {
       )}
 
       {/* Main card container */}
-      <div className={`w-full max-w-5xl rounded-3xl overflow-hidden shadow-2xl border flex flex-col relative z-10 min-h-[600px] transition-colors duration-300 ${
-        isLight 
-          ? 'bg-white border-gray-200/80 text-gray-800' 
+      <div className={`w-full max-w-5xl rounded-3xl overflow-hidden shadow-2xl border flex flex-col relative z-10 min-h-[600px] transition-colors duration-300 ${isLight
+          ? 'bg-white border-gray-200/80 text-gray-800'
           : 'bg-[#0d1117] border-white/5 text-white'
-      }`}>
-        
-        {/* Top Header Bar Row (Spans Full Card Width) */}
-        <div className={`w-full py-4 px-6 md:px-8 flex justify-between items-center border-b transition-colors duration-300 ${
-          isLight ? 'border-gray-100 bg-white' : 'border-white/5 bg-[#0d1117]'
         }`}>
+
+        {/* Top Header Bar Row (Spans Full Card Width) */}
+        <div className={`w-full py-4 px-6 md:px-8 flex justify-between items-center border-b transition-colors duration-300 ${isLight ? 'border-gray-100 bg-white' : 'border-white/5 bg-[#0d1117]'
+          }`}>
           {/* Logo Brand */}
           <div onClick={() => router.push('/')} className="cursor-pointer">
             <LogoBrand isDarkTheme={!isLight} boxSize="w-9 h-9" />
           </div>
-          
+
           {/* Sign Up Redirect Link */}
           <div className="flex items-center gap-1.5 text-xs font-semibold">
             <span className={isLight ? 'text-gray-500' : 'text-gray-400'}>Don't have an account?</span>
             <button
               type="button"
               onClick={() => router.push('/register')}
-              className="text-[#5c3db5] dark:text-[#8b6cf5] font-extrabold hover:underline cursor-pointer transition-colors"
+              className="text-[#1d4ed8] dark:text-[#60a5fa] font-extrabold hover:underline cursor-pointer transition-colors"
             >
               Sign Up
             </button>
@@ -213,7 +201,7 @@ export default function Login() {
 
         {/* Content Row Split (50/50 Image & Form) */}
         <div className="w-full flex flex-col md:flex-row flex-1">
-          
+
           {/* Left Column: Udaipur Palace Dusk Image */}
           <div className="w-full md:w-1/2 relative min-h-[300px] md:min-h-auto overflow-hidden">
             <img
@@ -223,11 +211,14 @@ export default function Login() {
             />
             {/* Dark gradient fade over Udaipur image */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent"></div>
-            
+
             {/* Overlaid branding content */}
             <div className="absolute inset-0 p-8 flex flex-col justify-end text-left z-10">
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-tight always-white">
-                Plan Your Perfect Event <br />in Udaipur
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-tight always-white font-outfit">
+                Plan Your <span className="font-serif italic text-amber-400 font-normal">Perfect</span> Event <br />
+                <span className="text-blue-400 drop-shadow-[0_0_15px_rgba(59,130,246,0.8)]">
+                AI
+                </span> in <span className="bg-gradient-to-r from-blue-400 via-sky-300 to-amber-300 bg-clip-text text-transparent font-black">Udaipur</span>
               </h1>
               <p className="text-xs always-gray-200 mt-2.5 max-w-sm leading-relaxed font-semibold">
                 AI-powered event planning to make your special moments unforgettable.
@@ -236,10 +227,9 @@ export default function Login() {
           </div>
 
           {/* Right Column: Sign In Form */}
-          <div className={`w-full md:w-1/2 p-6 md:p-10 flex flex-col justify-center items-center text-left relative transition-colors duration-300 ${
-            isLight ? 'bg-white' : 'bg-[#0d1117]'
-          }`}>
-            
+          <div className={`w-full md:w-1/2 p-6 md:p-10 flex flex-col justify-center items-center text-left relative transition-colors duration-300 ${isLight ? 'bg-white' : 'bg-[#0d1117]'
+            }`}>
+
             {isResetMode ? (
               /* Custom Password Reset Form */
               <form onSubmit={handleResetSubmit} className="w-full max-w-md flex flex-col gap-4 animate-scale-up">
@@ -276,11 +266,10 @@ export default function Login() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="Enter your email"
-                      className={`w-full border rounded-xl text-xs py-3 pl-10 pr-4 transition-all focus:outline-none ${
-                        isLight 
-                          ? 'bg-gray-50 border-gray-200 text-gray-900 focus:border-[#5c3db5] focus:bg-white' 
-                          : 'bg-white/3 border-white/5 text-white focus:border-[#8b6cf5]/50 focus:bg-white/5'
-                      }`}
+                      className={`w-full border rounded-xl text-xs py-3 pl-10 pr-4 transition-all focus:outline-none ${isLight
+                          ? 'bg-gray-50 border-gray-200 text-gray-900 focus:border-[#1d4ed8] focus:bg-white'
+                          : 'bg-white/3 border-white/5 text-white focus:border-[#60a5fa]/50 focus:bg-white/5'
+                        }`}
                       required
                     />
                   </div>
@@ -289,7 +278,7 @@ export default function Login() {
                 <button
                   type="submit"
                   disabled={resetLoading}
-                  className="bg-[#5c3db5] hover:bg-[#4b3099] text-white font-bold text-xs py-3 rounded-xl transition-all shadow-lg shadow-[#5c3db5]/15 cursor-pointer flex items-center justify-center gap-2 mt-1 disabled:opacity-50"
+                  className="bg-[#1d4ed8] hover:bg-[#1e3a8a] text-white font-bold text-xs py-3 rounded-xl transition-all shadow-lg shadow-[#1d4ed8]/15 cursor-pointer flex items-center justify-center gap-2 mt-1 disabled:opacity-50"
                 >
                   {resetLoading && <span className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin shrink-0"></span>}
                   Send Reset Link
@@ -303,6 +292,7 @@ export default function Login() {
                       setError(null);
                       setResetSuccess(null);
                       setEtherealUrl(null);
+                      setLocalResetLink(null);
                     }}
                     className="text-xs font-bold text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white cursor-pointer hover:underline"
                   >
@@ -325,36 +315,49 @@ export default function Login() {
                     </a>
                   </div>
                 )}
+
+                {localResetLink && (
+                  <div className="mt-3 p-3.5 border rounded-2xl bg-amber-500/5 border-amber-500/10 flex flex-col gap-2.5 animate-scale-up">
+                    <p className={`text-[10px] leading-relaxed text-center font-medium ${isLight ? 'text-gray-600' : 'text-gray-400'}`}>
+                      ⚠️ Email dispatch is using placeholder configuration. Click below to reset your password directly (Local Dev Mode):
+                    </p>
+                    <a
+                      href={localResetLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs py-3 rounded-xl transition-all shadow-md text-center flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      Reset Password Now
+                    </a>
+                  </div>
+                )}
               </form>
             ) : (
               <>
                 {/* Portal Selector Tabs */}
-                <div className={`flex w-full max-w-md p-1 rounded-2xl mb-6 transition-colors border ${
-                  isLight ? 'bg-gray-100/80 border-gray-200' : 'bg-white/5 border-white/5'
-                }`}>
+                <div className={`flex w-full max-w-md p-1 rounded-2xl mb-6 transition-colors border ${isLight ? 'bg-gray-100/80 border-gray-200' : 'bg-white/5 border-white/5'
+                  }`}>
                   <button
                     onClick={() => handleTabChange('user')}
                     type="button"
-                    className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-                      activeTab === 'user'
-                        ? 'bg-[#5c3db5] text-white shadow-md'
-                        : isLight 
+                    className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${activeTab === 'user'
+                        ? 'bg-[#1d4ed8] text-white shadow-md'
+                        : isLight
                           ? 'text-gray-500 hover:text-gray-900'
                           : 'text-gray-400 hover:text-white'
-                    }`}
+                      }`}
                   >
                     User Portal
                   </button>
                   <button
                     onClick={() => handleTabChange('admin')}
                     type="button"
-                    className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-                      activeTab === 'admin'
-                        ? 'bg-[#5c3db5] text-white shadow-md'
-                        : isLight 
+                    className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${activeTab === 'admin'
+                        ? 'bg-[#1d4ed8] text-white shadow-md'
+                        : isLight
                           ? 'text-gray-500 hover:text-gray-900'
                           : 'text-gray-400 hover:text-white'
-                    }`}
+                      }`}
                   >
                     Admin Portal
                   </button>
@@ -392,11 +395,10 @@ export default function Login() {
                           setShowForgotPassword(false);
                         }}
                         placeholder="Enter your email"
-                        className={`w-full border rounded-xl text-xs py-3 pl-10 pr-4 transition-all focus:outline-none ${
-                          isLight 
-                            ? 'bg-gray-50 border-gray-200 text-gray-900 focus:border-[#5c3db5] focus:bg-white' 
-                            : 'bg-white/3 border-white/5 text-white focus:border-[#8b6cf5]/50 focus:bg-white/5'
-                        }`}
+                        className={`w-full border rounded-xl text-xs py-3 pl-10 pr-4 transition-all focus:outline-none ${isLight
+                            ? 'bg-gray-50 border-gray-200 text-gray-900 focus:border-[#1d4ed8] focus:bg-white'
+                            : 'bg-white/3 border-white/5 text-white focus:border-[#60a5fa]/50 focus:bg-white/5'
+                          }`}
                         required
                       />
                     </div>
@@ -416,18 +418,17 @@ export default function Login() {
                           setShowForgotPassword(false);
                         }}
                         placeholder="Enter your password"
-                        className={`w-full border rounded-xl text-xs py-3 pl-10 pr-10 transition-all focus:outline-none ${
-                          isLight 
-                            ? 'bg-gray-50 border-gray-200 text-gray-900 focus:border-[#5c3db5] focus:bg-white' 
-                            : 'bg-white/3 border-white/5 text-white focus:border-[#8b6cf5]/50 focus:bg-white/5'
-                        }`}
+                        className={`w-full border rounded-xl text-xs py-3 pl-10 pr-10 transition-all focus:outline-none ${isLight
+                            ? 'bg-gray-50 border-gray-200 text-gray-900 focus:border-[#1d4ed8] focus:bg-white'
+                            : 'bg-white/3 border-white/5 text-white focus:border-[#60a5fa]/50 focus:bg-white/5'
+                          }`}
                         required
                       />
                       {/* Eye Toggle Icon */}
                       <button
-                         type="button"
-                         onClick={() => setShowPassword(!showPassword)}
-                         className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none cursor-pointer"
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none cursor-pointer"
                       >
                         {showPassword ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
                       </button>
@@ -451,7 +452,7 @@ export default function Login() {
                               setError(null);
                               setResetSuccess(null);
                             }}
-                            className="text-xs font-bold text-[#5c3db5] dark:text-[#8b6cf5] hover:underline cursor-pointer font-sans"
+                            className="text-xs font-bold text-[#1d4ed8] dark:text-[#60a5fa] hover:underline cursor-pointer font-sans"
                           >
                             Forgot Password?
                           </button>
@@ -463,7 +464,7 @@ export default function Login() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="bg-[#5c3db5] hover:bg-[#4b3099] text-white font-bold text-xs py-3 rounded-xl transition-all shadow-lg shadow-[#5c3db5]/15 cursor-pointer flex items-center justify-center gap-2 mt-1 disabled:opacity-50"
+                    className="bg-[#1d4ed8] hover:bg-[#1e3a8a] text-white font-bold text-xs py-3 rounded-xl transition-all shadow-lg shadow-[#1d4ed8]/15 cursor-pointer flex items-center justify-center gap-2 mt-1 disabled:opacity-50"
                   >
                     {loading && <span className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin shrink-0"></span>}
                     Login
@@ -490,9 +491,8 @@ export default function Login() {
             )}
 
             {/* Copyright Footer */}
-            <div className={`w-full max-w-md text-center text-[10px] mt-6 pt-3 border-t ${
-              isLight ? 'text-gray-400 border-gray-100' : 'text-gray-500 border-white/5'
-            }`}>
+            <div className={`w-full max-w-md text-center text-[10px] mt-6 pt-3 border-t ${isLight ? 'text-gray-400 border-gray-100' : 'text-gray-500 border-white/5'
+              }`}>
               © {new Date().getFullYear()} JAGAH Udaipur. All rights reserved.
             </div>
           </div>

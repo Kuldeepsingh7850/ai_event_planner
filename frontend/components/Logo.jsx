@@ -18,8 +18,8 @@ export function LogoIcon({ className = "w-5 h-5" }) {
     >
       <defs>
         <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#a855f7" />
-          <stop offset="100%" stopColor="#4f46e5" />
+          <stop offset="0%" stopColor="#f59e0b" />
+          <stop offset="100%" stopColor="#1d4ed8" />
         </linearGradient>
       </defs>
 

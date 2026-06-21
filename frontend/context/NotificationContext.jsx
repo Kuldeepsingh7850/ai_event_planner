@@ -15,7 +15,20 @@ export function NotificationProvider({ children }) {
       const res = await authFetch('/notifications');
       if (res.ok) {
         const data = await res.json();
-        setNotifications(data);
+        const isAdmin = user.role === 'admin';
+        const filtered = data.filter(n => {
+          const msg = n.message.toLowerCase();
+          const isAdminRelated =
+            msg.includes("new user") ||
+            msg.includes("feedback") ||
+            msg.includes("new venue") ||
+            msg.includes("new vendor") ||
+            msg.includes("new event") ||
+            msg.includes("system update") ||
+            msg.includes("new features");
+          return isAdmin ? isAdminRelated : !isAdminRelated;
+        });
+        setNotifications(filtered);
       }
     } catch (err) {
       console.error('Error fetching notifications:', err.message);

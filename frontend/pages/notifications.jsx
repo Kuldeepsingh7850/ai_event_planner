@@ -13,13 +13,14 @@ import {
   CheckCircle,
   Settings,
   Check,
+  CheckSquare,
   ChevronLeft,
   ChevronRight,
   Loader2
 } from 'lucide-react';
 
 export default function NotificationsPage() {
-  const { authFetch } = useAuth();
+  const { authFetch, user } = useAuth();
   const {
     notifications: dbNotifications,
     unreadCount,
@@ -34,8 +35,55 @@ export default function NotificationsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(8);
 
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedNotifIds, setSelectedNotifIds] = useState([]);
+  const [deletedFallbackIds, setDeletedFallbackIds] = useState([]);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('deleted_fallback_notifications');
+      if (stored) {
+        try {
+          setDeletedFallbackIds(JSON.parse(stored));
+        } catch (e) {}
+      }
+    }
+  }, []);
+
   // Hardcoded mockup notifications matching reference image
-  const fallbackNotifications = [
+  const fallbackNotifications = user?.role === 'admin' ? [
+    {
+      id: 'f1_admin',
+      message: 'New user registered: Aarav Sharma (aarav@gmail.com)',
+      status: 'unread',
+      created_at: new Date(Date.now() - 10 * 60000).toISOString() // 10 mins ago
+    },
+    {
+      id: 'f2_admin',
+      message: 'New feedback received: "Loved the UI design and event flow!"',
+      status: 'unread',
+      created_at: new Date(Date.now() - 4 * 3600000).toISOString() // 4 hours ago
+    },
+    {
+      id: 'f3_admin',
+      message: 'New venue added: Radisson Blu Udaipur Palace Resort',
+      status: 'read',
+      created_at: new Date(Date.now() - 24 * 3600000).toISOString() // 1 day ago
+    },
+    {
+      id: 'f4_admin',
+      message: 'New event added: Royal Wedding by user Amit Kumar',
+      status: 'read',
+      created_at: new Date('2024-05-23T18:15:00').toISOString()
+    },
+    {
+      id: 'f5_admin',
+      message: 'New vendor added: Udaipur Royal Caterers',
+      status: 'read',
+      created_at: new Date('2024-05-22T12:00:00').toISOString()
+    }
+  ] : [
     {
       id: 'f1',
       message: 'Your booking for The Leela Palace, Udaipur on 25 Dec 2024 is confirmed.',
@@ -95,11 +143,41 @@ export default function NotificationsPage() {
     let colorClass = "bg-slate-500/10 text-slate-500 dark:text-slate-400 border-slate-500/20";
     let text = notif.message;
 
-    if (msg.includes("booking") || msg.includes("venue")) {
+    if (msg.includes("new user registered")) {
+      title = "New User Registration";
+      type = "system";
+      iconName = "user-plus";
+      colorClass = "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20";
+    } else if (msg.includes("new feedback received")) {
+      title = "Feedback Submitted";
+      type = "system";
+      iconName = "message-square";
+      colorClass = "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20";
+    } else if (msg.includes("new venue added")) {
+      title = "New Venue Added";
+      type = "system";
+      iconName = "calendar";
+      colorClass = "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20";
+    } else if (msg.includes("new vendor added")) {
+      title = "New Vendor Added";
+      type = "system";
+      iconName = "user-plus";
+      colorClass = "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20";
+    } else if (msg.includes("new event added")) {
+      title = "New Event Created";
+      type = "system";
+      iconName = "calendar";
+      colorClass = "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20";
+    } else if (msg.includes("timeline")) {
+      title = "Timeline Completed";
+      type = "updates";
+      iconName = "clock";
+      colorClass = "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 border-indigo-500/20";
+    } else if (msg.includes("booking") || msg.includes("venue")) {
       title = "Venue Booking Confirmed";
       type = "updates";
       iconName = "calendar";
-      colorClass = "bg-purple-500/10 text-[#5a2bd4] dark:text-purple-400 border-purple-500/20";
+      colorClass = "bg-purple-500/10 text-[#1d4ed8] dark:text-purple-400 border-purple-500/20";
     } else if (msg.includes("guest") || msg.includes("invited")) {
       title = "New Guest Added";
       type = "updates";
@@ -124,7 +202,7 @@ export default function NotificationsPage() {
       title = "Budget Updated";
       type = "updates";
       iconName = "receipt";
-      colorClass = "bg-[#efe9fc] text-[#5a2bd4] dark:bg-indigo-500/10 dark:text-indigo-400 border-indigo-500/20";
+      colorClass = "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 border-indigo-500/20";
     } else if (msg.includes("completed") || msg.includes("marked completed")) {
       title = "Task Completed";
       type = "updates";
@@ -148,7 +226,9 @@ export default function NotificationsPage() {
   };
 
   // Combine database notifications with fallback templates if database is fresh
-  const allNotifications = (dbNotifications.length > 0 ? dbNotifications : fallbackNotifications).map(parseNotification);
+  const allNotifications = (dbNotifications.length > 0 ? dbNotifications : fallbackNotifications)
+    .filter(n => !deletedFallbackIds.includes(n.id))
+    .map(parseNotification);
 
   // Format Timestamps dynamically
   const formatTimestamp = (dateString) => {
@@ -227,8 +307,78 @@ export default function NotificationsPage() {
     }
   };
 
+  const handleToggleSelectionMode = () => {
+    setIsSelectionMode(!isSelectionMode);
+    setSelectedNotifIds([]);
+  };
+
+  const handleToggleSelectNotif = (id) => {
+    if (selectedNotifIds.includes(id)) {
+      setSelectedNotifIds(prev => prev.filter(x => x !== id));
+    } else {
+      setSelectedNotifIds(prev => [...prev, id]);
+    }
+  };
+
+  const handleSelectAllOnPage = () => {
+    const pageIds = paginatedNotifications.map(n => n.id);
+    const allSelected = pageIds.every(id => selectedNotifIds.includes(id));
+    if (allSelected) {
+      setSelectedNotifIds(prev => prev.filter(id => !pageIds.includes(id)));
+    } else {
+      setSelectedNotifIds(prev => [...new Set([...prev, ...pageIds])]);
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedNotifIds.length === 0) {
+      showToast('Please select at least one notification to delete', 'warning');
+      return;
+    }
+
+    setDeleteLoading(true);
+    try {
+      const dbIds = selectedNotifIds.filter(id => !id.toString().startsWith('f'));
+      const fallbackIds = selectedNotifIds.filter(id => id.toString().startsWith('f'));
+
+      if (dbIds.length > 0) {
+        const res = await authFetch('/notifications/delete', {
+          method: 'POST',
+          body: JSON.stringify({ ids: dbIds })
+        });
+        if (!res.ok) {
+          let errMsg = 'Failed to delete notifications';
+          try {
+            const errData = await res.json();
+            errMsg = errData.message || errMsg;
+          } catch (e) {
+            errMsg = `Server error (${res.status})`;
+          }
+          throw new Error(errMsg);
+        }
+      }
+
+      if (fallbackIds.length > 0) {
+        const newDeleted = [...deletedFallbackIds, ...fallbackIds];
+        setDeletedFallbackIds(newDeleted);
+        localStorage.setItem('deleted_fallback_notifications', JSON.stringify(newDeleted));
+      }
+
+      showToast('Selected notifications deleted successfully', 'success');
+      setSelectedNotifIds([]);
+      setIsSelectionMode(false);
+      fetchNotifications();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   useEffect(() => {
     setCurrentPage(1);
+    setSelectedNotifIds([]);
+    setIsSelectionMode(false);
   }, [activeTab]);
 
   return (
@@ -243,18 +393,58 @@ export default function NotificationsPage() {
             Stay updated with your event activities.
           </p>
         </div>
-        <button
-          onClick={handleMarkAllRead}
-          disabled={unreadCount === 0 && dbNotifications.length > 0}
-          className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-300 hover:text-white disabled:opacity-40 disabled:pointer-events-none text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:bg-white/10"
-        >
-          {loading ? (
-            <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
+        <div className="flex flex-wrap items-center gap-2">
+          {isSelectionMode ? (
+            <>
+              <button
+                onClick={handleSelectAllOnPage}
+                className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-300 hover:text-white text-xs font-bold transition-all hover:bg-white/10 cursor-pointer"
+              >
+                Select Page
+              </button>
+              <button
+                onClick={handleDeleteSelected}
+                disabled={selectedNotifIds.length === 0 || deleteLoading}
+                className="px-3.5 py-2 rounded-xl bg-red-650/10 border border-red-500/20 text-red-500 hover:bg-red-600 hover:text-white disabled:opacity-40 disabled:pointer-events-none text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-md"
+              >
+                {deleteLoading ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <span>🗑️ Delete ({selectedNotifIds.length})</span>
+                )}
+              </button>
+              <button
+                onClick={handleToggleSelectionMode}
+                className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-300 hover:text-white text-xs font-bold transition-all hover:bg-white/10 cursor-pointer"
+              >
+                Cancel
+              </button>
+            </>
           ) : (
-            <Check className="w-4 h-4 text-indigo-400" />
+            <>
+              <button
+                onClick={handleToggleSelectionMode}
+                disabled={paginatedNotifications.length === 0}
+                className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-300 hover:text-white disabled:opacity-40 disabled:pointer-events-none text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:bg-white/10"
+              >
+                <CheckSquare className="w-4 h-4 text-indigo-400" />
+                Select
+              </button>
+              <button
+                onClick={handleMarkAllRead}
+                disabled={unreadCount === 0 && dbNotifications.length > 0}
+                className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-300 hover:text-white disabled:opacity-40 disabled:pointer-events-none text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:bg-white/10"
+              >
+                {loading ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
+                ) : (
+                  <Check className="w-4 h-4 text-indigo-400" />
+                )}
+                Mark all as read
+              </button>
+            </>
           )}
-          Mark all as read
-        </button>
+        </div>
       </div>
 
       {/* 2. Filter Tabs Header */}
@@ -270,7 +460,7 @@ export default function NotificationsPage() {
               onClick={() => setActiveTab(tab.id)}
               className={`pb-3 relative cursor-pointer whitespace-nowrap transition-colors ${
                 isActive
-                  ? 'text-[#5a2bd4] dark:text-indigo-400 font-extrabold border-b-2 border-[#5a2bd4] dark:border-indigo-400'
+                  ? 'text-[#1d4ed8] dark:text-indigo-400 font-extrabold border-b-2 border-[#1d4ed8] dark:border-indigo-400'
                   : 'hover:text-gray-800 dark:hover:text-white'
               }`}
             >
@@ -288,44 +478,72 @@ export default function NotificationsPage() {
             <span>No notifications in this category.</span>
           </div>
         ) : (
-          paginatedNotifications.map((notif) => (
-            <div
-              key={notif.id}
-              className={`p-5 flex items-center justify-between gap-4 transition-all hover:bg-white/[0.01] ${
-                notif.status === 'unread' ? 'bg-indigo-500/[0.015]' : ''
-              }`}
-            >
-              <div className="flex items-center gap-4 min-w-0">
-                {/* Custom Icon Wrapper */}
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${notif.colorClass}`}>
-                  {renderIcon(notif.iconName)}
+          paginatedNotifications.map((notif) => {
+            const isSelected = selectedNotifIds.includes(notif.id);
+            return (
+              <div
+                key={notif.id}
+                onClick={() => {
+                  if (isSelectionMode) {
+                    handleToggleSelectNotif(notif.id);
+                  }
+                }}
+                className={`p-5 flex items-center justify-between gap-4 transition-all ${
+                  isSelectionMode ? 'cursor-pointer hover:bg-white/[0.02]' : 'hover:bg-white/[0.01]'
+                } ${
+                  notif.status === 'unread' ? 'bg-indigo-500/[0.015]' : ''
+                } ${
+                  isSelected ? 'bg-indigo-650/10' : ''
+                }`}
+              >
+                <div className="flex items-center gap-4 min-w-0 flex-1">
+                  {isSelectionMode && (
+                    <div 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleSelectNotif(notif.id);
+                      }}
+                      className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-all cursor-pointer ${
+                        isSelected 
+                          ? 'bg-indigo-600 border-indigo-500 text-white' 
+                          : 'border-white/20 hover:border-indigo-500/50'
+                      }`}
+                    >
+                      {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                    </div>
+                  )}
+
+                  {/* Custom Icon Wrapper */}
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${notif.colorClass}`}>
+                    {renderIcon(notif.iconName)}
+                  </div>
+
+                  <div className="flex flex-col gap-0.5 min-w-0">
+                    <h4 className="text-xs sm:text-sm font-bold text-gray-200 dark:text-white leading-tight">
+                      {notif.title}
+                    </h4>
+                    <p className="text-[11px] sm:text-xs text-gray-400 dark:text-gray-300 font-medium leading-normal mt-0.5 line-clamp-1 sm:line-clamp-none">
+                      {notif.text}
+                    </p>
+                  </div>
                 </div>
 
-                <div className="flex flex-col gap-0.5 min-w-0">
-                  <h4 className="text-xs sm:text-sm font-bold text-gray-200 dark:text-white leading-tight">
-                    {notif.title}
-                  </h4>
-                  <p className="text-[11px] sm:text-xs text-gray-400 dark:text-gray-300 font-medium leading-normal mt-0.5 line-clamp-1 sm:line-clamp-none">
-                    {notif.text}
-                  </p>
+                {/* Time and Unread Dot */}
+                <div className="flex items-center gap-4 shrink-0 text-right">
+                  <span className="text-[10px] sm:text-xs text-gray-500 font-bold font-outfit">
+                    {formatTimestamp(notif.created_at)}
+                  </span>
+                  
+                  {/* Purple Unread indicator dot */}
+                  <span className={`w-2 h-2 rounded-full transition-all shrink-0 ${
+                    notif.status === 'unread' 
+                      ? 'bg-[#1d4ed8] dark:bg-indigo-500 shadow-sm shadow-indigo-500' 
+                      : 'bg-transparent'
+                  }`} />
                 </div>
               </div>
-
-              {/* Time and Unread Dot */}
-              <div className="flex items-center gap-4 shrink-0 text-right">
-                <span className="text-[10px] sm:text-xs text-gray-500 font-bold font-outfit">
-                  {formatTimestamp(notif.created_at)}
-                </span>
-                
-                {/* Purple Unread indicator dot */}
-                <span className={`w-2 h-2 rounded-full transition-all shrink-0 ${
-                  notif.status === 'unread' 
-                    ? 'bg-[#5a2bd4] dark:bg-indigo-500 shadow-sm shadow-indigo-500' 
-                    : 'bg-transparent'
-                }`} />
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
@@ -351,7 +569,7 @@ export default function NotificationsPage() {
                   onClick={() => setCurrentPage(pNum)}
                   className={`w-6 h-6 rounded-lg text-[10px] font-bold transition-all flex items-center justify-center cursor-pointer ${
                     currentPage === pNum
-                      ? 'bg-[#5a2bd4] text-white font-extrabold shadow-sm shadow-indigo-600/10'
+                      ? 'bg-[#1d4ed8] text-white font-extrabold shadow-sm shadow-indigo-600/10'
                       : 'bg-white/3 border border-white/5 text-gray-400 hover:text-white hover:bg-white/5'
                   }`}
                 >

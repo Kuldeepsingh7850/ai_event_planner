@@ -26,7 +26,7 @@ export default function LogoutPage() {
       {/* LOGOUT CONFIRM SCREEN */}
       <div className="glass-panel w-full max-w-sm rounded-2xl border border-white/5 p-8 flex flex-col items-center text-center gap-6 shadow-xl animate-scale-up">
         {/* Circular LogOut Icon container */}
-        <div className="w-20 h-20 rounded-full bg-purple-500/10 border border-purple-500/20 text-[#5a2bd4] dark:text-indigo-400 flex items-center justify-center shrink-0 shadow-inner">
+        <div className="w-20 h-20 rounded-full bg-purple-500/10 border border-purple-500/20 text-[#1d4ed8] dark:text-indigo-400 flex items-center justify-center shrink-0 shadow-inner">
           <LogOut className="w-10 h-10 transform scale-x-[-1] translate-x-0.5" />
         </div>
 
@@ -45,7 +45,7 @@ export default function LogoutPage() {
           <button
             onClick={handleConfirmLogout}
             disabled={loading}
-            className="flex-1 py-2.5 bg-[#5a2bd4] hover:bg-[#4c24b5] always-white text-xs font-bold rounded-xl transition-all shadow-md shadow-indigo-500/10 cursor-pointer flex items-center justify-center gap-1.5"
+            className="flex-1 py-2.5 bg-[#1d4ed8] hover:bg-[#1e3a8a] always-white text-xs font-bold rounded-xl transition-all shadow-md shadow-indigo-500/10 cursor-pointer flex items-center justify-center gap-1.5"
           >
             {loading && <span className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin shrink-0"></span>}
             Yes, Logout

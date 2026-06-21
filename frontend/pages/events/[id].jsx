@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
@@ -31,7 +31,9 @@ import {
   Loader2,
   ChevronRight,
   Building,
-  Utensils
+  Utensils,
+  User,
+  Mail
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -104,6 +106,18 @@ const getTimelineMinutes = (title) => {
   return hours * 60 + minutes;
 };
 
+const formatTime12Hour = (timeStr) => {
+  if (!timeStr) return '';
+  const [hourStr, minuteStr] = timeStr.split(':');
+  let hour = parseInt(hourStr);
+  const minutes = minuteStr;
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  hour = hour % 12;
+  hour = hour ? hour : 12;
+  const formattedHour = String(hour).padStart(2, '0');
+  return `${formattedHour}:${minutes} ${ampm}`;
+};
+
 
 const parsePayment = (exp, idx) => {
   if (!exp || !exp.title) return {
@@ -166,6 +180,7 @@ export default function EventDetailHub() {
 
   // Active Tab
   const [activeTab, setActiveTab] = useState('overview');
+  const [tasksView, setTasksView] = useState('checklist'); // 'checklist' or 'timeline'
 
   // Loading states
   const [loading, setLoading] = useState(true);
@@ -204,88 +219,65 @@ export default function EventDetailHub() {
   const [payDate, setPayDate] = useState('');
   const [payStatus, setPayStatus] = useState('Paid');
 
-  // AI Suggestions Modal States
+  // AI Chatbot States
   const [showAISuggestionsModal, setShowAISuggestionsModal] = useState(false);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiSuggestions, setAiSuggestions] = useState(null);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const chatEndRef = useRef(null);
+
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages, chatLoading]);
+
+  const handleSendChatMessage = async (e) => {
+    e.preventDefault();
+    if (!chatInput.trim() || chatLoading) return;
+
+    const userMsg = { sender: 'user', text: chatInput };
+    setChatMessages(prev => [...prev, userMsg]);
+    const inputToSend = chatInput;
+    setChatInput('');
+    setChatLoading(true);
+
+    try {
+      const res = await authFetch('/ai/chat', {
+        method: 'POST',
+        body: JSON.stringify({
+          eventId: id,
+          message: inputToSend,
+          history: chatMessages
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setChatMessages(prev => [...prev, { sender: 'ai', text: data.reply }]);
+      } else {
+        throw new Error('Failed to get AI reply');
+      }
+    } catch (err) {
+      showToast(err.message, 'error');
+      setChatMessages(prev => [...prev, { sender: 'ai', text: 'Sorry, I encountered an error. Please try again!' }]);
+    } finally {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      setChatLoading(false);
+    }
+  };
 
   const handleTriggerAISuggestions = () => {
+    if (event) {
+      setChatMessages([
+        { 
+          sender: 'ai', 
+          text: `Hello! I am your AI Event Assistant. Ask me anything about planning your "${event.title}" event in Udaipur! For example, you can ask me for budget advice, vendor recommendations, or timeline suggestions.` 
+        }
+      ]);
+    }
     setShowAISuggestionsModal(true);
-    setAiLoading(true);
-    
-    // Simulate AI model generation delay
-    setTimeout(() => {
-      if (!event) {
-        setAiSuggestions({
-          checklist: ["Review guest count and budget.", "Choose a theme vibe.", "Browse local vendors."],
-          decor: "Standard decor based on event scale.",
-          vendors: "Contact general event decorators and venue coordinators.",
-          budgetTip: "Set aside 15% of the total budget for unexpected costs."
-        });
-        setAiLoading(false);
-        return;
-      }
-      
-      const type = event.event_type || 'Event';
-      const guest = event.guest_count || 100;
-      const budgetVal = event.budget || 50000;
-      const location = event.location || 'Udaipur';
-      const themeVal = event.theme || 'Traditional';
-
-      let checklist = [];
-      let decor = "";
-      let vendors = "";
-      let budgetTip = "";
-
-      if (type.toLowerCase().includes('wedding') || type.toLowerCase().includes('shaadi') || type.toLowerCase().includes('marriage')) {
-        checklist = [
-          `Coordinate mandap decorations matching "${themeVal}".`,
-          `Hire a professional heritage photographer familiar with "${location}" locations.`,
-          `Finalize dynamic Rajasthani welcome folk dancers and buffet setup.`,
-          `Verify guest count (${guest} guests) with the venue seating plan.`,
-          `Send digital wedding e-invitations with RSVP deadlines.`
-        ];
-        decor = `Elegant combination of marigold hangings, vintage drapes, royal brass lanterns, and palacemandap floral setup.`;
-        vendors = `Delicious Bites Catering (specializing in Mewari buffet) and Epic Moments Photography (wedding specialist).`;
-        budgetTip = `For a budget of ${formatRupee(budgetVal)}, allocate around 40% for venue/catering, 25% for wedding decor, 15% for photography, and keep 10% as contingency backup.`;
-      } else if (type.toLowerCase().includes('birthday') || type.toLowerCase().includes('party')) {
-        checklist = [
-          `Book DJ and sound systems for a dance-floor setup.`,
-          `Order a customized themed cake and prepare dessert table.`,
-          `Setup colorful photo booth backdrop with matching props.`,
-          `Prepare child-friendly seating and game coordinator schedule.`,
-          `Create a playlist with guest requests.`
-        ];
-        decor = `Vibrant balloon arches, neon LED name boards, themed table centerpieces, and warm fairy light backdrops.`;
-        vendors = `Ananta Resort decorator team, local dessert bakers, and sound system vendors.`;
-        budgetTip = `Since you have a budget of ${formatRupee(budgetVal)}, focus 60% on food/drinks and sound, 20% on visual decorations, and 20% on birthday activities/gifts.`;
-      } else if (type.toLowerCase().includes('corporate') || type.toLowerCase().includes('conference') || type.toLowerCase().includes('college') || type.toLowerCase().includes('farewell')) {
-        checklist = [
-          `Confirm Audio/Visual setup (projectors, microphones, podium).`,
-          `Prepare custom badges, register notebooks and welcoming booths.`,
-          `Design customized banners and certificates for guests.`,
-          `Schedule tea/coffee breaks and lunch buffet timings.`,
-          `Draft event host speech and timeline slideshow slides.`
-        ];
-        decor = `Professional minimalism with company/college banners, corporate blue theme accents, stage podium spotlights, and clean presentation displays.`;
-        vendors = `Radisson Blu AV team, local corporate printers, and professional high-speed stage photographers.`;
-        budgetTip = `With ${formatRupee(budgetVal)} budget, prioritize 50% for high-quality food/AV rentals, 30% for marketing/banners/souvenirs, and 20% on guest hospitality.`;
-      } else {
-        checklist = [
-          `Setup clean seating arrangements for ${guest} guests at ${location}.`,
-          `Determine event flow checklist timeline milestones.`,
-          `Coordinate with decorators for traditional floral decor.`,
-          `Finalize menu catering choice and beverage service.`,
-          `Double check the AV sound system setup.`
-        ];
-        decor = `Contemporary setups with colorful drapes, warm yellow spotlight fills, and minimalist flower accents.`;
-        vendors = `Local general coordinators, sound equipment hire, and professional buffet caterers.`;
-        budgetTip = `Optimize budget allocation: 50% on food & drinks, 20% on venue, 20% on theme decor/AV, and 10% on miscellaneous items.`;
-      }
-
-      setAiSuggestions({ checklist, decor, vendors, budgetTip });
-      setAiLoading(false);
-    }, 850);
   };
 
   // Set default payDate and payInvoiceId when opening modal
@@ -302,6 +294,7 @@ export default function EventDetailHub() {
   const [guests, setGuests] = useState([]);
   const [guestName, setGuestName] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
+  const [guestPhone, setGuestPhone] = useState('');
   const [guestStatus, setGuestStatus] = useState('pending');
 
   // Tasks States
@@ -311,6 +304,11 @@ export default function EventDetailHub() {
   const [taskAssignee, setTaskAssignee] = useState('Self');
   const [taskPriority, setTaskPriority] = useState('Medium');
   const [taskStatus, setTaskStatus] = useState('To Do');
+
+  // Timeline States
+  const [timelineName, setTimelineName] = useState('');
+  const [timelineTime, setTimelineTime] = useState('18:00');
+  const [timelineDate, setTimelineDate] = useState('');
 
   // Vendors States
   const [vendors, setVendors] = useState([]);
@@ -407,25 +405,27 @@ export default function EventDetailHub() {
       }
 
       const storedCover = localStorage.getItem(`event_cover_${id}`);
-      if (storedCover && !storedCover.includes('.png')) {
+      if (storedCover && storedCover.startsWith('data:')) {
         setCoverPhoto(storedCover);
       } else if (event) {
         const cat = (event.event_type || '').toLowerCase();
-        if (cat.includes('wedding') || cat.includes('marriage')) {
-          setCoverPhoto('/leela_palace.jpg');
-        } else if (cat.includes('birthday') || cat.includes('anniversary')) {
-          setCoverPhoto('/hero_udaipur_3.jpg');
-        } else if (cat.includes('corporate') || cat.includes('seminar') || cat.includes('conference')) {
-          setCoverPhoto('/oberoi_udaivilas.jpg');
-        } else if (cat.includes('college') || cat.includes('festival') || cat.includes('fest')) {
-          setCoverPhoto('/monsoon_palace.jpg');
-        } else if (cat.includes('private') || cat.includes('party')) {
-          setCoverPhoto('/jag_mandir.jpg');
+        const title = (event.title || '').toLowerCase();
+        const combined = `${cat} ${title}`;
+        if (combined.includes('wed') || combined.includes('marri') || combined.includes('shaadi')) {
+          setCoverPhoto('/landing_wedding.png');
+        } else if (combined.includes('birth') || combined.includes('anniv') || combined.includes('janamdin')) {
+          setCoverPhoto('/landing_birthday.png');
+        } else if (combined.includes('farewell') || combined.includes('vidaai') || combined.includes('graduation') || combined.includes('college') || combined.includes('school') || combined.includes('university') || combined.includes('fest')) {
+          setCoverPhoto('/landing_college.png');
+        } else if (combined.includes('corp') || combined.includes('conf') || combined.includes('seminar') || combined.includes('meet') || combined.includes('work')) {
+          setCoverPhoto('/landing_corporate.png');
+        } else if (combined.includes('gala') || combined.includes('festival') || combined.includes('concert') || combined.includes('priv') || combined.includes('party') || combined.includes('celebrat') || combined.includes('get together')) {
+          setCoverPhoto('/landing_private.png');
         } else {
-          setCoverPhoto('/hero_udaipur_1.jpg');
+          setCoverPhoto('/landing_custom.png');
         }
       } else {
-        setCoverPhoto('/leela_palace.jpg');
+        setCoverPhoto('/landing_custom.png');
       }
     }
   }, [id, event]);
@@ -451,9 +451,9 @@ export default function EventDetailHub() {
       if (res.ok) {
         const data = await res.json();
         setEvent(data);
-        // Setup initial edit states
         setEditTitle(data.title);
         setEditDate(data.date ? data.date.split('T')[0] : '');
+        setTimelineDate(data.date ? data.date.split('T')[0] : '');
         setEditTime(data.time || '18:00');
         setEditLocation(data.location);
         setEditBudget(data.budget);
@@ -771,6 +771,7 @@ export default function EventDetailHub() {
           eventId: id,
           guest_name: guestName,
           email: guestEmail,
+          phone: guestPhone || '-',
           status: guestStatus
         })
       });
@@ -778,6 +779,7 @@ export default function EventDetailHub() {
         showToast('Attendee added successfully', 'success');
         setGuestName('');
         setGuestEmail('');
+        setGuestPhone('');
         fetchGuestDetails();
         fetchNotifications();
       }
@@ -821,6 +823,33 @@ export default function EventDetailHub() {
   // Tasks Checklist
   const handleAddTask = async (e) => {
     e.preventDefault();
+
+    if (tasksView === 'timeline') {
+      if (!timelineName || !timelineTime || !timelineDate) return;
+      const formattedTime = formatTime12Hour(timelineTime);
+      const serializedTitle = `${formattedTime} - ${timelineName} || Self || Medium || To Do`;
+
+      try {
+        const res = await authFetch('/task/add', {
+          method: 'POST',
+          body: JSON.stringify({
+            eventId: id,
+            title: serializedTitle,
+            deadline: timelineDate,
+            status: 'pending'
+          })
+        });
+        if (res.ok) {
+          showToast('Timeline milestone added successfully', 'success');
+          setTimelineName('');
+          fetchTaskDetails();
+        }
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+      return;
+    }
+
     if (!taskTitle || !taskDeadline) return;
 
     // Serialize task details into task.title
@@ -859,7 +888,11 @@ export default function EventDetailHub() {
         body: JSON.stringify({ status: newStatus })
       });
       if (res.ok) {
-        showToast(newStatus === 'completed' ? 'Task marked completed! 🎉' : 'Task pending', 'success');
+        const taskObj = tasks.find(t => t.id === taskId);
+        const isTimeline = taskObj ? isTimelineTask(taskObj.title) : false;
+        if (!isTimeline) {
+          showToast(newStatus === 'completed' ? 'Task marked completed! 🎉' : 'Task pending', 'success');
+        }
         fetchTaskDetails();
         fetchNotifications();
       }
@@ -884,17 +917,12 @@ export default function EventDetailHub() {
   const handleAddVendor = async (e) => {
     e.preventDefault();
     if (!vendorName) return;
-    if (!vendorOwner && !vendorPhone && !vendorEmail) {
-      showToast('Please provide at least one contact detail (Owner, Phone, or Email)', 'error');
+    if (!vendorPhone) {
+      showToast('Please provide a Phone Number', 'error');
       return;
     }
     
-    // Combine fields for database contact field
-    const contactParts = [];
-    if (vendorOwner) contactParts.push(`Owner: ${vendorOwner}`);
-    if (vendorPhone) contactParts.push(`Phone: ${vendorPhone}`);
-    if (vendorEmail) contactParts.push(`Email: ${vendorEmail}`);
-    const combinedContact = contactParts.join(' | ') || 'N/A';
+    const combinedContact = vendorPhone;
 
     try {
       const res = await authFetch('/vendor/add', {
@@ -1026,7 +1054,7 @@ export default function EventDetailHub() {
       : 'No deadline';
     return {
       id: t.id,
-      title: t.title,
+      title: parseTask(t).displayName,
       time: formattedDeadline,
       completed: t.status === 'completed'
     };
@@ -1043,15 +1071,68 @@ export default function EventDetailHub() {
   // Donut SVG segments calculations (Circumference radius 45 ~ 282.74)
   const radius = 45;
   const circumference = 2 * Math.PI * radius; // 282.74
-  const budgetShares = [
-    { label: 'Venue', percent: 40, color: '#6366f1', amount: totalBudget * 0.40 }, // Indigo
-    { label: 'Catering', percent: 25, color: '#10b981', amount: totalBudget * 0.25 }, // Emerald
-    { label: 'Decoration', percent: 15, color: '#f59e0b', amount: totalBudget * 0.15 }, // Amber
-    { label: 'Entertainment', percent: 10, color: '#f43f5e', amount: totalBudget * 0.10 }, // Rose
-    { label: 'Photography', percent: 5, color: '#a855f7', amount: totalBudget * 0.05 }, // Purple
-    { label: 'Others', percent: 5, color: '#6b7280', amount: totalBudget * 0.05 } // Gray
+  // Group actual expenses by category
+  const categorySpent = {
+    Venue: 0,
+    Catering: 0,
+    Decoration: 0,
+    Entertainment: 0,
+    Photography: 0,
+    Others: 0
+  };
+
+  expenses.forEach(e => {
+    const cat = e.category || 'Miscellaneous';
+    let mappedCat = 'Others';
+    if (/venue/i.test(cat)) mappedCat = 'Venue';
+    else if (/cater/i.test(cat)) mappedCat = 'Catering';
+    else if (/decor|stage/i.test(cat)) mappedCat = 'Decoration';
+    else if (/entertain|music|dj|sound/i.test(cat)) mappedCat = 'Entertainment';
+    else if (/photo|video|av|audio/i.test(cat)) mappedCat = 'Photography';
+    
+    categorySpent[mappedCat] += parseFloat(e.amount || 0);
+  });
+
+  const budgetShares = [];
+  const categoriesList = [
+    { label: 'Venue', color: '#6366f1' },
+    { label: 'Catering', color: '#10b981' },
+    { label: 'Decoration', color: '#f59e0b' },
+    { label: 'Entertainment', color: '#f43f5e' },
+    { label: 'Photography', color: '#a855f7' },
+    { label: 'Others', color: '#6b7280' }
   ];
-  let accPercent = 0;
+
+  const denominator = totalSpent > totalBudget ? totalSpent : totalBudget;
+
+  let currentAcc = 0;
+  categoriesList.forEach(cat => {
+    const amt = categorySpent[cat.label];
+    const pct = denominator > 0 ? (amt / denominator) * 100 : 0;
+    const strokeOffset = circumference - (currentAcc / 100) * circumference;
+    currentAcc += pct;
+    budgetShares.push({
+      label: cat.label,
+      amount: amt,
+      percent: pct,
+      color: cat.color,
+      strokeOffset
+    });
+  });
+
+  if (totalBudget > totalSpent || denominator === 0) {
+    const remAmt = Math.max(0, totalBudget - totalSpent);
+    const remPct = denominator > 0 ? (remAmt / denominator) * 100 : 100;
+    const strokeOffset = circumference - (currentAcc / 100) * circumference;
+    budgetShares.push({
+      label: 'Remaining',
+      amount: remAmt,
+      percent: remPct,
+      color: theme === 'light' ? '#e2e8f0' : '#1e293b', // Slate gray representation for remaining budget
+      strokeOffset
+    });
+  }
+
 
   // RSVP Ring SVG segments calculations (Circumference radius 35 ~ 219.91)
   const rsvpRadius = 35;
@@ -1099,7 +1180,7 @@ export default function EventDetailHub() {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setShowEditModal(true)}
-              className="px-3.5 py-2 border border-white/5 hover:border-[#5a2bd4]/20 bg-white/3 hover:bg-white/5 text-gray-200 font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors"
+              className="px-3.5 py-2 border border-white/5 hover:border-[#1d4ed8]/20 bg-white/3 hover:bg-white/5 text-gray-200 font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors"
             >
               <Edit className="w-3.5 h-3.5" />
               Edit Event
@@ -1207,7 +1288,7 @@ export default function EventDetailHub() {
           </div>
 
           <div className="w-full bg-white/5 rounded-full h-1.5 overflow-hidden">
-            <div className="bg-[#5a2bd4] h-full rounded-full" style={{ width: `${taskPct}%` }}></div>
+            <div className="bg-[#1d4ed8] h-full rounded-full" style={{ width: `${taskPct}%` }}></div>
           </div>
         </div>
 
@@ -1219,9 +1300,8 @@ export default function EventDetailHub() {
           { id: 'overview', name: 'Overview' },
           { id: 'budget', name: 'Budget' },
           { id: 'guests', name: 'Guests' },
-          { id: 'tasks', name: 'Tasks' },
+          { id: 'tasks', name: 'Tasks & Timeline' },
           { id: 'vendors', name: 'Vendors' },
-          { id: 'payments', name: 'Payments' },
           { id: 'notes_docs', name: 'Notes & Documents' }
         ].map((tab) => (
           <button
@@ -1229,7 +1309,7 @@ export default function EventDetailHub() {
             onClick={() => setActiveTab(tab.id)}
             className={`py-2.5 px-4.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
               activeTab === tab.id
-                ? 'bg-white text-[#5a2bd4] shadow-sm'
+                ? 'bg-white text-[#1d4ed8] shadow-sm'
                 : 'text-gray-400 hover:text-white'
             }`}
           >
@@ -1253,10 +1333,10 @@ export default function EventDetailHub() {
                 <div className="flex justify-between items-center border-b border-white/5 pb-2.5">
                   <h3 className="text-xs font-black uppercase tracking-wider text-white">Event Timeline</h3>
                   <button
-                    onClick={() => setActiveTab('tasks')}
+                    onClick={() => { setActiveTab('tasks'); setTasksView('timeline'); }}
                     className="text-[9px] font-bold text-indigo-400 hover:text-indigo-300 cursor-pointer animate-pulse-subtle"
                   >
-                    Manage Tasks
+                    Edit Timeline
                   </button>
                 </div>
                 
@@ -1315,49 +1395,47 @@ export default function EventDetailHub() {
                   {/* SVG Donut Chart */}
                   <div className="md:col-span-5 flex justify-center py-2">
                     <div className="relative w-32 h-32">
-                      <svg className="w-full h-full transform -rotate-90" viewBox="0 0 120 120">
-                        <circle cx="60" cy="60" r={radius} fill="transparent" stroke="rgba(255,255,255,0.03)" strokeWidth="9" />
-                        {budgetShares.map((seg, idx) => {
-                          const strokeDash = (seg.percent / 100) * circumference;
-                          const strokeOffset = circumference - (accPercent / 100) * circumference;
-                          accPercent += seg.percent;
-                          return (
-                            <circle
-                              key={idx}
-                              cx="60"
-                              cy="60"
-                              r={radius}
-                              fill="transparent"
-                              stroke={seg.color}
-                              strokeWidth="9"
-                              strokeDasharray={`${strokeDash} ${circumference}`}
-                              strokeDashoffset={strokeOffset}
-                              className="transition-all duration-300"
-                            />
-                          );
-                        })}
-                      </svg>
-                      
-                      <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-2">
-                        <span className="text-[10px] font-black text-white">{formatRupee(totalBudget)}</span>
-                        <span className="text-[7px] text-gray-500 uppercase tracking-widest mt-0.5">Total Budget</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Legend list */}
-                  <div className="md:col-span-7 flex flex-col gap-1.5 text-[9px] text-gray-400 font-semibold pr-1">
-                    {budgetShares.map((seg, idx) => (
-                      <div key={idx} className="flex justify-between items-center">
-                        <div className="flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: seg.color }}></span>
-                          <span className="text-gray-300">{seg.label}</span>
-                          <span className="text-[8px] text-gray-500 font-medium">({seg.percent}%)</span>
-                        </div>
-                        <span className="text-white font-extrabold">{formatRupee(seg.amount)}</span>
-                      </div>
-                    ))}
-                  </div>
+                       <svg className="w-full h-full transform -rotate-90" viewBox="0 0 120 120">
+                         <circle cx="60" cy="60" r={radius} fill="transparent" stroke={theme === 'light' ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255,255,255,0.03)'} strokeWidth="9" />
+                         {budgetShares.map((seg, idx) => {
+                           const strokeDash = (seg.percent / 100) * circumference;
+                           return (
+                             <circle
+                               key={idx}
+                               cx="60"
+                               cy="60"
+                               r={radius}
+                               fill="transparent"
+                               stroke={seg.color}
+                               strokeWidth="9"
+                               strokeDasharray={`${strokeDash} ${circumference}`}
+                               strokeDashoffset={seg.strokeOffset}
+                               className="transition-all duration-300"
+                             />
+                           );
+                         })}
+                       </svg>
+                       
+                       <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-2">
+                         <span className="text-[10px] font-black text-white">{formatRupee(totalBudget)}</span>
+                         <span className="text-[7px] text-gray-500 uppercase tracking-widest mt-0.5">Total Budget</span>
+                       </div>
+                     </div>
+                   </div>
+ 
+                   {/* Legend list */}
+                   <div className="md:col-span-7 flex flex-col gap-1.5 text-[9px] text-gray-400 font-semibold pr-1">
+                     {budgetShares.filter(seg => seg.label !== 'Remaining').map((seg, idx) => (
+                       <div key={idx} className="flex justify-between items-center">
+                         <div className="flex items-center gap-1.5">
+                           <span className="w-2 h-2 rounded-full" style={{ backgroundColor: seg.color }}></span>
+                           <span className="text-gray-300">{seg.label}</span>
+                           <span className="text-[8px] text-gray-500 font-medium">({Math.round(seg.percent)}%)</span>
+                         </div>
+                         <span className="text-white font-extrabold">{formatRupee(seg.amount)}</span>
+                       </div>
+                     ))}
+                   </div>
 
                 </div>
 
@@ -1437,14 +1515,14 @@ export default function EventDetailHub() {
                 {venueVendor ? (
                   <button
                     onClick={() => setActiveTab('vendors')}
-                    className="w-full py-2 border border-white/5 hover:border-[#5a2bd4]/20 bg-white/3 hover:bg-white/5 text-gray-300 font-bold text-[10px] rounded-xl cursor-pointer transition-colors"
+                    className="w-full py-2 border border-white/5 hover:border-[#1d4ed8]/20 bg-white/3 hover:bg-white/5 text-gray-300 font-bold text-[10px] rounded-xl cursor-pointer transition-colors"
                   >
                     Manage Vendors
                   </button>
                 ) : (
                   <button
                     onClick={() => router.push('/venues')}
-                    className="w-full py-2 border border-white/5 hover:border-[#5a2bd4]/20 bg-white/3 hover:bg-white/5 text-gray-300 font-bold text-[10px] rounded-xl cursor-pointer transition-colors"
+                    className="w-full py-2 border border-white/5 hover:border-[#1d4ed8]/20 bg-white/3 hover:bg-white/5 text-gray-300 font-bold text-[10px] rounded-xl cursor-pointer transition-colors"
                   >
                     Explore Venue
                   </button>
@@ -1469,7 +1547,7 @@ export default function EventDetailHub() {
                     {/* Task completion SVG circle */}
                     <div className="flex justify-center relative w-24 h-24 mx-auto">
                       <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                        <circle cx="50" cy="50" r="40" fill="transparent" stroke="rgba(255,255,255,0.03)" strokeWidth="8" />
+                        <circle cx="50" cy="50" r="40" fill="transparent" stroke={theme === 'light' ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255,255,255,0.03)'} strokeWidth="8" />
                         <circle
                           cx="50"
                           cy="50"
@@ -1551,7 +1629,7 @@ export default function EventDetailHub() {
                               showToast('Added important note!', 'success');
                             }
                           }}
-                          className="px-2.5 py-1 text-[8px] font-bold bg-[#5a2bd4] text-white rounded"
+                          className="px-2.5 py-1 text-[8px] font-bold bg-[#1d4ed8] text-white rounded"
                         >
                           Add Note
                         </button>
@@ -1605,7 +1683,7 @@ export default function EventDetailHub() {
                 
                 {/* Organizer details */}
                 <div className="flex items-center gap-2.5 border-t border-white/5 pt-3">
-                  <div className="w-7 h-7 rounded-full bg-[#5a2bd4] text-white flex items-center justify-center font-bold text-[10px] border border-white/10 uppercase">
+                  <div className="w-7 h-7 rounded-full bg-[#1d4ed8] text-white flex items-center justify-center font-bold text-[10px] border border-white/10 uppercase">
                     {user?.name ? user.name.charAt(0) : 'R'}
                   </div>
                   <div className="flex flex-col">
@@ -1625,10 +1703,10 @@ export default function EventDetailHub() {
                 <div className="flex justify-between items-center border-b border-white/5 pb-2.5">
                   <h3 className="text-xs font-black uppercase tracking-wider text-white">Recent Payments</h3>
                   <button
-                    onClick={() => setActiveTab('payments')}
+                    onClick={() => setActiveTab('budget')}
                     className="text-[9px] font-bold text-indigo-400 hover:text-indigo-300 cursor-pointer"
                   >
-                    View All Payments
+                    View Budget Details
                   </button>
                 </div>
 
@@ -1667,13 +1745,13 @@ export default function EventDetailHub() {
             </div>
 
             {/* Bottom Support Banner */}
-            <div className={`glass-panel p-4 rounded-2xl border border-[#5a2bd4]/20 flex flex-col sm:flex-row justify-between items-center gap-4 mt-2 ${
+            <div className={`glass-panel p-4 rounded-2xl border border-[#1d4ed8]/20 flex flex-col sm:flex-row justify-between items-center gap-4 mt-2 ${
               theme === 'light'
                 ? 'bg-indigo-50/40'
                 : 'bg-gradient-to-r from-indigo-950/15 to-purple-950/15'
             }`}>
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-[#5a2bd4]/10 border border-[#5a2bd4]/20 text-[#5a2bd4] dark:text-indigo-400 flex items-center justify-center shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-[#1d4ed8]/10 border border-[#1d4ed8]/20 text-[#1d4ed8] dark:text-indigo-400 flex items-center justify-center shrink-0">
                   <Sparkles className="w-5 h-5 animate-pulse" />
                 </div>
                 <div className="text-left">
@@ -1683,7 +1761,7 @@ export default function EventDetailHub() {
               </div>
               <button
                 onClick={handleTriggerAISuggestions}
-                className="px-4 py-2.5 bg-[#5a2bd4] hover:bg-[#6b3ce2] text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-lg shadow-indigo-600/10 transition-colors cursor-pointer"
+                className="px-4 py-2.5 bg-[#1d4ed8] hover:bg-[#1e40af] text-white always-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-lg shadow-indigo-600/10 transition-colors cursor-pointer"
               >
                 <Sparkles className="w-3.5 h-3.5" />
                 Ask AI Assistant
@@ -1771,7 +1849,7 @@ export default function EventDetailHub() {
                       <div
                         style={{ width: `${budgetProgress}%` }}
                         className={`h-full rounded-full transition-all duration-500 ${
-                          budgetProgress > 90 ? 'bg-rose-500' : budgetProgress > 70 ? 'bg-amber-500' : 'bg-[#5a2bd4]'
+                          budgetProgress > 90 ? 'bg-rose-500' : budgetProgress > 70 ? 'bg-amber-500' : 'bg-[#1d4ed8]'
                         }`}
                       ></div>
                     </div>
@@ -1838,7 +1916,7 @@ export default function EventDetailHub() {
 
                   <button
                     type="submit"
-                    className="w-full py-2.5 bg-[#5a2bd4] hover:bg-[#6b3ce2] text-white font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/10 cursor-pointer transition-colors"
+                    className="w-full py-2.5 bg-[#1d4ed8] hover:bg-[#1e40af] text-white font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/10 cursor-pointer transition-colors"
                   >
                     <Plus className="w-4 h-4" />
                     Save Expense
@@ -1871,7 +1949,15 @@ export default function EventDetailHub() {
                     >
                       <div className="flex flex-col gap-0.5 truncate">
                         <span className="text-xs font-bold text-gray-200">{g.guest_name}</span>
-                        <span className="text-[10px] text-gray-500 truncate">{g.email}</span>
+                        <div className="flex flex-wrap items-center gap-x-2 text-[10px] text-gray-500 mt-0.5 font-semibold">
+                          <span className="truncate">{g.email}</span>
+                          {g.phone && g.phone !== '-' && (
+                            <span className="flex items-center gap-1 shrink-0">
+                              <span className="text-gray-600 font-extrabold">•</span>
+                              <span className="text-gray-400">{g.phone}</span>
+                            </span>
+                          )}
+                        </div>
                       </div>
                       
                       <div className="flex items-center gap-3 shrink-0">
@@ -1913,7 +1999,7 @@ export default function EventDetailHub() {
                 
                 <div className="flex justify-center relative w-24 h-24 mx-auto my-2">
                   <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                    <circle cx="50" cy="50" r={rsvpRadius} fill="transparent" stroke="rgba(255,255,255,0.03)" strokeWidth="6" />
+                    <circle cx="50" cy="50" r={rsvpRadius} fill="transparent" stroke={theme === 'light' ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255,255,255,0.03)'} strokeWidth="6" />
                     
                     {/* Yes circle */}
                     <circle
@@ -1991,6 +2077,17 @@ export default function EventDetailHub() {
                   </div>
 
                   <div className="flex flex-col gap-1">
+                    <label className="text-[10px] text-gray-500 font-semibold uppercase">Contact No.</label>
+                    <input
+                      type="text"
+                      value={guestPhone}
+                      onChange={(e) => setGuestPhone(e.target.value)}
+                      placeholder="e.g. +91 98765 43210"
+                      className="w-full bg-white/3 border border-white/5 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500/50 transition-all font-semibold"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
                     <label className="text-[10px] text-gray-500 font-semibold uppercase">Initial RSVP Status</label>
                     <select
                       value={guestStatus}
@@ -2005,7 +2102,7 @@ export default function EventDetailHub() {
 
                   <button
                     type="submit"
-                    className="w-full py-2.5 bg-[#5a2bd4] hover:bg-[#6b3ce2] text-white font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/10 cursor-pointer transition-colors"
+                    className="w-full py-2.5 bg-[#1d4ed8] hover:bg-[#1e40af] text-white font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/10 cursor-pointer transition-colors"
                   >
                     <Plus className="w-4 h-4" />
                     Save Attendee
@@ -2023,86 +2120,164 @@ export default function EventDetailHub() {
             
             {/* Left side checklist */}
             <div className="glass-panel p-6 rounded-2xl border border-white/5 md:col-span-2 flex flex-col gap-4 shadow-xl">
-              <h3 className="text-xs font-black uppercase tracking-wider text-white border-b border-white/5 pb-2.5 flex justify-between items-center">
-                <span>Task Checklist</span>
+              <div className="border-b border-white/5 pb-2.5 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTasksView('checklist')}
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all ${
+                      tasksView === 'checklist'
+                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10'
+                        : 'text-gray-400 hover:text-white bg-white/3'
+                    }`}
+                  >
+                    📋 Task Checklist ({checklistTasks.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTasksView('timeline')}
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all ${
+                      tasksView === 'timeline'
+                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10'
+                        : 'text-gray-400 hover:text-white bg-white/3'
+                    }`}
+                  >
+                    ⏱️ Event Timeline ({timelineTasks.length})
+                  </button>
+                </div>
                 <span className="text-[10px] text-gray-500 font-semibold">
-                  {checklistTasks.filter(t => t.status === 'completed').length}/{checklistTasks.length} Completed
+                  {tasksView === 'checklist'
+                    ? `${checklistTasks.filter(t => t.status === 'completed').length}/${checklistTasks.length} Completed`
+                    : `${timelineTasks.filter(t => t.status === 'completed').length}/${timelineTasks.length} Completed`
+                  }
                 </span>
-              </h3>
+              </div>
 
-              {checklistTasks.length === 0 ? (
-                <p className="text-xs text-gray-500 text-center py-12">All clear. No tasks added yet.</p>
-              ) : (
-                <div className="flex flex-col gap-2.5 max-h-96 overflow-y-auto pr-1">
-                  {checklistTasks.map((rawTask) => {
-                    const task = parseTask(rawTask);
-                    return (
-                      <div
-                        key={task.id}
-                        className={`p-3 rounded-xl border flex justify-between items-center gap-4 transition-all ${
-                          task.status === 'completed'
-                            ? 'bg-[#0f1d1a]/25 border-emerald-500/10 text-gray-400'
-                            : 'bg-white/2 border-white/5 text-gray-200'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3 truncate">
-                          <button
-                            onClick={() => handleToggleTaskStatus(task.id, task.status)}
-                            className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
-                              task.status === 'completed'
-                                ? 'bg-emerald-500 border-emerald-400 text-[#0d0f14]'
-                                : 'border-gray-600 hover:border-indigo-400'
-                            }`}
-                          >
-                            {task.status === 'completed' && <Check className="w-3.5 h-3.5 stroke-[3px]" />}
-                          </button>
-                          
+              {tasksView === 'checklist' ? (
+                checklistTasks.length === 0 ? (
+                  <p className="text-xs text-gray-500 text-center py-12">All clear. No checklist tasks added yet.</p>
+                ) : (
+                  <div className="flex flex-col gap-2.5 max-h-96 overflow-y-auto pr-1">
+                    {checklistTasks.map((rawTask) => {
+                      const task = parseTask(rawTask);
+                      return (
+                        <div
+                          key={task.id}
+                          className={`p-3 rounded-xl border flex justify-between items-center gap-4 transition-all ${
+                            task.status === 'completed'
+                              ? 'bg-[#0f1d1a]/25 border-emerald-500/10 text-gray-400'
+                              : 'bg-white/2 border-white/5 text-gray-200'
+                          }`}
+                        >
                           <div className="flex items-center gap-3 truncate">
-                            <img
-                              src={
-                                task.assigneeName === 'Self' && user?.avatar
-                                  ? user.avatar
-                                  : assigneeAvatars[task.assigneeName] || `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assigneeName)}&background=random`
-                              }
-                              alt={task.assigneeName}
-                              className="w-7 h-7 rounded-full border border-white/10 shrink-0 object-cover"
-                            />
-                            <div className="flex flex-col truncate">
+                            <button
+                              onClick={() => handleToggleTaskStatus(task.id, task.status)}
+                              className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
+                                task.status === 'completed'
+                                  ? 'bg-emerald-500 border-emerald-400 text-[#0d0f14]'
+                                  : 'border-gray-600 hover:border-indigo-400'
+                              }`}
+                            >
+                              {task.status === 'completed' && <Check className="w-3.5 h-3.5 stroke-[3px]" />}
+                            </button>
+                            
+                            <div className="flex items-center gap-3 truncate">
+                              <img
+                                src={
+                                  task.assigneeName === 'Self' && user?.avatar
+                                    ? user.avatar
+                                    : assigneeAvatars[task.assigneeName] || `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assigneeName)}&background=random`
+                                }
+                                alt={task.assigneeName}
+                                className="w-7 h-7 rounded-full border border-white/10 shrink-0 object-cover"
+                              />
+                              <div className="flex flex-col truncate text-left">
+                                <span className={`text-xs font-bold leading-normal truncate ${task.status === 'completed' ? 'line-through text-gray-500' : ''}`}>
+                                  {task.displayName}
+                                </span>
+                                <div className="flex items-center gap-2 text-[9px] text-gray-500 mt-0.5 font-semibold">
+                                  <span>Deadline: {new Date(task.deadline).toLocaleDateString()}</span>
+                                  <span>•</span>
+                                  <span className="text-gray-400">
+                                    {task.assigneeName === 'Self' && user?.name ? `${user.name} (Self)` : task.assigneeName}
+                                  </span>
+                                  <span>•</span>
+                                  <span className={`px-1 rounded text-[8px] uppercase font-bold border ${
+                                    task.priority === 'High'
+                                      ? 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+                                      : task.priority === 'Medium'
+                                      ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                                      : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                                  }`}>
+                                    {task.priority}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={() => handleDeleteTask(task.id)}
+                            className="p-1.5 rounded-md hover:bg-rose-500/10 text-gray-500 hover:text-rose-400 transition-colors shrink-0 cursor-pointer"
+                          >
+                            <Trash className="w-4 h-4" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
+              ) : (
+                timelineTasks.length === 0 ? (
+                  <p className="text-xs text-gray-500 text-center py-12">All clear. No timeline milestones added yet.</p>
+                ) : (
+                  <div className="flex flex-col gap-2.5 max-h-96 overflow-y-auto pr-1">
+                    {timelineTasks.map((rawTask) => {
+                      const task = parseTask(rawTask);
+                      return (
+                        <div
+                          key={task.id}
+                          className={`p-3 rounded-xl border flex justify-between items-center gap-4 transition-all ${
+                            task.status === 'completed'
+                              ? 'bg-[#0f1d1a]/25 border-emerald-500/10 text-gray-400'
+                              : 'bg-white/2 border-white/5 text-gray-200'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 truncate">
+                            <button
+                              onClick={() => handleToggleTaskStatus(task.id, task.status)}
+                              className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
+                                task.status === 'completed'
+                                  ? 'bg-emerald-500 border-emerald-400 text-[#0d0f14]'
+                                  : 'border-gray-600 hover:border-indigo-400'
+                              }`}
+                            >
+                              {task.status === 'completed' && <Check className="w-3.5 h-3.5 stroke-[3px]" />}
+                            </button>
+                            
+                            <div className="flex flex-col truncate text-left">
                               <span className={`text-xs font-bold leading-normal truncate ${task.status === 'completed' ? 'line-through text-gray-500' : ''}`}>
                                 {task.displayName}
                               </span>
                               <div className="flex items-center gap-2 text-[9px] text-gray-500 mt-0.5 font-semibold">
-                                <span>Deadline: {new Date(task.deadline).toLocaleDateString()}</span>
-
+                                <span className="text-indigo-400">Scheduled Time</span>
                                 <span>•</span>
-                                <span className="text-gray-400">
-                                  {task.assigneeName === 'Self' && user?.name ? `${user.name} (Self)` : task.assigneeName}
-                                </span>
-                                <span>•</span>
-                                <span className={`px-1 rounded text-[8px] uppercase font-bold border ${
-                                  task.priority === 'High'
-                                    ? 'bg-rose-500/10 border-rose-500/20 text-rose-400'
-                                    : task.priority === 'Medium'
-                                    ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
-                                    : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                                }`}>
-                                  {task.priority}
-                                </span>
+                                <span>{new Date(task.deadline).toLocaleDateString()}</span>
                               </div>
                             </div>
                           </div>
-                        </div>
 
-                        <button
-                          onClick={() => handleDeleteTask(task.id)}
-                          className="p-1.5 rounded-md hover:bg-rose-500/10 text-gray-500 hover:text-rose-400 transition-colors shrink-0 cursor-pointer"
-                        >
-                          <Trash className="w-4 h-4" />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
+                          <button
+                            onClick={() => handleDeleteTask(task.id)}
+                            className="p-1.5 rounded-md hover:bg-rose-500/10 text-gray-500 hover:text-rose-400 transition-colors shrink-0 cursor-pointer"
+                          >
+                            <Trash className="w-4 h-4" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
               )}
             </div>
 
@@ -2110,98 +2285,139 @@ export default function EventDetailHub() {
             <div className="glass-panel p-6 rounded-2xl border border-white/5 md:col-span-1 flex flex-col gap-4 shadow-xl text-left">
               <div className="flex items-center justify-between pb-3 border-b border-white/5">
                 <div className="flex items-center gap-2">
-                  <CheckSquare className="w-5 h-5 text-indigo-500" />
-                  <span className="text-sm font-bold text-gray-200 tracking-tight">Add New Task</span>
+                  {tasksView === 'timeline' ? (
+                    <>
+                      <Clock className="w-5 h-5 text-indigo-500" />
+                      <span className="text-sm font-bold text-gray-200 tracking-tight">Add Timeline Event</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckSquare className="w-5 h-5 text-indigo-500" />
+                      <span className="text-sm font-bold text-gray-200 tracking-tight">Add New Task</span>
+                    </>
+                  )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTaskTitle('');
-                    setTaskDeadline('');
-                    setTaskAssignee('Self');
-                    setTaskPriority('Medium');
-                    setTaskStatus('To Do');
-                  }}
-                  className="text-gray-400 hover:text-gray-200 transition-colors cursor-pointer"
-                  aria-label="Clear Form"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+
               </div>
               
               <form onSubmit={handleAddTask} className="flex flex-col gap-4">
-                {/* Task Name */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] text-gray-400 font-bold uppercase">TASK NAME</label>
-                  <input
-                    type="text"
-                    value={taskTitle}
-                    onChange={(e) => setTaskTitle(e.target.value)}
-                    placeholder="e.g. Booking the venue stage decorator"
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 font-bold"
-                    required
-                  />
-                </div>
+                {tasksView === 'timeline' ? (
+                  <>
+                    {/* Timeline Event Name */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] text-gray-400 font-bold uppercase">TIMELINE NAME</label>
+                      <input
+                        type="text"
+                        value={timelineName}
+                        onChange={(e) => setTimelineName(e.target.value)}
+                        placeholder="e.g. Ring Ceremony or Couple Entry"
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 font-bold"
+                        required
+                      />
+                    </div>
 
-                {/* Assigned To */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] text-gray-400 font-bold uppercase">ASSIGNED TO</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Self, Rahul Sharma, etc."
-                    value={taskAssignee}
-                    onChange={(e) => setTaskAssignee(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 font-bold"
-                    required
-                  />
-                </div>
+                    {/* Time Input */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] text-gray-400 font-bold uppercase">TIME</label>
+                      <input
+                        type="time"
+                        value={timelineTime}
+                        onChange={(e) => setTimelineTime(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 cursor-pointer font-bold"
+                        style={{ colorScheme: theme === 'light' ? 'light' : 'dark' }}
+                        required
+                      />
+                    </div>
 
-                {/* Due Date */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] text-gray-400 font-bold uppercase">DUE DATE</label>
-                  <input
-                    type="date"
-                    value={taskDeadline}
-                    onChange={(e) => setTaskDeadline(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 cursor-pointer font-bold"
-                    style={{ colorScheme: theme === 'light' ? 'light' : 'dark' }}
-                    required
-                  />
-                </div>
+                    {/* Date Input */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] text-gray-400 font-bold uppercase">DATE</label>
+                      <input
+                        type="date"
+                        value={timelineDate}
+                        onChange={(e) => setTimelineDate(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 cursor-pointer font-bold"
+                        style={{ colorScheme: theme === 'light' ? 'light' : 'dark' }}
+                        required
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Task Name */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] text-gray-400 font-bold uppercase">TASK NAME</label>
+                      <input
+                        type="text"
+                        value={taskTitle}
+                        onChange={(e) => setTaskTitle(e.target.value)}
+                        placeholder="e.g. Booking the venue stage decorator"
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 font-bold"
+                        required
+                      />
+                    </div>
 
-                {/* Priority & Status in a Grid */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] text-gray-400 font-bold uppercase">PRIORITY</label>
-                    <select
-                      value={taskPriority}
-                      onChange={(e) => setTaskPriority(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500 cursor-pointer font-bold"
-                    >
-                      <option value="High" className="bg-[#151c2c] text-white">High</option>
-                      <option value="Medium" className="bg-[#151c2c] text-white">Medium</option>
-                      <option value="Low" className="bg-[#151c2c] text-white">Low</option>
-                    </select>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] text-gray-400 font-bold uppercase">STATUS</label>
-                    <select
-                      value={taskStatus}
-                      onChange={(e) => setTaskStatus(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500 cursor-pointer font-bold"
-                    >
-                      <option value="To Do" className="bg-[#151c2c] text-white">To Do</option>
-                      <option value="In Progress" className="bg-[#151c2c] text-white">In Progress</option>
-                      <option value="Completed" className="bg-[#151c2c] text-white">Completed</option>
-                    </select>
-                  </div>
-                </div>
+                    {/* Assigned To */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] text-gray-400 font-bold uppercase">ASSIGNED TO</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Self, Rahul Sharma, etc."
+                        value={taskAssignee}
+                        onChange={(e) => setTaskAssignee(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 font-bold"
+                        required
+                      />
+                    </div>
+
+                    {/* Due Date */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] text-gray-400 font-bold uppercase">DUE DATE</label>
+                      <input
+                        type="date"
+                        value={taskDeadline}
+                        onChange={(e) => setTaskDeadline(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 cursor-pointer font-bold"
+                        style={{ colorScheme: theme === 'light' ? 'light' : 'dark' }}
+                        required
+                      />
+                    </div>
+
+                    {/* Priority & Status in a Grid */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] text-gray-400 font-bold uppercase">PRIORITY</label>
+                        <select
+                          value={taskPriority}
+                          onChange={(e) => setTaskPriority(e.target.value)}
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500 cursor-pointer font-bold"
+                        >
+                          <option value="High" className="bg-[#151c2c] text-white">High</option>
+                          <option value="Medium" className="bg-[#151c2c] text-white">Medium</option>
+                          <option value="Low" className="bg-[#151c2c] text-white">Low</option>
+                        </select>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] text-gray-400 font-bold uppercase">STATUS</label>
+                        <select
+                          value={taskStatus}
+                          onChange={(e) => setTaskStatus(e.target.value)}
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500 cursor-pointer font-bold"
+                        >
+                          <option value="To Do" className="bg-[#151c2c] text-white">To Do</option>
+                          <option value="In Progress" className="bg-[#151c2c] text-white">In Progress</option>
+                          <option value="Completed" className="bg-[#151c2c] text-white">Completed</option>
+                        </select>
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 <button
                   type="submit"
-                  className="w-full py-3 bg-[#5a2bd4] hover:bg-[#6b3ce2] text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/10 cursor-pointer transition-colors uppercase tracking-wider mt-2"
+                  className="w-full py-3 bg-[#1d4ed8] hover:bg-[#1e40af] text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/10 cursor-pointer transition-colors uppercase tracking-wider mt-2"
                 >
-                  ADD TASK
+                  {tasksView === 'timeline' ? 'Add Timeline Event' : 'Add Task'}
                 </button>
               </form>
             </div>
@@ -2234,7 +2450,30 @@ export default function EventDetailHub() {
                         <div className="flex items-center gap-2 text-[10px] text-gray-500 font-semibold">
                           <span className="bg-white/5 px-2 py-0.5 rounded text-gray-400">{v.category}</span>
                           <span>•</span>
-                          <span className="truncate">{v.contact}</span>
+                          <span className="truncate">
+                            {v.contact && v.contact.includes(' | ') ? (
+                              (() => {
+                                const parts = v.contact.split(' | ');
+                                const phonePart = parts.find(p => p.toLowerCase().includes('phone:'));
+                                const ownerPart = parts.find(p => p.toLowerCase().includes('owner:'));
+                                const emailPart = parts.find(p => p.toLowerCase().includes('email:'));
+                                
+                                const phoneVal = phonePart ? phonePart.replace(/phone:\s*/i, '') : '';
+                                const ownerVal = ownerPart ? ownerPart.replace(/owner:\s*/i, '') : '';
+                                const emailVal = emailPart ? emailPart.replace(/email:\s*/i, '') : '';
+                                
+                                return (
+                                  <span className="flex flex-wrap items-center gap-1.5 text-gray-400">
+                                    {phoneVal && <span>📞 {phoneVal}</span>}
+                                    {ownerVal && <span>• 👤 {ownerVal}</span>}
+                                    {emailVal && <span className="hidden sm:inline">• ✉️ {emailVal}</span>}
+                                  </span>
+                                );
+                              })()
+                            ) : (
+                              <span>📞 {v.contact}</span>
+                            )}
+                          </span>
                         </div>
                       </div>
 
@@ -2298,41 +2537,61 @@ export default function EventDetailHub() {
                     const selected = globalVendors.find(v => String(v.id) === String(selectedGlobalVendorId));
                     if (!selected) return null;
                     return (
-                      <div className="p-4 rounded-xl bg-white/5 border border-white/10 flex flex-col gap-3 animate-fade-in shadow-inner">
-                        <div className="flex justify-between items-start border-b border-white/5 pb-2">
-                          <div>
-                            <h5 className="text-xs font-bold text-white uppercase tracking-wider">{selected.name}</h5>
-                            <span className="text-[9px] font-semibold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full mt-1 inline-block">
-                              {selected.category}
-                            </span>
-                          </div>
+                      <div className={`p-4.5 rounded-2xl flex flex-col gap-4 animate-scale-up ${
+                        theme === 'light'
+                          ? 'bg-slate-50 border border-slate-200/80 shadow-md shadow-slate-100'
+                          : 'bg-gradient-to-br from-[#1e293b]/80 via-[#111827]/90 to-[#0f172a]/95 border border-indigo-500/20 shadow-xl shadow-black/25'
+                      }`}>
+                        <div className={`flex justify-between items-center border-b pb-2.5 ${
+                          theme === 'light' ? 'border-slate-200/60' : 'border-white/5'
+                        }`}>
+                          <h5 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">{selected.name}</h5>
+                          <span className={`text-[9px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                            theme === 'light'
+                              ? 'text-indigo-600 bg-indigo-50 border border-indigo-100'
+                              : 'text-indigo-400 bg-indigo-500/15 border border-indigo-500/20'
+                          }`}>
+                            {selected.category}
+                          </span>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2.5 text-[10px] text-gray-400 font-semibold leading-relaxed">
-                          <div className="flex flex-col">
-                            <span className="text-[8px] uppercase tracking-wider text-gray-500">Owner Name</span>
-                            <span className="text-gray-250 font-bold">{selected.contact_person || 'N/A'}</span>
+                        <div className="grid grid-cols-2 gap-3 text-[10px] text-gray-500 dark:text-gray-400 font-semibold leading-relaxed">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[8px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Owner Name</span>
+                            <span className="flex items-center gap-1.5 text-slate-700 dark:text-gray-300 font-bold mt-0.5">
+                              <User className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                              {selected.contact_person || 'N/A'}
+                            </span>
                           </div>
-                          <div className="flex flex-col">
-                            <span className="text-[8px] uppercase tracking-wider text-gray-500">Phone Number</span>
-                            <span className="text-gray-250 font-bold">{selected.phone || 'N/A'}</span>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[8px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Phone Number</span>
+                            <span className="flex items-center gap-1.5 text-slate-700 dark:text-gray-300 font-bold mt-0.5">
+                              <PhoneCall className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                              {selected.phone || 'N/A'}
+                            </span>
                           </div>
-                          <div className="flex flex-col">
-                            <span className="text-[8px] uppercase tracking-wider text-gray-500">Email Address</span>
-                            <span className="text-gray-250 font-bold truncate">{selected.email || 'N/A'}</span>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[8px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Email Address</span>
+                            <span className="flex items-center gap-1.5 text-slate-700 dark:text-gray-300 font-bold mt-0.5 truncate">
+                              <Mail className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                              <span className="truncate">{selected.email || 'N/A'}</span>
+                            </span>
                           </div>
-                          <div className="flex flex-col">
-                            <span className="text-[8px] uppercase tracking-wider text-gray-500">Location / Address</span>
-                            <span className="text-gray-250 font-bold">Udaipur, Rajasthan</span>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[8px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Location / Address</span>
+                            <span className="flex items-center gap-1.5 text-slate-700 dark:text-gray-300 font-bold mt-0.5">
+                              <MapPin className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 shrink-0" />
+                              Udaipur, Rajasthan
+                            </span>
                           </div>
                         </div>
 
                         <button
                           type="button"
                           onClick={handleAutoFillVendor}
-                          className="w-full py-2 bg-[#5a2bd4]/20 hover:bg-[#5a2bd4]/40 border border-[#5a2bd4]/40 text-white font-extrabold text-[10px] rounded-lg tracking-wider transition-all cursor-pointer uppercase flex items-center justify-center gap-1 mt-1"
+                          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white always-white font-extrabold text-[10px] rounded-xl tracking-wider transition-all cursor-pointer uppercase flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/15"
                         >
-                          Select & Auto-Fill Form
+                          Select 
                         </button>
                       </div>
                     );
@@ -2417,7 +2676,7 @@ export default function EventDetailHub() {
 
                 <button
                   type="submit"
-                  className="w-full py-2.5 bg-[#5a2bd4] hover:bg-[#6b3ce2] text-white font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/10 cursor-pointer transition-colors"
+                  className="w-full py-2.5 bg-[#1d4ed8] hover:bg-[#1e40af] text-white font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/10 cursor-pointer transition-colors"
                 >
                   <Plus className="w-4 h-4" />
                   Save Supplier
@@ -2428,72 +2687,7 @@ export default function EventDetailHub() {
           </div>
         )}
 
-        {/* ================= PAYMENTS TAB ================= */}
-        {activeTab === 'payments' && (
-          <div className="glass-panel p-6 rounded-2xl border border-white/5 shadow-xl flex flex-col gap-4 animate-fade-in max-w-4xl mx-auto">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-white/5 pb-3">
-              <h3 className="text-xs font-black uppercase tracking-wider text-white">Full Transaction Payments Ledger</h3>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded border border-emerald-500/25">
-                  Total Spent: {formatRupee(totalSpent)}
-                </span>
-                <button
-                  onClick={() => setShowAddPaymentModal(true)}
-                  className="px-3 py-1.5 bg-[#5a2bd4] hover:bg-[#6b3ce2] text-white text-[10px] font-bold rounded-lg flex items-center gap-1 cursor-pointer transition-colors shadow-md shadow-indigo-600/10"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Add Payment Transaction
-                </button>
-              </div>
-            </div>
 
-            <div className="overflow-x-auto mt-2">
-              <table className="w-full text-left text-xs text-gray-300 font-medium">
-                <thead>
-                  <tr className="border-b border-white/5 text-gray-500 font-bold uppercase tracking-wider">
-                    <th className="py-3 px-2">Invoice ID</th>
-                    <th className="py-3 px-2">Expense / Description</th>
-                    <th className="py-3 px-2">Amount Paid</th>
-                    <th className="py-3 px-2">Payment Date</th>
-                    <th className="py-3 px-2">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {expenses.length > 0 ? (
-                    expenses.map((exp, idx) => {
-                      const pay = parsePayment(exp, idx);
-                      return (
-                        <tr key={pay.id} className="hover:bg-white/1 transition-colors">
-                          <td className="py-3 px-2 font-bold text-indigo-400">{pay.invoiceId}</td>
-                          <td className="py-3 px-2 text-white">{pay.description}</td>
-                          <td className="py-3 px-2 font-bold text-emerald-400">{formatRupee(parseFloat(pay.amount))}</td>
-                          <td className="py-3 px-2 text-gray-400">{pay.date}</td>
-                          <td className="py-3 px-2">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase border ${
-                              pay.status === 'Paid'
-                                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                                : pay.status === 'Pending'
-                                ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
-                                : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
-                            }`}>
-                              {pay.status}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  ) : (
-                    <tr className="text-center">
-                      <td colSpan="5" className="py-8 text-xs text-gray-500 font-bold">
-                        No transactions recorded yet. Click "Add Payment Transaction" to record one.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
 
         {/* ================= NOTES & DOCUMENTS TAB ================= */}
         {activeTab === 'notes_docs' && (
@@ -2523,7 +2717,7 @@ export default function EventDetailHub() {
                         showToast('Note added!', 'success');
                       }
                     }}
-                    className="px-4 bg-[#5a2bd4] hover:bg-[#6b3ce2] text-white text-xs font-bold rounded-xl cursor-pointer"
+                    className="px-4 bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-xs font-bold rounded-xl cursor-pointer"
                   >
                     Add
                   </button>
@@ -2562,7 +2756,7 @@ export default function EventDetailHub() {
             
             <div className="p-4 border-b border-white/5 bg-white/1 flex justify-between items-center">
               <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                <Edit className="w-4 h-4 text-[#5a2bd4]" /> Edit Event Parameters
+                <Edit className="w-4 h-4 text-[#1d4ed8]" /> Edit Event Parameters
               </h3>
               <button
                 onClick={() => setShowEditModal(false)}
@@ -2649,7 +2843,7 @@ export default function EventDetailHub() {
                     onChange={(e) => setEditType(e.target.value)}
                     className="w-full bg-white/3 border border-white/5 rounded-xl px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-indigo-500/50 transition-all cursor-pointer font-semibold"
                   >
-                    {['Wedding', 'Birthday', 'Farewell', 'Corporate', 'Seminar', 'Conference', 'Gala', 'Festival', 'Other'].map(c => (
+                    {['Wedding', 'Engagement', 'Birthday Party', 'Anniversary', 'Baby Shower', 'Corporate Meeting', 'Conference', 'Product Launch', 'Cultural Event', 'College Fest', 'Exhibition', 'Other'].map(c => (
                       <option key={c} value={c} className="bg-[#151c2c]">{c}</option>
                     ))}
                   </select>
@@ -2676,7 +2870,7 @@ export default function EventDetailHub() {
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="px-5 py-2 bg-[#5a2bd4] hover:bg-[#6b3ce2] text-white font-bold text-[10px] rounded-xl shadow-lg cursor-pointer transition-colors flex items-center gap-1"
+                  className="px-5 py-2 bg-[#1d4ed8] hover:bg-[#1e40af] text-white font-bold text-[10px] rounded-xl shadow-lg cursor-pointer transition-colors flex items-center gap-1"
                 >
                   {actionLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   Save Changes
@@ -2818,7 +3012,7 @@ export default function EventDetailHub() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-[#5a2bd4] hover:bg-[#6b3ce2] text-white font-bold text-[10px] rounded-xl shadow-lg cursor-pointer transition-colors"
+                  className="px-5 py-2 bg-[#1d4ed8] hover:bg-[#1e40af] text-white font-bold text-[10px] rounded-xl shadow-lg cursor-pointer transition-colors"
                 >
                   Add Transaction
                 </button>
@@ -2828,16 +3022,24 @@ export default function EventDetailHub() {
         </div>
       )}
 
-      {/* AI Suggestions Overlay Modal */}
+      {/* AI Chatbot Overlay Modal */}
       {showAISuggestionsModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="glass-panel w-full max-w-lg rounded-2xl border border-white/10 overflow-hidden shadow-2xl flex flex-col animate-scale-in max-h-[90vh]">
+          <div className="glass-panel w-full max-w-lg rounded-2xl border border-white/10 overflow-hidden shadow-2xl flex flex-col animate-scale-in h-[80vh] max-h-[700px]">
             
-            <div className="p-4 border-b border-white/5 bg-white/1 flex justify-between items-center">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-purple-400 animate-pulse" />
-                AI Planner Assistant Recommendations
-              </h3>
+            {/* Modal Header */}
+            <div className="p-4 border-b border-white/5 bg-white/1 flex justify-between items-center shrink-0">
+              <div className="flex flex-col text-left">
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-purple-400 animate-pulse" />
+                  AI Event Assistant
+                </h3>
+                {event && (
+                  <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider mt-0.5">
+                    {event.event_type} • {event.guest_count} Guests • {formatRupee(event.budget)} Budget
+                  </span>
+                )}
+              </div>
               <button
                 onClick={() => setShowAISuggestionsModal(false)}
                 className="text-gray-400 hover:text-white transition-colors cursor-pointer"
@@ -2846,84 +3048,61 @@ export default function EventDetailHub() {
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto flex flex-col gap-5 text-left text-xs">
-              {aiLoading ? (
-                <div className="flex flex-col items-center justify-center py-16 gap-3">
-                  <div className="w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin"></div>
-                  <span className="text-gray-400 font-semibold animate-pulse">Analyzing event details & generating custom blueprint...</span>
+            {/* Chat Messages Area */}
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 text-xs scrollbar-thin">
+              {chatMessages.map((msg, idx) => (
+                <div
+                  key={idx}
+                  className={`flex flex-col max-w-[85%] ${
+                    msg.sender === 'user' ? 'ml-auto items-end' : 'mr-auto items-start'
+                  }`}
+                >
+                  <div
+                    className={`p-3 rounded-2xl leading-relaxed ${
+                      msg.sender === 'user'
+                        ? 'bg-[#1d4ed8]/25 border border-[#1d4ed8]/45 text-white rounded-tr-none text-right'
+                        : 'bg-white/5 border border-white/5 text-gray-200 rounded-tl-none text-left'
+                    }`}
+                  >
+                    <p className="whitespace-pre-wrap font-medium">{msg.text}</p>
+                  </div>
+                  <span className="text-[7px] text-gray-500 font-semibold mt-1 px-1">
+                    {msg.sender === 'user' ? 'You' : 'AI Assistant'}
+                  </span>
                 </div>
-              ) : (
-                aiSuggestions && (
-                  <>
-                    {/* Event summary snippet */}
-                    <div className="bg-white/3 border border-white/5 rounded-xl p-3.5 flex flex-col gap-1.5">
-                      <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Target Event Profile</span>
-                      <h4 className="text-sm font-extrabold text-white">{event?.title || 'Your Event'}</h4>
-                      <div className="grid grid-cols-2 gap-2 text-[10px] text-gray-400 font-semibold mt-1">
-                        <div>Type: <span className="text-gray-200">{event?.event_type || 'Event'}</span></div>
-                        <div>Guests: <span className="text-gray-200">{event?.guest_count || 0}</span></div>
-                        <div>Budget: <span className="text-amber-400 font-bold">{formatRupee(event?.budget || 0)}</span></div>
-                        <div>Theme: <span className="text-gray-200">{event?.theme || 'Standard'}</span></div>
-                      </div>
-                    </div>
+              ))}
 
-                    {/* AI Suggestions checklist */}
-                    <div className="flex flex-col gap-2.5">
-                      <h4 className="font-bold text-white flex items-center gap-1.5 border-b border-white/5 pb-1">
-                        <CheckSquare className="w-4 h-4 text-[#10b981]" /> Generated Planning Checklist
-                      </h4>
-                      <ul className="flex flex-col gap-2 text-gray-300 font-medium">
-                        {aiSuggestions.checklist && aiSuggestions.checklist.map((item, idx) => (
-                          <li key={idx} className="flex items-start gap-2 bg-white/1 px-3 py-2 border border-white/5 rounded-lg leading-relaxed">
-                            <span className="text-[#10b981] font-black">•</span>
-                            <span>{renderItemSafely(item)}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    {/* AI Theme & Decor suggestions */}
-                    <div className="flex flex-col gap-2.5">
-                      <h4 className="font-bold text-white flex items-center gap-1.5 border-b border-white/5 pb-1">
-                        <Palette className="w-4 h-4 text-purple-400" /> Decorative & Theme Concept
-                      </h4>
-                      <p className="text-gray-300 bg-white/1 p-3 border border-white/5 rounded-lg leading-relaxed font-medium">
-                        {renderItemSafely(aiSuggestions.decor)}
-                      </p>
-                    </div>
-
-                    {/* AI Udaipur Vendor matches */}
-                    <div className="flex flex-col gap-2.5">
-                      <h4 className="font-bold text-white flex items-center gap-1.5 border-b border-white/5 pb-1">
-                        <Users className="w-4 h-4 text-indigo-400" /> Local Udaipur Vendor Recommendations
-                      </h4>
-                      <p className="text-gray-300 bg-white/1 p-3 border border-white/5 rounded-lg leading-relaxed font-medium">
-                        {renderItemSafely(aiSuggestions.vendors)}
-                      </p>
-                    </div>
-
-                    {/* AI Budget optimization tips */}
-                    <div className="flex flex-col gap-2.5">
-                      <h4 className="font-bold text-white flex items-center gap-1.5 border-b border-white/5 pb-1">
-                        <Receipt className="w-4 h-4 text-amber-400" /> Budget Allocation Advice
-                      </h4>
-                      <div className="text-gray-300 bg-amber-500/5 border border-amber-500/10 p-3 rounded-lg leading-relaxed font-semibold">
-                        {renderItemSafely(aiSuggestions.budgetTip)}
-                      </div>
-                    </div>
-                  </>
-                )
+              {/* Chat Loading State */}
+              {chatLoading && (
+                <div className="flex flex-col max-w-[85%] mr-auto items-start">
+                  <div className="bg-white/5 border border-white/5 p-3 rounded-2xl rounded-tl-none flex items-center gap-2">
+                    <Loader2 className="w-3.5 h-3.5 text-purple-400 animate-spin" />
+                    <span className="text-[10px] text-gray-400 font-bold animate-pulse">AI is writing a reply...</span>
+                  </div>
+                </div>
               )}
+
+              <div ref={chatEndRef} />
             </div>
 
-            <div className="p-4 border-t border-white/5 bg-white/1 flex justify-end gap-2 shrink-0">
+            {/* Chat Input Area */}
+            <form onSubmit={handleSendChatMessage} className="p-3 border-t border-white/5 bg-white/1 flex gap-2 items-center shrink-0">
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="Ask something (e.g., recommend Udaipur venues, food menus)..."
+                className="flex-1 bg-white/3 border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500/50 transition-all font-semibold"
+                disabled={chatLoading}
+              />
               <button
-                onClick={() => setShowAISuggestionsModal(false)}
-                className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white text-xs font-bold rounded-xl cursor-pointer transition-colors"
+                type="submit"
+                disabled={chatLoading || !chatInput.trim()}
+                className="p-2.5 bg-[#1d4ed8] hover:bg-[#1e40af] disabled:bg-gray-700/30 disabled:border-gray-700/10 text-white always-white rounded-xl shadow-lg flex items-center justify-center cursor-pointer transition-colors"
               >
-                Close Suggestions
+                <Send className="w-4 h-4 text-white always-white" />
               </button>
-            </div>
+            </form>
 
           </div>
         </div>

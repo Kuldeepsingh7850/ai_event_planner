@@ -11,28 +11,28 @@ const mockDb = {
     { id: 2, name: 'John Doe', email: 'john@gmail.com', password: '$2a$10$m0GWB4B8r/XXzJ0tusxemOiFmlLRZUUmUf73wIETwvwYWIkZEktV.', role: 'user', status: 'active', avatar: null, created_at: new Date() }
   ],
   events: [
-    { id: 1, user_id: 2, title: 'Annual College Farewell 2026', description: 'Farewell party for the graduating computer science batch.', event_type: 'Farewell', date: '2026-06-15', time: '16:00:00', location: 'Main Campus Auditorium', budget: 50000.00, guest_count: 200, status: 'planning', theme: 'Royal / Traditional', created_at: new Date() }
+    { id: 1, user_id: 2, title: 'Annual College Farewell 2026', event_type: 'Farewell', date: '2026-06-15', time: '16:00:00', location: 'Main Campus Auditorium', budget: 50000.00, guest_count: 200, status: 'planning', theme: 'Royal / Traditional', created_at: new Date() }
   ],
   guests: [
-    { id: 1, event_id: 1, guest_name: 'Prof. Alan Turing', email: 'turing@univ.edu', status: 'confirmed', created_at: new Date() },
-    { id: 2, event_id: 1, guest_name: 'Dr. Grace Hopper', email: 'hopper@univ.edu', status: 'pending', created_at: new Date() },
-    { id: 3, event_id: 1, guest_name: 'Steve Jobs', email: 'steve@apple.com', status: 'declined', created_at: new Date() }
+    { id: 1, event_id: 1, guest_name: 'Prof. Alan Turing', email: 'turing@univ.edu', status: 'confirmed' },
+    { id: 2, event_id: 1, guest_name: 'Dr. Grace Hopper', email: 'hopper@univ.edu', status: 'pending' },
+    { id: 3, event_id: 1, guest_name: 'Steve Jobs', email: 'steve@apple.com', status: 'declined' }
   ],
   budget: [
     { id: 1, event_id: 1, total_budget: 50000.00, expenses: 15000.00, remaining_budget: 35000.00 }
   ],
   expenses: [
-    { id: 1, event_id: 1, title: 'Auditorium Booking Deposit', amount: 10000.00, category: 'Venue', date: '2026-05-20', created_at: new Date() },
-    { id: 2, event_id: 1, title: 'Stage Decoration Advance', amount: 5000.00, category: 'Decor', date: '2026-05-21', created_at: new Date() }
+    { id: 1, event_id: 1, title: 'Auditorium Booking Deposit', amount: 10000.00, category: 'Venue', date: '2026-05-20' },
+    { id: 2, event_id: 1, title: 'Stage Decoration Advance', amount: 5000.00, category: 'Decor', date: '2026-05-21' }
   ],
   tasks: [
-    { id: 1, event_id: 1, title: 'Book caterer for dinner buffet', deadline: '2026-06-01', status: 'pending', created_at: new Date() },
-    { id: 2, event_id: 1, title: 'Send digital invitations to seniors', deadline: '2026-05-30', status: 'completed', created_at: new Date() },
-    { id: 3, event_id: 1, title: 'Coordinate playlist with photographer/DJ', deadline: '2026-06-10', status: 'pending', created_at: new Date() }
+    { id: 1, event_id: 1, title: 'Book caterer for dinner buffet', deadline: '2026-06-01', status: 'pending' },
+    { id: 2, event_id: 1, title: 'Send digital invitations to seniors', deadline: '2026-05-30', status: 'completed' },
+    { id: 3, event_id: 1, title: 'Coordinate playlist with photographer/DJ', deadline: '2026-06-10', status: 'pending' }
   ],
   vendors: [
-    { id: 1, event_id: 1, vendor_name: 'Delicious Bites Catering', category: 'Caterer', contact: '+1-555-0199', cost: 25000.00, status: 'contacted', created_at: new Date() },
-    { id: 2, event_id: 1, vendor_name: 'Epic Moments Photography', category: 'Photographer', contact: '+1-555-0188', cost: 12000.00, status: 'hired', created_at: new Date() }
+    { id: 1, event_id: 1, vendor_name: 'Delicious Bites Catering', category: 'Caterer', contact: '+1-555-0199', cost: 25000.00, status: 'contacted' },
+    { id: 2, event_id: 1, vendor_name: 'Epic Moments Photography', category: 'Photographer', contact: '+1-555-0188', cost: 12000.00, status: 'hired' }
   ],
   feedback: [
     { id: 1, user_id: 2, rating: 5, comment: 'Absolutely love the AI generation features! Saved me hours of timeline drafting.', created_at: new Date() }
@@ -122,6 +122,20 @@ const initDb = async () => {
     } catch (schemaErr) {
       console.warn("⚠️ Could not auto-verify or alter events table schema:", schemaErr.message);
     }
+
+    // Auto-update schema to drop created_at columns from expenses, guests, tasks, vendors
+    const tablesToDropCreatedAt = ['expenses', 'guests', 'tasks', 'vendors'];
+    for (const tableName of tablesToDropCreatedAt) {
+      try {
+        const [columns] = await conn.query(`SHOW COLUMNS FROM \`${tableName}\` LIKE 'created_at'`);
+        if (columns.length > 0) {
+          await conn.query(`ALTER TABLE \`${tableName}\` DROP COLUMN \`created_at\``);
+          console.log(`✅ Successfully dropped created_at column from ${tableName} table`);
+        }
+      } catch (dropErr) {
+        console.warn(`⚠️ Could not drop created_at from ${tableName}:`, dropErr.message);
+      }
+    }
     
     conn.release();
   } catch (error) {
@@ -176,8 +190,11 @@ const handleMockQuery = (sql, params) => {
     if (normalizedSql.includes('from events')) {
       const getEnhancedEvent = (e) => {
         const b = mockDb.budget.find(bg => bg.event_id === e.id);
+        const u = mockDb.users.find(usr => usr.id === e.user_id);
         return {
           ...e,
+          user_name: u ? u.name : 'Unknown User',
+          user_email: u ? u.email : '',
           expenses: b ? parseFloat(b.expenses) : 0.00,
           remaining_budget: b ? parseFloat(b.remaining_budget) : parseFloat(e.budget)
         };
@@ -289,15 +306,14 @@ const handleMockQuery = (sql, params) => {
         id: counters.events++,
         user_id: parseInt(params[0]),
         title: params[1],
-        description: params[2],
-        event_type: params[3],
-        date: params[4],
-        time: params[5],
-        location: params[6],
-        budget: parseFloat(params[7]),
-        guest_count: parseInt(params[8]),
-        status: params[9] || 'planning',
-        theme: params[10] || 'Royal / Traditional',
+        event_type: params[2],
+        date: params[3],
+        time: params[4],
+        location: params[5],
+        budget: parseFloat(params[6]),
+        guest_count: parseInt(params[7]),
+        status: params[8] || 'planning',
+        theme: params[9] || 'Royal / Traditional',
         created_at: new Date()
       };
       mockDb.events.push(newEvent);
@@ -323,8 +339,7 @@ const handleMockQuery = (sql, params) => {
         guest_name: params[1],
         email: params[2],
         phone: params[3] || null,
-        status: params[4] || 'pending',
-        created_at: new Date()
+        status: params[4] || 'pending'
       };
       mockDb.guests.push(newGuest);
       return { insertId: newGuest.id, affectedRows: 1 };
@@ -352,8 +367,7 @@ const handleMockQuery = (sql, params) => {
         title: params[1],
         amount: parseFloat(params[2]),
         category: params[3],
-        date: params[4],
-        created_at: new Date()
+        date: params[4]
       };
       mockDb.expenses.push(newExpense);
 
@@ -374,8 +388,7 @@ const handleMockQuery = (sql, params) => {
         event_id: parseInt(params[0]),
         title: params[1],
         deadline: params[2],
-        status: params[3] || 'pending',
-        created_at: new Date()
+        status: params[3] || 'pending'
       };
       mockDb.tasks.push(newTask);
       return { insertId: newTask.id, affectedRows: 1 };
@@ -390,8 +403,7 @@ const handleMockQuery = (sql, params) => {
         category: params[2],
         contact: params[3],
         cost: parseFloat(params[4] || 0),
-        status: params[5] || 'contacted',
-        created_at: new Date()
+        status: params[5] || 'contacted'
       };
       mockDb.vendors.push(newVendor);
       return { insertId: newVendor.id, affectedRows: 1 };
@@ -529,24 +541,23 @@ const handleMockQuery = (sql, params) => {
     }
     // EVENTS update
     if (normalizedSql.includes('update events')) {
-      // UPDATE events SET title=?, description=?, event_type=?, date=?, time=?, location=?, budget=?, guest_count=?, status=?, theme=? WHERE id=?
+      // UPDATE events SET title=?, event_type=?, date=?, time=?, location=?, budget=?, guest_count=?, status=?, theme=? WHERE id=?
       const title = params[0];
-      const description = params[1];
-      const event_type = params[2];
-      const date = params[3];
-      const time = params[4];
-      const location = params[5];
-      const budget = parseFloat(params[6]);
-      const guest_count = parseInt(params[7]);
-      const status = params[8];
-      const theme = params[9];
-      const id = parseInt(params[10]);
+      const event_type = params[1];
+      const date = params[2];
+      const time = params[3];
+      const location = params[4];
+      const budget = parseFloat(params[5]);
+      const guest_count = parseInt(params[6]);
+      const status = params[7];
+      const theme = params[8];
+      const id = parseInt(params[9]);
 
       const idx = mockDb.events.findIndex(e => e.id === id);
       if (idx !== -1) {
         mockDb.events[idx] = {
           ...mockDb.events[idx],
-          title, description, event_type, date, time, location, budget, guest_count, status, theme
+          title, event_type, date, time, location, budget, guest_count, status, theme
         };
         // Update total budget in budget table too
         const bIdx = mockDb.budget.findIndex(b => b.event_id === id);
@@ -717,6 +728,24 @@ const handleMockQuery = (sql, params) => {
       const lenBefore = mockDb.vendors.length;
       mockDb.vendors = mockDb.vendors.filter(v => v.id !== id);
       return { affectedRows: lenBefore - mockDb.vendors.length };
+    }
+
+    // NOTIFICATIONS delete
+    if (normalizedSql.includes('delete from notifications')) {
+      if (normalizedSql.includes('id in') || normalizedSql.includes('id =') || normalizedSql.includes('id = ?')) {
+        // Find parameter containing the array of IDs
+        const idsParam = params.find(p => Array.isArray(p));
+        const ids = idsParam 
+          ? idsParam.map(x => parseInt(x)) 
+          : params.map(x => parseInt(x)).filter(x => !isNaN(x));
+        const lenBefore = mockDb.notifications.length;
+        mockDb.notifications = mockDb.notifications.filter(n => !ids.includes(n.id));
+        return { affectedRows: lenBefore - mockDb.notifications.length };
+      }
+      const userId = parseInt(params[0]);
+      const lenBefore = mockDb.notifications.length;
+      mockDb.notifications = mockDb.notifications.filter(n => n.user_id !== userId);
+      return { affectedRows: lenBefore - mockDb.notifications.length };
     }
   }
 

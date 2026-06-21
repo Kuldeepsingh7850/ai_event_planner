@@ -26,10 +26,7 @@ export default function Profile() {
   const [fullName, setFullName] = useState('');
   const [emailAddress, setEmailAddress] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [designation, setDesignation] = useState('');
-  const [location, setLocation] = useState('');
   const [website, setWebsite] = useState('');
-  const [bio, setBio] = useState('');
   const [avatar, setAvatar] = useState('');
 
   const [loading, setLoading] = useState(true);
@@ -100,18 +97,12 @@ export default function Profile() {
             if (!dbData.phone) {
               setPhoneNumber(parsed.phoneNumber || '');
             }
-            setDesignation(parsed.designation || '');
-            setLocation(parsed.location || '');
             setWebsite(parsed.website || '');
-            setBio(parsed.bio || '');
           } else {
             if (!dbData.phone) {
               setPhoneNumber('');
             }
-            setDesignation('');
-            setLocation('');
             setWebsite('');
-            setBio('');
           }
         }
       } catch (err) {
@@ -175,10 +166,7 @@ export default function Profile() {
         fullName,
         emailAddress,
         phoneNumber,
-        designation,
-        location,
-        website,
-        bio
+        website
       };
       const localKey = user ? `profile_settings_${user.id}` : 'profile_settings';
       localStorage.setItem(localKey, JSON.stringify(profileObj));
@@ -346,52 +334,15 @@ export default function Profile() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                {/* Phone Number */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] text-gray-400 uppercase tracking-wider">Phone Number</label>
-                  <input
-                    type="text"
-                    required
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-
-                {/* Designation */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] text-gray-400 uppercase tracking-wider">Designation</label>
-                  <input
-                    type="text"
-                    required
-                    value={designation}
-                    onChange={(e) => setDesignation(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-              </div>
-
-              {/* Location */}
+              {/* Phone Number */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] text-gray-400 uppercase tracking-wider">Location</label>
+                <label className="text-[10px] text-gray-400 uppercase tracking-wider">Phone Number</label>
                 <input
                   type="text"
                   required
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              {/* Bio Area */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] text-gray-400 uppercase tracking-wider">Bio</label>
-                <textarea
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
-                  rows={4}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-indigo-500 resize-none leading-relaxed font-semibold"
                 />
               </div>
 
@@ -399,7 +350,7 @@ export default function Profile() {
               <button
                 type="submit"
                 disabled={submitLoading}
-                className="px-5 py-3 bg-[#5a2bd4] hover:bg-[#4c24b5] disabled:opacity-40 disabled:pointer-events-none always-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-indigo-600/10 cursor-pointer self-start"
+                className="px-5 py-3 bg-[#1d4ed8] hover:bg-[#1e3a8a] disabled:opacity-40 disabled:pointer-events-none always-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-indigo-600/10 cursor-pointer self-start"
               >
                 {submitLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -456,7 +407,7 @@ export default function Profile() {
               <button
                 type="submit"
                 disabled={passwordLoading}
-                className="px-5 py-3 bg-[#5a2bd4] hover:bg-[#4c24b5] disabled:opacity-40 disabled:pointer-events-none always-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-indigo-600/10 cursor-pointer self-start"
+                className="px-5 py-3 bg-[#1d4ed8] hover:bg-[#1e3a8a] disabled:opacity-40 disabled:pointer-events-none always-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-indigo-600/10 cursor-pointer self-start"
               >
                 {passwordLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -515,7 +466,7 @@ export default function Profile() {
               <button
                 type="submit"
                 disabled={feedbackSubmitLoading}
-                className="px-5 py-3 bg-[#5a2bd4] hover:bg-[#4c24b5] disabled:opacity-40 disabled:pointer-events-none always-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-indigo-600/10 cursor-pointer self-start"
+                className="px-5 py-3 bg-[#1d4ed8] hover:bg-[#1e3a8a] disabled:opacity-40 disabled:pointer-events-none always-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-indigo-600/10 cursor-pointer self-start"
               >
                 {feedbackSubmitLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

@@ -34,7 +34,7 @@ export default function Sidebar({ isOpen, onClose }) {
     { name: 'Venues', path: '/venues', icon: Building },
     { name: 'Budget Planner', path: '/budget', icon: Receipt },
     { name: 'Guest Management', path: '/guests', icon: Users },
-    { name: 'Task Timeline', path: '/tasks', icon: CheckSquare },
+    { name: 'Tasks', path: '/tasks', icon: CheckSquare },
     { name: 'Notifications', path: '/notifications', icon: Bell },
     { name: 'Favorites', path: '/favorites', icon: Star },
     { name: 'Profile Settings', path: '/profile', icon: Settings }
@@ -50,6 +50,7 @@ export default function Sidebar({ isOpen, onClose }) {
     { name: 'Bookings', path: '/admin?tab=bookings', icon: CheckSquare },
     { name: 'Feedback', path: '/admin?tab=feedback', icon: MessageSquare },
     { name: 'Reports', path: '/admin?tab=reports', icon: TrendingUp },
+    { name: 'Notifications', path: '/notifications', icon: Bell },
     { name: 'Settings', path: '/admin?tab=settings', icon: Settings }
   ];
 
@@ -119,7 +120,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   href={item.path}
                   className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
                     isActive
-                      ? 'bg-[#efe9fc] text-[#5a2bd4] dark:bg-indigo-600 dark:text-white shadow-sm dark:shadow-indigo-600/15'
+                      ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-600 dark:text-white shadow-sm dark:shadow-indigo-600/15'
                       : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white'
                   }`}
                 >

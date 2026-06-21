@@ -101,7 +101,7 @@ export default function ResetPassword() {
             <button
               type="button"
               onClick={() => router.push('/login')}
-              className="text-[#5c3db5] dark:text-[#8b6cf5] font-extrabold hover:underline cursor-pointer transition-colors"
+              className="text-[#1d4ed8] dark:text-[#60a5fa] font-extrabold hover:underline cursor-pointer transition-colors"
             >
               Back to Sign In
             </button>
@@ -176,8 +176,8 @@ export default function ResetPassword() {
                     placeholder="Enter new password (min. 6 chars)"
                     className={`w-full border rounded-xl text-xs py-3 pl-10 pr-10 transition-all focus:outline-none ${
                       isLight 
-                        ? 'bg-gray-50 border-gray-200 text-gray-900 focus:border-[#5c3db5] focus:bg-white' 
-                        : 'bg-white/3 border-white/5 text-white focus:border-[#8b6cf5]/50 focus:bg-white/5'
+                        ? 'bg-gray-50 border-gray-200 text-gray-900 focus:border-[#1d4ed8] focus:bg-white' 
+                        : 'bg-white/3 border-white/5 text-white focus:border-[#60a5fa]/50 focus:bg-white/5'
                     }`}
                     required
                   />
@@ -206,8 +206,8 @@ export default function ResetPassword() {
                     placeholder="Confirm new password"
                     className={`w-full border rounded-xl text-xs py-3 pl-10 pr-10 transition-all focus:outline-none ${
                       isLight 
-                        ? 'bg-gray-50 border-gray-200 text-gray-900 focus:border-[#5c3db5] focus:bg-white' 
-                        : 'bg-white/3 border-white/5 text-white focus:border-[#8b6cf5]/50 focus:bg-white/5'
+                        ? 'bg-gray-50 border-gray-200 text-gray-900 focus:border-[#1d4ed8] focus:bg-white' 
+                        : 'bg-white/3 border-white/5 text-white focus:border-[#60a5fa]/50 focus:bg-white/5'
                     }`}
                     required
                   />
@@ -224,7 +224,7 @@ export default function ResetPassword() {
               <button
                 type="submit"
                 disabled={loading || !!success}
-                className="bg-[#5c3db5] hover:bg-[#4b3099] text-white font-bold text-xs py-3 rounded-xl transition-all shadow-lg shadow-[#5c3db5]/15 cursor-pointer flex items-center justify-center gap-2 mt-1 disabled:opacity-50"
+                className="bg-[#1d4ed8] hover:bg-[#1e3a8a] text-white font-bold text-xs py-3 rounded-xl transition-all shadow-lg shadow-[#1d4ed8]/15 cursor-pointer flex items-center justify-center gap-2 mt-1 disabled:opacity-50"
               >
                 {loading && <span className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin shrink-0"></span>}
                 Reset Password

@@ -36,8 +36,23 @@ const addFeedback = async (req, res) => {
       [req.user.id, rateVal, comment || '']
     );
 
+    const feedbackId = result.insertId;
+
+    // Send feedback notification to admins
+    try {
+      const admins = await db.query("SELECT id FROM users WHERE role = 'admin'");
+      for (const admin of admins) {
+        await db.query(
+          "INSERT INTO notifications (user_id, message, status) VALUES (?, ?, 'unread')",
+          [admin.id, `New feedback received from ${req.user.name || 'User'}: ${rateVal} stars. "${comment || ''}"`]
+        );
+      }
+    } catch (err) {
+      console.error('Failed to create admin notification for feedback:', err.message);
+    }
+
     res.status(201).json({
-      id: result.insertId,
+      id: feedbackId,
       user_id: req.user.id,
       rating: rateVal,
       comment: comment || ''

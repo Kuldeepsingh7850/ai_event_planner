@@ -40,6 +40,19 @@ const registerUser = async (req, res) => {
 
     const newUserId = result.insertId;
 
+    // Send registration notification to admins
+    try {
+      const admins = await db.query("SELECT id FROM users WHERE role = 'admin'");
+      for (const admin of admins) {
+        await db.query(
+          "INSERT INTO notifications (user_id, message, status) VALUES (?, ?, 'unread')",
+          [admin.id, `New user registered: ${name} (${email})`]
+        );
+      }
+    } catch (err) {
+      console.error('Failed to create admin notification for new user:', err.message);
+    }
+
     res.status(201).json({
       id: newUserId,
       name,
@@ -153,6 +166,13 @@ const forgotPassword = async (req, res) => {
       `
     };
 
+    console.log('SMTP Config check in forgotPassword request:');
+    console.log('- SMTP_HOST:', process.env.SMTP_HOST);
+    console.log('- SMTP_PORT:', process.env.SMTP_PORT);
+    console.log('- SMTP_SECURE:', process.env.SMTP_SECURE);
+    console.log('- SMTP_USER:', process.env.SMTP_USER);
+    console.log('- SMTP_PASS length:', process.env.SMTP_PASS ? process.env.SMTP_PASS.length : 0);
+
     let transporter;
     let testAccount = null;
 
@@ -182,17 +202,43 @@ const forgotPassword = async (req, res) => {
       });
     }
 
-    const info = await transporter.sendMail(mailOptions);
+    let emailSent = false;
     let etherealUrl = '';
-    if (testAccount) {
-      etherealUrl = nodemailer.getTestMessageUrl(info);
-      console.log(`✉️ Ethereal Email sent: ${etherealUrl}`);
+    let emailError = null;
+
+    try {
+      // Check if SMTP is using mock placeholder pass - bypass dispatch to save timeout
+      if (process.env.SMTP_PASS && (process.env.SMTP_PASS.includes('xxxx') || process.env.SMTP_PASS.includes('your-gmail'))) {
+        throw new Error('Placeholder SMTP password detected in .env');
+      }
+
+      console.log('Attempting to send email via SMTP...');
+      const info = await transporter.sendMail(mailOptions);
+      emailSent = true;
+      console.log('✅ SMTP Mail sent successfully! MessageId:', info.messageId);
+      if (testAccount) {
+        etherealUrl = nodemailer.getTestMessageUrl(info);
+        console.log(`✉️ Ethereal Email sent: ${etherealUrl}`);
+      }
+    } catch (mailErr) {
+      console.error('SMTP Mail dispatch failed, falling back to local print:', mailErr);
+      emailError = mailErr.message;
     }
 
+    // Log the link in console so developer can always access it
+    console.log(`==================================================`);
+    console.log(`🔑 PASSWORD RESET URL FOR ${user.email}:`);
+    console.log(`🔗 ${resetUrl}`);
+    console.log(`==================================================`);
+
     res.json({
-      message: 'Password reset link sent to your email.',
+      message: emailSent 
+        ? 'Password reset link sent to your email.' 
+        : 'Password reset link generated (Local development fallback).',
       resetLink: resetUrl,
-      etherealUrl: etherealUrl
+      etherealUrl: etherealUrl,
+      localFallback: !emailSent,
+      emailError: emailError
     });
   } catch (error) {
     console.error('Forgot password error:', error.message);

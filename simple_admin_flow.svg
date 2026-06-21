@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 450" width="100%" height="100%">
+  <defs>
+    <!-- Drop Shadow Filter -->
+    <filter id="shadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="2" dy="4" stdDeviation="4" flood-color="#0F172A" flood-opacity="0.06" />
+    </filter>
+    <!-- Gradients -->
+    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8B5CF6" />
+      <stop offset="100%" stop-color="#6D28D9" />
+    </linearGradient>
+    <linearGradient id="roseGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F43F5E" />
+      <stop offset="100%" stop-color="#E11D48" />
+    </linearGradient>
+    <!-- Arrow marker -->
+    <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 7 5 L 0 8.5 z" fill="#64748B" />
+    </marker>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="100%" height="100%" fill="#F8FAFC" rx="16" />
+  
+  <!-- Title -->
+  <text x="40" y="45" font-family="Segoe UI, sans-serif" font-size="20" font-weight="bold" fill="#0F172A">JAGAH — Admin Moderation Flow Diagram</text>
+  <text x="40" y="65" font-family="Segoe UI, sans-serif" font-size="11.5" fill="#64748B">Administrative panel capabilities, security auditing, and moderation controls</text>
+
+  <!-- Flow Nodes -->
+  <!-- Admin Authentication -->
+  <rect x="60" y="120" width="160" height="50" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5" filter="url(#shadow)" />
+  <text x="140" y="150" font-family="Segoe UI, sans-serif" font-size="13" font-weight="600" fill="#0F172A" text-anchor="middle">Admin Login</text>
+
+  <!-- Admin Dashboard -->
+  <rect x="330" y="120" width="180" height="50" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5" filter="url(#shadow)" />
+  <text x="420" y="150" font-family="Segoe UI, sans-serif" font-size="13" font-weight="600" fill="#0F172A" text-anchor="middle">Overview &amp; App Metrics</text>
+
+  <!-- User Management Portal -->
+  <rect x="620" y="120" width="200" height="50" rx="8" fill="url(#purpleGrad)" filter="url(#shadow)" />
+  <text x="720" y="150" font-family="Segoe UI, sans-serif" font-size="13" font-weight="bold" fill="#FFFFFF" text-anchor="middle">User Moderation Portal</text>
+
+  <!-- Moderation Actions -->
+  <!-- Monitor Accounts -->
+  <rect x="60" y="300" width="160" height="50" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5" filter="url(#shadow)" />
+  <text x="140" y="330" font-family="Segoe UI, sans-serif" font-size="12" font-weight="600" fill="#334155" text-anchor="middle">🔍 Monitor Accounts</text>
+
+  <!-- Block/Unblock -->
+  <rect x="250" y="300" width="160" height="50" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5" filter="url(#shadow)" />
+  <text x="330" y="330" font-family="Segoe UI, sans-serif" font-size="12" font-weight="600" fill="#334155" text-anchor="middle">🚫 Block / Unblock</text>
+
+  <!-- Modify Roles -->
+  <rect x="440" y="300" width="180" height="50" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5" filter="url(#shadow)" />
+  <text x="530" y="330" font-family="Segoe UI, sans-serif" font-size="12" font-weight="600" fill="#334155" text-anchor="middle">🎭 Change Role (User ↔ Admin)</text>
+
+  <!-- Delete User -->
+  <rect x="650" y="300" width="170" height="50" rx="8" fill="#FFF1F2" stroke="#FECDD3" stroke-width="1.5" filter="url(#shadow)" />
+  <text x="735" y="330" font-family="Segoe UI, sans-serif" font-size="12" font-weight="600" fill="#E11D48" text-anchor="middle">❌ Delete Accounts</text>
+
+  <!-- Connectors (Arrows) -->
+  <!-- Login -> Dashboard -->
+  <line x1="220" y1="145" x2="322" y2="145" stroke="#64748B" stroke-width="2" marker-end="url(#arrow)" />
+  <!-- Dashboard -> User Management -->
+  <line x1="510" y1="145" x2="612" y2="145" stroke="#64748B" stroke-width="2" marker-end="url(#arrow)" />
+  
+  <!-- User Management -> Actions (Tree branches) -->
+  <path d="M 720,170 L 720,240 L 140,240 L 140,292" fill="none" stroke="#64748B" stroke-width="2" marker-end="url(#arrow)" />
+  <path d="M 330,240 L 330,292" fill="none" stroke="#64748B" stroke-width="2" marker-end="url(#arrow)" />
+  <path d="M 530,240 L 530,292" fill="none" stroke="#64748B" stroke-width="2" marker-end="url(#arrow)" />
+  <path d="M 720,240 L 735,240 L 735,292" fill="none" stroke="#64748B" stroke-width="2" marker-end="url(#arrow)" />
+</svg>

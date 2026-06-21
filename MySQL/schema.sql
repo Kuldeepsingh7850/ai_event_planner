@@ -7,7 +7,6 @@ USE `ai_event_planner`;
 -- 1. Users Table
 CREATE TABLE IF NOT EXISTS `users` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `clerk_id` VARCHAR(255) UNIQUE DEFAULT NULL,
   `name` VARCHAR(255) NOT NULL,
   `email` VARCHAR(255) UNIQUE NOT NULL,
   `password` VARCHAR(255) DEFAULT NULL,
@@ -41,7 +40,6 @@ CREATE TABLE IF NOT EXISTS `guests` (
   `email` VARCHAR(255) NOT NULL,
   `phone` VARCHAR(50) DEFAULT NULL,
   `status` VARCHAR(50) DEFAULT 'pending', -- 'pending', 'confirmed', 'declined'
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (`event_id`) REFERENCES `events`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -63,7 +61,6 @@ CREATE TABLE IF NOT EXISTS `expenses` (
   `amount` DECIMAL(12, 2) NOT NULL,
   `category` VARCHAR(100) NOT NULL, -- e.g., Venue, Catering, Decor, AV, Miscellaneous
   `date` DATE NOT NULL,
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (`event_id`) REFERENCES `events`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -74,7 +71,6 @@ CREATE TABLE IF NOT EXISTS `tasks` (
   `title` VARCHAR(255) NOT NULL,
   `deadline` DATE NOT NULL,
   `status` VARCHAR(50) DEFAULT 'pending', -- 'pending', 'completed'
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (`event_id`) REFERENCES `events`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -87,7 +83,6 @@ CREATE TABLE IF NOT EXISTS `vendors` (
   `contact` VARCHAR(255) NOT NULL,
   `cost` DECIMAL(12, 2) DEFAULT 0.00,
   `status` VARCHAR(50) DEFAULT 'contacted', -- 'contacted', 'hired', 'completed'
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (`event_id`) REFERENCES `events`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

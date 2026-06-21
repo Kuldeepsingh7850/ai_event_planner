@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import {
@@ -7,23 +6,18 @@ import {
   MapPin,
   Calendar,
   Trash2,
-  Heart,
   ChevronLeft,
   ChevronRight,
-  Filter,
   Check,
   Building,
-  Users,
-  Compass
+  Users
 } from 'lucide-react';
 
 export default function FavoritesPage() {
   const { user } = useAuth();
   const { showToast } = useNotifications();
 
-  // Categories Horizontal Tabs: 'All', 'Venues', 'Vendors', 'Tasks', 'Ideas'
-  const [activeTab, setActiveTab] = useState('All');
-  const [selectedTypeFilter, setSelectedTypeFilter] = useState('All Types');
+
   const [favorites, setFavorites] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -95,15 +89,6 @@ export default function FavoritesPage() {
       metaLabel: 'Due: 22 May 2024',
       image: '/hero_udaipur_1.jpg',
       metadataType: 'due_date'
-    },
-    {
-      id: 'fav-8',
-      title: 'Wedding Budget Plan',
-      category: 'Idea',
-      subCategory: 'Idea',
-      metaLabel: 'Added on: 20 May 2024',
-      image: '/oberoi_udaivilas.jpg',
-      metadataType: 'added_date'
     }
   ];
 
@@ -154,26 +139,8 @@ export default function FavoritesPage() {
     showToast(`Removed "${name}" from favorites`, 'info');
   };
 
-  // Filter Logic based on Active Tab & Dropdown Type Filter
-  const filteredFavorites = favorites.filter(item => {
-    // 1. Tab Filter
-    let matchesTab = true;
-    if (activeTab === 'Venues') matchesTab = item.category === 'Venue';
-    else if (activeTab === 'Vendors') matchesTab = item.category === 'Vendor';
-    else if (activeTab === 'Tasks') matchesTab = item.category === 'Task';
-    else if (activeTab === 'Ideas') matchesTab = item.category === 'Idea';
-
-    // 2. Dropdown Filter
-    let matchesDropdown = true;
-    if (selectedTypeFilter !== 'All Types') {
-      if (selectedTypeFilter === 'Venues') matchesDropdown = item.category === 'Venue';
-      else if (selectedTypeFilter === 'Vendors') matchesDropdown = item.category === 'Vendor';
-      else if (selectedTypeFilter === 'Tasks') matchesDropdown = item.category === 'Task';
-      else if (selectedTypeFilter === 'Ideas') matchesDropdown = item.category === 'Idea';
-    }
-
-    return matchesTab && matchesDropdown;
-  });
+  // Set filtered favorites to simply map all items
+  const filteredFavorites = favorites;
 
   // Pagination bounds
   const totalPages = Math.max(Math.ceil(filteredFavorites.length / pageSize), 1);
@@ -181,10 +148,6 @@ export default function FavoritesPage() {
     (currentPage - 1) * pageSize,
     currentPage * pageSize
   );
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [activeTab, selectedTypeFilter]);
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-12 font-medium">
@@ -200,49 +163,7 @@ export default function FavoritesPage() {
         </div>
       </div>
 
-      {/* 2. Horizontal Filter Tabs & Dropdowns toolbar */}
-      <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 border-b border-white/5 pb-2">
-        {/* Horizontal Status tabs */}
-        <div className="flex gap-6 overflow-x-auto text-[13px] font-bold text-gray-500 scrollbar-none pr-4">
-          {[
-            { id: 'All', label: 'All' },
-            { id: 'Venues', label: 'Venues' },
-            { id: 'Vendors', label: 'Vendors' },
-            { id: 'Tasks', label: 'Tasks' },
-            { id: 'Ideas', label: 'Ideas' }
-          ].map(tab => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`pb-3 relative cursor-pointer whitespace-nowrap transition-colors ${
-                  isActive
-                    ? 'text-[#5a2bd4] dark:text-indigo-400 font-extrabold border-b-2 border-[#5a2bd4] dark:border-indigo-400'
-                    : 'hover:text-gray-800 dark:hover:text-white'
-                }`}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
 
-        {/* Dropdown Filter on the right */}
-        <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">
-          <select
-            value={selectedTypeFilter}
-            onChange={(e) => setSelectedTypeFilter(e.target.value)}
-            className="px-3.5 py-2 bg-white/5 border border-white/10 rounded-xl hover:border-indigo-500/35 transition-all text-xs font-bold text-gray-300 hover:text-white focus:outline-none focus:border-indigo-500 cursor-pointer"
-          >
-            <option value="All Types" className="bg-[#151c2c] text-white">All Types</option>
-            <option value="Venues" className="bg-[#151c2c] text-white">Venues</option>
-            <option value="Vendors" className="bg-[#151c2c] text-white">Vendors</option>
-            <option value="Tasks" className="bg-[#151c2c] text-white">Tasks</option>
-            <option value="Ideas" className="bg-[#151c2c] text-white">Ideas</option>
-          </select>
-        </div>
-      </div>
 
       {/* 3. Catalog Grid of Favorites */}
       {loading ? (
@@ -261,57 +182,63 @@ export default function FavoritesPage() {
           {paginatedFavorites.map(item => (
             <div
               key={item.id}
-              className="glass-card rounded-2xl border border-white/5 overflow-hidden flex flex-col justify-between group shadow-sm"
+              className="glass-card rounded-[24px] border border-white/5 overflow-hidden flex flex-col justify-between group cursor-pointer shadow-md hover:-translate-y-1.5 transition-all duration-300"
             >
-              {/* Image Section */}
-              <div className="relative overflow-hidden aspect-video bg-slate-800">
-                <img
-                  src={item.image}
-                  alt={item.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 filter brightness-[1.02]"
-                />
-                
-                {/* Heart Toggle overlays */}
-                <button
-                  onClick={(e) => handleRemoveFavorite(item.id, item.title, e)}
-                  className="absolute top-3 right-3 p-1.5 rounded-full backdrop-blur-md border border-white/10 bg-[#07080a]/40 cursor-pointer"
-                  title="Remove from favorites"
-                >
-                  <Heart className="w-3.5 h-3.5 text-indigo-500 fill-indigo-500 transition-all hover:scale-110" />
-                </button>
-              </div>
 
               {/* Title & Metadata Details */}
-              <div className="p-4 flex flex-col gap-2.5">
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-[10px] text-gray-500 font-extrabold uppercase">{item.subCategory}</span>
-                  <h4 className="text-xs sm:text-sm font-extrabold text-white dark:text-white truncate leading-tight group-hover:text-[#5a2bd4] dark:group-hover:text-indigo-400 transition-colors">
-                    {item.title}
-                  </h4>
+              <div className="p-5 flex flex-col gap-4 flex-1 justify-between">
+                <div className="flex items-start gap-3.5">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 border ${
+                    item.category === 'Venue'
+                      ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'
+                      : item.category === 'Vendor'
+                      ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                      : item.category === 'Task'
+                      ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                      : 'bg-purple-500/10 border-purple-500/20 text-purple-400'
+                  }`}>
+                    {item.category === 'Venue' ? (
+                      <Building className="w-4.5 h-4.5" />
+                    ) : item.category === 'Vendor' ? (
+                      <Users className="w-4.5 h-4.5" />
+                    ) : item.category === 'Task' ? (
+                      <Check className="w-4.5 h-4.5" />
+                    ) : (
+                      <Star className="w-4.5 h-4.5" />
+                    )}
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <h4 className="text-xs sm:text-sm font-extrabold text-white dark:text-white leading-tight mb-1 truncate group-hover:text-indigo-400 transition-colors">
+                      {item.title}
+                    </h4>
+                    <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">
+                      {item.subCategory}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Metadata details (MapPin / Calendar icons) */}
-                <div className="flex items-center gap-1.5 text-[10px] text-gray-400 font-bold border-b border-white/5 pb-3">
+                <div className="flex flex-col gap-2 border-t border-white/5 pt-3.5 text-[10px] text-gray-500 dark:text-gray-400 font-semibold">
                   {item.metadataType === 'location' ? (
-                    <>
-                      <MapPin className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+                    <span className="flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                       <span>{item.location}</span>
-                    </>
+                    </span>
                   ) : (
-                    <>
-                      <Calendar className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+                    <span className="flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                       <span className="font-outfit">{item.metaLabel}</span>
-                    </>
+                    </span>
                   )}
                 </div>
 
                 {/* Remove from Favorites outline CTA */}
                 <button
                   onClick={(e) => handleRemoveFavorite(item.id, item.title, e)}
-                  className="w-full py-2 border border-white/10 hover:border-rose-500/25 bg-white/3 hover:bg-rose-500/5 text-gray-400 hover:text-rose-500 text-[10px] font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  className="w-full py-2.5 border border-white/10 hover:border-rose-500/25 bg-white/3 hover:bg-rose-500/5 text-gray-400 hover:text-rose-500 text-[10px] font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer mt-1"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
-                  Remove
+                  Remove from Favorites
                 </button>
               </div>
             </div>
@@ -341,7 +268,7 @@ export default function FavoritesPage() {
                   onClick={() => setCurrentPage(pNum)}
                   className={`w-6 h-6 rounded-lg text-[10px] font-bold transition-all flex items-center justify-center cursor-pointer ${
                     currentPage === pNum
-                      ? 'bg-[#5a2bd4] text-white font-extrabold shadow-sm shadow-indigo-600/10'
+                      ? 'bg-[#1d4ed8] text-white font-extrabold shadow-sm shadow-indigo-600/10'
                       : 'bg-white/3 border border-white/5 text-gray-400 hover:text-white hover:bg-white/5'
                   }`}
                 >

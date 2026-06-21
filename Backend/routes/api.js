@@ -64,11 +64,14 @@ const {
 
 const {
   getNotifications,
-  markNotificationsRead
+  markNotificationsRead,
+  createNotification,
+  deleteNotifications
 } = require('../controllers/notificationController');
 
 const {
-  getAISuggestions
+  getAISuggestions,
+  chatWithAI
 } = require('../controllers/aiController');
 
 // --- AUTHENTICATION MODULE ---
@@ -121,9 +124,12 @@ router.post('/feedback/add', protect, addFeedback);
 // --- NOTIFICATION MODULE ---
 router.get('/notifications', protect, getNotifications);
 router.put('/notifications/read', protect, markNotificationsRead);
+router.post('/notifications/add', protect, createNotification);
+router.post('/notifications/delete', protect, deleteNotifications);
 
 // --- AI RECOMMENDATION MODULE ---
 router.post('/ai/suggestions', protect, getAISuggestions);
+router.post('/ai/chat', protect, chatWithAI);
 
 // --- ADMIN MODULE ---
 router.get('/admin/users', protect, admin, getAllUsers);

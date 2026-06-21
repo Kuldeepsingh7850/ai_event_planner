@@ -1,5 +1,31 @@
 @import "tailwindcss";
 
+@theme {
+  --color-indigo-50: #eff6ff;
+  --color-indigo-100: #dbeafe;
+  --color-indigo-200: #bfdbfe;
+  --color-indigo-300: #93c5fd;
+  --color-indigo-400: #60a5fa;
+  --color-indigo-500: #3b82f6;
+  --color-indigo-600: #1d4ed8;
+  --color-indigo-700: #1e40af;
+  --color-indigo-800: #1e3a8a;
+  --color-indigo-900: #172554;
+  --color-indigo-950: #0f172a;
+
+  --color-purple-50: #fffbeb;
+  --color-purple-100: #fef3c7;
+  --color-purple-200: #fde68a;
+  --color-purple-300: #fcd34d;
+  --color-purple-400: #fbbf24;
+  --color-purple-500: #f59e0b;
+  --color-purple-600: #d97706;
+  --color-purple-700: #b45309;
+  --color-purple-800: #92400e;
+  --color-purple-900: #78350f;
+  --color-purple-950: #451a03;
+}
+
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 /* Custom premium design system details and animations */
@@ -30,18 +56,18 @@
 
 .glass-card:hover {
   background: rgba(31, 41, 55, 0.6);
-  border-color: rgba(99, 102, 241, 0.3);
+  border-color: rgba(59, 130, 246, 0.3);
   transform: translateY(-2px);
-  box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.1), 0 8px 10px -6px rgba(99, 102, 241, 0.1);
+  box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.1), 0 8px 10px -6px rgba(59, 130, 246, 0.1);
 }
 
 /* Custom glow effect */
 .glow-text-indigo {
-  text-shadow: 0 0 15px rgba(99, 102, 241, 0.5);
+  text-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
 }
 
 .glow-text-purple {
-  text-shadow: 0 0 15px rgba(168, 85, 247, 0.5);
+  text-shadow: 0 0 15px rgba(245, 158, 11, 0.5);
 }
 
 /* Custom Scrollbar for premium dark feel */
@@ -67,11 +93,11 @@
 @keyframes pulseGlow {
   0%, 100% {
     opacity: 0.5;
-    box-shadow: 0 0 15px rgba(99, 102, 241, 0.2);
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
   }
   50% {
     opacity: 1;
-    box-shadow: 0 0 30px rgba(99, 102, 241, 0.5);
+    box-shadow: 0 0 30px rgba(59, 130, 246, 0.5);
   }
 }
 
@@ -155,13 +181,13 @@ body {
   color: #64748b !important;
 }
 [data-theme="light"] .text-indigo-300 {
-  color: #4f46e5 !important;
+  color: #2563eb !important;
 }
 [data-theme="light"] .text-indigo-400 {
-  color: #6366f1 !important;
+  color: #1d4ed8 !important;
 }
 [data-theme="light"] .text-purple-400 {
-  color: #7c3aed !important;
+  color: #d97706 !important;
 }
 [data-theme="light"] .text-pink-400 {
   color: #db2777 !important;
@@ -213,8 +239,8 @@ body {
 [data-theme="light"] input:focus, 
 [data-theme="light"] select:focus, 
 [data-theme="light"] textarea:focus {
-  border-color: #6366f1 !important;
-  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.2) !important;
+  border-color: #1d4ed8 !important;
+  box-shadow: 0 0 0 1px rgba(29, 78, 216, 0.2) !important;
 }
 [data-theme="light"] input::placeholder, 
 [data-theme="light"] textarea::placeholder {
@@ -238,31 +264,31 @@ body {
 }
 [data-theme="light"] .glass-card:hover {
   background: rgba(255, 255, 255, 0.8) !important;
-  border-color: rgba(99, 102, 241, 0.4) !important;
-  box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.08), 0 8px 10px -6px rgba(99, 102, 241, 0.08) !important;
+  border-color: rgba(29, 78, 216, 0.4) !important;
+  box-shadow: 0 10px 25px -5px rgba(29, 78, 216, 0.08), 0 8px 10px -6px rgba(29, 78, 216, 0.08) !important;
 }
 
 /* Custom layout details colors */
 [data-theme="light"] .glow-text-indigo {
-  text-shadow: 0 0 15px rgba(99, 102, 241, 0.15);
+  text-shadow: 0 0 15px rgba(29, 78, 216, 0.15);
 }
 [data-theme="light"] .border-indigo-500\/15 {
-  border-color: rgba(99, 102, 241, 0.2) !important;
+  border-color: rgba(29, 78, 216, 0.2) !important;
 }
 [data-theme="light"] .bg-indigo-500\/10 {
-  background-color: rgba(99, 102, 241, 0.08) !important;
+  background-color: rgba(29, 78, 216, 0.08) !important;
 }
 [data-theme="light"] .bg-indigo-500\/15 {
-  background-color: rgba(99, 102, 241, 0.12) !important;
+  background-color: rgba(29, 78, 216, 0.12) !important;
 }
 [data-theme="light"] .bg-indigo-500\/5 {
-  background-color: rgba(99, 102, 241, 0.04) !important;
+  background-color: rgba(29, 78, 216, 0.04) !important;
 }
 [data-theme="light"] .bg-purple-500\/10 {
-  background-color: rgba(168, 85, 247, 0.08) !important;
+  background-color: rgba(217, 119, 6, 0.08) !important;
 }
 [data-theme="light"] .bg-purple-500\/5 {
-  background-color: rgba(168, 85, 247, 0.04) !important;
+  background-color: rgba(217, 119, 6, 0.04) !important;
 }
 [data-theme="light"] .bg-pink-500\/5 {
   background-color: rgba(219, 39, 119, 0.04) !important;
@@ -291,7 +317,7 @@ body {
 
 /* Custom Text Gradients */
 .logo-text {
-  background: linear-gradient(to right, #ffffff, #e2e8f0, #818cf8);
+  background: linear-gradient(to right, #ffffff, #e0effe, #fbbf24);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent !important;
@@ -299,18 +325,18 @@ body {
 }
 
 [data-theme="light"] .logo-text {
-  background: linear-gradient(to right, #0f172a, #334155, #4f46e5) !important;
+  background: linear-gradient(to right, #0f172a, #1e40af, #d97706) !important;
   -webkit-background-clip: text !important;
   background-clip: text !important;
   color: transparent !important;
 }
 
 .logo-dot {
-  color: #818cf8; /* indigo-400 */
+  color: #fbbf24; /* Amber Gold */
 }
 
 [data-theme="light"] .logo-dot {
-  color: #4f46e5 !important; /* Indigo-600 */
+  color: #d97706 !important; /* Deep Amber Gold */
 }
 
 .text-gradient-white {
@@ -329,7 +355,7 @@ body {
 }
 
 .hero-gradient-text {
-  background: linear-gradient(to right, #818cf8, #c084fc, #f472b6);
+  background: linear-gradient(to right, #3b82f6, #f59e0b, #fbbf24);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent !important;
@@ -337,7 +363,7 @@ body {
 }
 
 [data-theme="light"] .hero-gradient-text {
-  background: linear-gradient(to right, #4f46e5, #9333ea, #db2777) !important;
+  background: linear-gradient(to right, #1d4ed8, #d97706, #fbbf24) !important;
   -webkit-background-clip: text !important;
   background-clip: text !important;
   color: transparent !important;
@@ -351,10 +377,10 @@ body {
   color: #047857 !important;
 }
 [data-theme="light"] .text-indigo-200 {
-  color: #4338ca !important;
+  color: #1e40af !important;
 }
 [data-theme="light"] .text-indigo-500 {
-  color: #4338ca !important;
+  color: #1e3a8a !important;
 }
 [data-theme="light"] .text-rose-300 {
   color: #be123c !important;
@@ -461,3 +487,29 @@ body {
 .always-indigo-200 {
   color: #c7d2fe !important;
 }
+
+/* Fix text gradients from being overridden by background gradient white-text rules in Light Mode */
+[data-theme="light"] .bg-clip-text {
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  -webkit-background-clip: text !important;
+}
+
+/* Custom styles for Dashboard Navbar Button Hover to bypass overrides */
+.dashboard-nav-btn {
+  transition: all 0.3s ease-in-out !important;
+}
+
+.dashboard-nav-btn:hover {
+  background: linear-gradient(135deg, #1d4ed8 0%, #4f46e5 100%) !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
+  box-shadow: 0 4px 15px rgba(29, 78, 216, 0.25) !important;
+}
+
+.dashboard-nav-btn:hover svg,
+.dashboard-nav-btn:hover span {
+  color: #ffffff !important;
+}
+

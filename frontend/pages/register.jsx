@@ -143,7 +143,7 @@ export default function Register() {
             <button
               type="button"
               onClick={() => router.push('/login')}
-              className="text-[#5c3db5] dark:text-[#8b6cf5] font-extrabold hover:underline cursor-pointer transition-colors"
+              className="text-[#1d4ed8] dark:text-[#60a5fa] font-extrabold hover:underline cursor-pointer transition-colors"
             >
               Sign In
             </button>
@@ -165,8 +165,9 @@ export default function Register() {
             
             {/* Overlaid branding content */}
             <div className="absolute inset-0 p-8 flex flex-col justify-end text-left z-10">
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-tight always-white">
-                Plan Your Perfect Event <br />in Udaipur
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-tight always-white font-outfit">
+                Plan Your <span className="font-serif italic text-amber-400 font-normal">Perfect</span> Event <br />
+                in <span className="bg-gradient-to-r from-blue-400 via-sky-300 to-amber-300 bg-clip-text text-transparent font-black">Udaipur</span>
               </h1>
               <p className="text-xs always-gray-200 mt-2.5 max-w-sm leading-relaxed font-semibold">
                 AI-powered event planning to make your special moments unforgettable.
@@ -209,8 +210,8 @@ export default function Register() {
                     placeholder="Enter your name"
                     className={`w-full border rounded-xl text-xs py-3 pl-10 pr-4 transition-all focus:outline-none ${
                       isLight 
-                        ? 'bg-gray-50 border-gray-200 text-gray-900 focus:border-[#5c3db5] focus:bg-white' 
-                        : 'bg-white/3 border-white/5 text-white focus:border-[#8b6cf5]/50 focus:bg-white/5'
+                        ? 'bg-gray-50 border-gray-200 text-gray-900 focus:border-[#1d4ed8] focus:bg-white' 
+                        : 'bg-white/3 border-white/5 text-white focus:border-[#60a5fa]/50 focus:bg-white/5'
                     }`}
                     required
                   />
@@ -229,8 +230,8 @@ export default function Register() {
                     placeholder="Enter your email"
                     className={`w-full border rounded-xl text-xs py-3 pl-10 pr-4 transition-all focus:outline-none ${
                       isLight 
-                        ? 'bg-gray-50 border-gray-200 text-gray-900 focus:border-[#5c3db5] focus:bg-white' 
-                        : 'bg-white/3 border-white/5 text-white focus:border-[#8b6cf5]/50 focus:bg-white/5'
+                        ? 'bg-gray-50 border-gray-200 text-gray-900 focus:border-[#1d4ed8] focus:bg-white' 
+                        : 'bg-white/3 border-white/5 text-white focus:border-[#60a5fa]/50 focus:bg-white/5'
                     }`}
                     required
                   />
@@ -249,8 +250,8 @@ export default function Register() {
                     placeholder="Enter your password"
                     className={`w-full border rounded-xl text-xs py-3 pl-10 pr-10 transition-all focus:outline-none ${
                       isLight 
-                        ? 'bg-gray-50 border-gray-200 text-gray-900 focus:border-[#5c3db5] focus:bg-white' 
-                        : 'bg-white/3 border-white/5 text-white focus:border-[#8b6cf5]/50 focus:bg-white/5'
+                        ? 'bg-gray-50 border-gray-200 text-gray-900 focus:border-[#1d4ed8] focus:bg-white' 
+                        : 'bg-white/3 border-white/5 text-white focus:border-[#60a5fa]/50 focus:bg-white/5'
                     }`}
                     required
                   />
@@ -268,7 +269,7 @@ export default function Register() {
               <button
                 type="submit"
                 disabled={loading}
-                className="bg-[#5c3db5] hover:bg-[#4b3099] text-white font-bold text-xs py-3 rounded-xl transition-all shadow-lg shadow-[#5c3db5]/15 cursor-pointer flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
+                className="bg-[#1d4ed8] hover:bg-[#1e3a8a] text-white font-bold text-xs py-3 rounded-xl transition-all shadow-lg shadow-[#1d4ed8]/15 cursor-pointer flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
               >
                 {loading && <span className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin shrink-0"></span>}
                 Sign Up

@@ -49,6 +49,7 @@ import {
   User,
   RotateCcw
 } from 'lucide-react';
+import { resolveImage, getEventCover, getVendorCover, getVenueCover } from '../../utils/imageResolver';
 
 const formatEventDate = (dateStr) => {
   if (!dateStr) return '';
@@ -103,62 +104,6 @@ const formatFeedbackDate = (dateStr) => {
   hours = hours ? hours : 12;
   return `${day} ${month} ${year}, ${hours}:${minutes} ${ampm}`;
 };
-
-const getRealEventCover = (category) => {
-  const cat = (category || '').toLowerCase();
-  if (cat.includes('wedding') || cat.includes('marriage')) return '/leela_palace.jpg';
-  if (cat.includes('birthday') || cat.includes('anniversary')) return '/hero_udaipur_3.jpg';
-  if (cat.includes('corporate') || cat.includes('seminar') || cat.includes('conference')) return '/oberoi_udaivilas.jpg';
-  if (cat.includes('college') || cat.includes('festival') || cat.includes('fest')) return '/monsoon_palace.jpg';
-  if (cat.includes('private') || cat.includes('party')) return '/jag_mandir.jpg';
-  return '/hero_udaipur_1.jpg';
-};
-
-const getRealVendorCover = (category) => {
-  const cat = (category || '').toLowerCase();
-  if (cat.includes('catering') || cat.includes('food') || cat.includes('bakery') || cat.includes('sweet')) return '/hero_udaipur_2.jpg';
-  if (cat.includes('decor') || cat.includes('flower') || cat.includes('stage') || cat.includes('tent')) return '/shiv_niwas.jpg';
-  if (cat.includes('entertainment') || cat.includes('music') || cat.includes('sound') || cat.includes('light') || cat.includes('dj')) return '/hero_udaipur_3.jpg';
-  if (cat.includes('photo') || cat.includes('video') || cat.includes('camera')) return '/jag_mandir.jpg';
-  if (cat.includes('planner') || cat.includes('organizer')) return '/leela_palace.jpg';
-  return '/hero_udaipur_1.jpg';
-};
-
-const getRealVenueCover = (nameOrType) => {
-  const nt = (nameOrType || '').toLowerCase();
-  if (nt.includes('leela')) return '/leela_palace.jpg';
-  if (nt.includes('lake palace') || nt.includes('taj')) return '/taj_lake_palace.jpg';
-  if (nt.includes('udaivilas') || nt.includes('oberoi')) return '/oberoi_udaivilas.jpg';
-  if (nt.includes('fateh garh') || nt.includes('resort')) return '/monsoon_palace.jpg';
-  if (nt.includes('shiv niwas') || nt.includes('ramada')) return '/shiv_niwas.jpg';
-  if (nt.includes('jag mandir') || nt.includes('bijolai') || nt.includes('fort')) return '/jag_mandir.jpg';
-  if (nt.includes('radisson') || nt.includes('hilltop')) return '/hero_udaipur_3.jpg';
-  return '/leela_palace.jpg';
-};
-
-const resolveImage = (imgSrc, type, categoryOrName) => {
-  const isMock = !imgSrc || 
-                 imgSrc.includes('udaipur_palace') || 
-                 imgSrc.includes('celebrate_collage') || 
-                 imgSrc.includes('services_') || 
-                 imgSrc.includes('landing_') ||
-                 imgSrc.endsWith('.png');
-  
-  if (imgSrc && imgSrc.includes('logo.png')) {
-    return imgSrc;
-  }
-  
-  if (!isMock) return imgSrc;
-  
-  if (type === 'event') {
-    return getRealEventCover(categoryOrName);
-  } else if (type === 'vendor') {
-    return getRealVendorCover(categoryOrName);
-  } else {
-    return getRealVenueCover(categoryOrName);
-  }
-};
-
 
 const defaultVenuesList = [
   {
@@ -300,9 +245,9 @@ const defaultVenuesList = [
     created_at: '2024-04-22T10:00:00.000Z',
     gallery: [
       '/jag_mandir.jpg',
-      'https://images.unsplash.com/photo-1585983224974-084a8e065e76?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1596394516093-501ba68a0ba6?auto=format&fit=crop&w=600&q=80',
       'https://images.unsplash.com/photo-1590001155093-a3c66ab0c3ff?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=600&q=80'
+      'https://images.unsplash.com/photo-1605538032432-a9f0c8d9ba5e?auto=format&fit=crop&w=600&q=80'
     ]
   },
   {
@@ -571,6 +516,208 @@ const defaultVendorsList = [
   }
 ];
 
+// Reusable Premium Bar Chart component replicating the provided screenshot design
+const PremiumBarChart = ({ data, categoryLabel = 'Events', isCurrency = false, colorType = 'indigo', isLight }) => {
+  const [hoveredIdx, setHoveredIdx] = useState(null);
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center py-8 text-xs text-gray-500 font-bold font-outfit">
+        No overview data available
+      </div>
+    );
+  }
+
+  // Find maximum value
+  const maxVal = Math.max(...data.map(d => d.value), 0);
+  
+  // Calculate dynamic chart limit
+  const getNiceLimit = (val) => {
+    if (val <= 0) return 4;
+    if (val <= 4) return 4;
+    if (val <= 10) return 10;
+    if (val <= 20) return 20;
+    if (val <= 50) return 50;
+    if (val <= 100) return 100;
+    
+    // For larger values:
+    const order = Math.pow(10, Math.floor(Math.log10(val)));
+    const ratio = val / order;
+    let roundedRatio = 10;
+    if (ratio <= 1.2) roundedRatio = 1.2;
+    else if (ratio <= 1.5) roundedRatio = 1.5;
+    else if (ratio <= 2) roundedRatio = 2;
+    else if (ratio <= 3) roundedRatio = 3;
+    else if (ratio <= 4) roundedRatio = 4;
+    else if (ratio <= 5) roundedRatio = 5;
+    else if (ratio <= 6) roundedRatio = 6;
+    else if (ratio <= 8) roundedRatio = 8;
+    
+    return roundedRatio * order;
+  };
+
+  const limit = getNiceLimit(maxVal);
+
+  // Generate 5 tick marks (0, 0.25, 0.5, 0.75, 1.0)
+  const ticks = [0, limit * 0.25, limit * 0.5, limit * 0.75, limit];
+
+  const formatTickVal = (v) => {
+    if (v === 0) return '0';
+    if (v >= 10000000) return (v / 10000000).toFixed(1).replace('.0', '') + 'Cr';
+    if (v >= 100000) return (v / 100000).toFixed(1).replace('.0', '') + 'L';
+    if (v >= 1000) return (v / 1000).toFixed(1).replace('.0', '') + 'k';
+    return Math.round(v).toString();
+  };
+
+  const N = data.length;
+  const plotWidth = 440;
+  // Dynamic bar width calculations to fit nicely within standard sizes
+  const barWidth = Math.min(36, (plotWidth / N) * 0.45);
+  const spacing = (plotWidth - barWidth) / (N - 1 || 1);
+
+  // Tooltip dot color matches theme color
+  const dotColor = colorType === 'amber' || colorType === 'gold' ? '#f59e0b' : '#6366f1';
+
+  return (
+    <div className="relative w-full flex-1 flex flex-col select-none font-outfit">
+      {/* Floating Glassmorphic Tooltip */}
+      {hoveredIdx !== null && hoveredIdx >= 0 && hoveredIdx < data.length && (
+        (() => {
+          const pt = data[hoveredIdx];
+          const barX = 45 + hoveredIdx * spacing;
+          const centerPercent = ((barX + barWidth / 2) / 500) * 100;
+          const barHeight = limit > 0 ? (pt.value / limit) * 220 : 0;
+          const barY = 260 - barHeight;
+          const topPercent = ((300 - barY) / 300) * 100;
+          
+          return (
+            <div
+              className={`absolute z-40 backdrop-blur-md rounded-xl p-2.5 shadow-2xl pointer-events-none transition-all duration-150 animate-scale-up text-left leading-none border ${
+                isLight 
+                  ? 'bg-white/95 border-gray-200 text-gray-900 shadow-gray-200/50' 
+                  : 'bg-[#0f121d]/95 border-white/10 text-white shadow-black/80'
+              }`}
+              style={{
+                left: `${centerPercent}%`,
+                bottom: `calc(${topPercent}% + 8px)`,
+                transform: 'translateX(-50%)',
+              }}
+            >
+              <div className={`text-[10px] font-bold mb-1 ${isLight ? 'text-gray-500' : 'text-gray-400'}`}>{pt.label}</div>
+              <div className="flex items-center gap-1.5 text-xs font-semibold">
+                <span className="w-2 h-2 rounded-full shrink-0 animate-pulse" style={{ backgroundColor: dotColor }}></span>
+                <span className={isLight ? 'text-gray-600' : 'text-gray-300'}>{categoryLabel}</span>
+                <span className={`font-extrabold ml-0.5 ${isLight ? 'text-gray-900' : 'text-white'}`}>
+                  {isCurrency ? `₹${pt.value.toLocaleString('en-IN')}` : pt.value}
+                </span>
+              </div>
+            </div>
+          );
+        })()
+      )}
+
+      {/* SVG Plot */}
+      <div className="w-full h-[260px] flex items-center justify-center animate-fade-in">
+        <svg viewBox="0 0 500 300" width="100%" height="100%" preserveAspectRatio="none" className="w-full h-full overflow-visible">
+          {/* Dashed Horizontal Grid Lines */}
+          {ticks.map((t, idx) => {
+            const y = 260 - (idx / 4) * 220;
+            return (
+              <g key={idx}>
+                {/* Dashed gridline */}
+                <line
+                  x1="45"
+                  y1={y}
+                  x2="485"
+                  y2={y}
+                  stroke={isLight ? "#e2e8f0" : "rgba(255, 255, 255, 0.08)"}
+                  strokeDasharray="4 4"
+                  strokeWidth="1"
+                />
+                {/* Y-axis Ticks text labels */}
+                <text
+                  x="33"
+                  y={y + 4.5}
+                  textAnchor="end"
+                  className={`text-[13px] font-extrabold ${isLight ? 'fill-gray-600' : 'fill-gray-400'}`}
+                >
+                  {formatTickVal(t)}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Bars Rendering */}
+          {data.map((d, idx) => {
+            const barX = 45 + idx * spacing;
+            const barHeight = limit > 0 ? (d.value / limit) * 220 : 0;
+            const barY = 260 - barHeight;
+            const isHovered = hoveredIdx === idx;
+            const isAnyHovered = hoveredIdx !== null;
+
+            // Brand Mewar theme color palette calculations: Indigo (primary) or Gold/Amber (revenue)
+            let fillCol, strokeCol;
+            if (colorType === 'amber' || colorType === 'gold') {
+              fillCol = isLight 
+                ? (isHovered ? '#78350f' : '#d97706') 
+                : (isHovered ? '#fde68a' : '#f59e0b');
+              strokeCol = isLight
+                ? (isHovered ? '#451a03' : '#b45309')
+                : (isHovered ? '#fef3c7' : '#fbbf24');
+            } else {
+              fillCol = isLight 
+                ? (isHovered ? '#312e81' : '#4f46e5') 
+                : (isHovered ? '#c7d2fe' : '#6366f1');
+              strokeCol = isLight
+                ? (isHovered ? '#1e1b4b' : '#3730a3')
+                : (isHovered ? '#e0e7ff' : '#818cf8');
+            }
+
+            // Apply opacity and blur to non-hovered bars when one is hovered
+            const opacity = isAnyHovered ? (isHovered ? 1 : 0.35) : 1;
+            const blurEffect = isAnyHovered && !isHovered ? 'blur(0.5px)' : 'none';
+
+            return (
+              <g key={idx}>
+                {/* The visual capsule-like bar */}
+                <rect
+                  x={barX}
+                  y={barY}
+                  width={barWidth}
+                  height={barHeight}
+                  rx="6"
+                  ry="6"
+                  fill={fillCol}
+                  stroke={strokeCol}
+                  strokeWidth="1.5"
+                  className="cursor-pointer"
+                  style={{
+                    opacity: opacity,
+                    filter: blurEffect,
+                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+                  }}
+                  onMouseEnter={() => setHoveredIdx(idx)}
+                  onMouseLeave={() => setHoveredIdx(null)}
+                />
+                
+                {/* X-axis tick monthly/interval label text */}
+                <text
+                  x={barX + barWidth / 2}
+                  y="284"
+                  textAnchor="middle"
+                  className={`text-[12px] font-extrabold uppercase tracking-wider ${isLight ? 'fill-gray-600' : 'fill-gray-400'}`}
+                >
+                  {d.label}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    </div>
+  );
+};
+
 export default function AdminDashboard() {
   const router = useRouter();
   const { user, authFetch, loading: authLoading, updateUserAvatar, updateUserName } = useAuth();
@@ -645,6 +792,36 @@ export default function AdminDashboard() {
   const [dashboardEndDate, setDashboardEndDate] = useState('');
   const [isDashboardDatePickerOpen, setIsDashboardDatePickerOpen] = useState(false);
 
+  // Custom Confirm Modal State
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    onCancel: null,
+    confirmText: 'Confirm',
+    cancelText: 'Cancel',
+    isDanger: false
+  });
+
+  const showConfirm = ({ title, message, onConfirm, isDanger = false, confirmText = 'Confirm', cancelText = 'Cancel' }) => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      onConfirm: () => {
+        onConfirm();
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      },
+      onCancel: () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      },
+      confirmText,
+      cancelText,
+      isDanger
+    });
+  };
+
   // States for Users Tab
   const [userStartDate, setUserStartDate] = useState('');
   const [userEndDate, setUserEndDate] = useState('');
@@ -706,6 +883,13 @@ export default function AdminDashboard() {
       }
       if (eventDatePickerRef.current && !eventDatePickerRef.current.contains(event.target)) {
         setIsEventDatePickerOpen(false);
+      }
+      if (!event.target.closest('.three-dot-menu-container')) {
+        setActiveUserMenuId(null);
+        setActiveEventMenuId(null);
+        setActiveBookingMenuId(null);
+        setActiveVenueMenuId(null);
+        setActiveVendorMenuId(null);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -773,9 +957,6 @@ export default function AdminDashboard() {
   const [adminName, setAdminName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPhone, setAdminPhone] = useState('');
-  const [adminDesignation, setAdminDesignation] = useState('');
-  const [adminLocation, setAdminLocation] = useState('');
-  const [adminBio, setAdminBio] = useState('');
   const [adminAvatar, setAdminAvatar] = useState('');
 
   const [adminSubmitLoading, setAdminSubmitLoading] = useState(false);
@@ -799,15 +980,9 @@ export default function AdminDashboard() {
         try {
           const parsed = JSON.parse(localSettings);
           setAdminPhone(parsed.phoneNumber || '');
-          setAdminDesignation(parsed.designation || 'System Administrator');
-          setAdminLocation(parsed.location || 'Udaipur, Rajasthan, India');
-          setAdminBio(parsed.bio || 'Managing heritage venue events, bookings, and platform coordination.');
         } catch (e) {}
       } else {
         setAdminPhone('+91 98765 43210');
-        setAdminDesignation('System Administrator');
-        setAdminLocation('Udaipur, Rajasthan, India');
-        setAdminBio('Managing heritage venue events, bookings, and platform coordination.');
       }
     }
   }, [user]);
@@ -954,10 +1129,7 @@ export default function AdminDashboard() {
       const profileObj = {
         fullName: adminName,
         emailAddress: adminEmail,
-        phoneNumber: adminPhone,
-        designation: adminDesignation,
-        location: adminLocation,
-        bio: adminBio
+        phoneNumber: adminPhone
       };
       const localKey = user ? `profile_settings_${user.id}` : 'profile_settings';
       localStorage.setItem(localKey, JSON.stringify(profileObj));
@@ -1150,23 +1322,28 @@ export default function AdminDashboard() {
       showToast('You cannot delete yourself!', 'error');
       return;
     }
-    if (!window.confirm(`Are you sure you want to delete user "${name}"?`)) {
-      return;
-    }
-    try {
-      const res = await authFetch(`/admin/users/${userId}`, {
-        method: 'DELETE'
-      });
-      if (res.ok) {
-        showToast(`Deleted user "${name}"`, 'success');
-        setUsersList(prev => prev.filter(u => u.id !== userId));
-      } else {
-        const errData = await res.json();
-        showToast(errData.message || 'Error deleting user', 'error');
+    showConfirm({
+      title: 'Delete User',
+      message: `Are you sure you want to delete user "${name}"?`,
+      isDanger: true,
+      confirmText: 'Delete',
+      onConfirm: async () => {
+        try {
+          const res = await authFetch(`/admin/users/${userId}`, {
+            method: 'DELETE'
+          });
+          if (res.ok) {
+            showToast(`Deleted user "${name}"`, 'success');
+            setUsersList(prev => prev.filter(u => u.id !== userId));
+          } else {
+            const errData = await res.json();
+            showToast(errData.message || 'Error deleting user', 'error');
+          }
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
       }
-    } catch (err) {
-      showToast(err.message, 'error');
-    }
+    });
   };
 
   // Venue Management Actions
@@ -1179,13 +1356,18 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteVenue = (venueId, name) => {
-    if (!window.confirm(`Are you sure you want to delete venue "${name}"?`)) {
-      return;
-    }
-    const updated = venuesList.filter(v => v.id !== venueId);
-    setVenuesList(updated);
-    localStorage.setItem('venues_data', JSON.stringify(updated));
-    showToast(`Deleted venue "${name}"`, 'success');
+    showConfirm({
+      title: 'Delete Venue',
+      message: `Are you sure you want to delete venue "${name}"?`,
+      isDanger: true,
+      confirmText: 'Delete',
+      onConfirm: () => {
+        const updated = venuesList.filter(v => v.id !== venueId);
+        setVenuesList(updated);
+        localStorage.setItem('venues_data', JSON.stringify(updated));
+        showToast(`Deleted venue "${name}"`, 'success');
+      }
+    });
   };
 
   const handleSaveVenue = (e) => {
@@ -1252,6 +1434,15 @@ export default function AdminDashboard() {
     localStorage.setItem('venues_data', JSON.stringify(updated));
     showToast(`New venue "${newVenue.name}" added successfully`, 'success');
     setIsAddVenueModalOpen(false);
+
+    // Trigger admin notification on backend
+    authFetch('/notifications/add', {
+      method: 'POST',
+      body: JSON.stringify({
+        message: `New venue added: ${newVenue.name} (${newVenue.location})`,
+        targetRole: 'admin'
+      })
+    }).catch(err => console.error('Failed to create venue admin notification:', err));
   };
 
   // Vendor Management Actions
@@ -1264,13 +1455,18 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteVendor = (vendorId, name) => {
-    if (!window.confirm(`Are you sure you want to delete vendor "${name}"?`)) {
-      return;
-    }
-    const updated = vendorsList.filter(v => v.id !== vendorId);
-    setVendorsList(updated);
-    localStorage.setItem('vendors_data', JSON.stringify(updated));
-    showToast(`Deleted vendor "${name}"`, 'success');
+    showConfirm({
+      title: 'Delete Vendor',
+      message: `Are you sure you want to delete vendor "${name}"?`,
+      isDanger: true,
+      confirmText: 'Delete',
+      onConfirm: () => {
+        const updated = vendorsList.filter(v => v.id !== vendorId);
+        setVendorsList(updated);
+        localStorage.setItem('vendors_data', JSON.stringify(updated));
+        showToast(`Deleted vendor "${name}"`, 'success');
+      }
+    });
   };
 
   const handleSaveVendor = (e) => {
@@ -1305,6 +1501,15 @@ export default function AdminDashboard() {
     localStorage.setItem('vendors_data', JSON.stringify(updated));
     showToast(`New vendor "${newVendor.name}" added successfully`, 'success');
     setIsAddVendorModalOpen(false);
+
+    // Trigger admin notification on backend
+    authFetch('/notifications/add', {
+      method: 'POST',
+      body: JSON.stringify({
+        message: `New vendor added: ${newVendor.name} (${newVendor.category})`,
+        targetRole: 'admin'
+      })
+    }).catch(err => console.error('Failed to create vendor admin notification:', err));
   };
 
   // Booking Management Actions
@@ -1412,18 +1617,23 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteEvent = async (id, title) => {
-    if (!window.confirm(`Are you sure you want to delete event "${title}"?`)) {
-      return;
-    }
-    try {
-      const res = await authFetch(`/delete-event/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        showToast(`Deleted event: "${title}"`, 'success');
-        setEvents(prev => prev.filter(e => e.id !== id));
+    showConfirm({
+      title: 'Delete Event',
+      message: `Are you sure you want to delete event "${title}"?`,
+      isDanger: true,
+      confirmText: 'Delete',
+      onConfirm: async () => {
+        try {
+          const res = await authFetch(`/delete-event/${id}`, { method: 'DELETE' });
+          if (res.ok) {
+            showToast(`Deleted event: "${title}"`, 'success');
+            setEvents(prev => prev.filter(e => e.id !== id));
+          }
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
       }
-    } catch (err) {
-      showToast(err.message, 'error');
-    }
+    });
   };
 
   if (authLoading || loading) {
@@ -1453,11 +1663,11 @@ export default function AdminDashboard() {
   });
 
   // Seeding high-fidelity values exactly matching the system database data
-  const displayEvents = events.length;
-  const displayUsers = usersList.length;
+  const displayEvents = dashboardFilteredEvents.length;
+  const displayUsers = dashboardFilteredUsers.length;
   const displayVenues = venuesList.length;
   const displayVendors = vendorsList.length;
-  const totalConfirmedRevenue = events
+  const totalConfirmedRevenue = dashboardFilteredEvents
     .filter(e => e.status === 'approved' || e.status === 'ongoing' || e.status === 'completed')
     .reduce((sum, e) => sum + parseFloat(e.budget || 0), 0);
   const displayRevenue = `₹ ${totalConfirmedRevenue.toLocaleString()}`;
@@ -2044,7 +2254,7 @@ export default function AdminDashboard() {
       color: getInitialsColor(getInitials(u.name))
     }));
 
-  const getChartData = () => {
+  const getEventsOverviewBarData = () => {
     let start, end;
     if (!eventsChartStartDate || !eventsChartEndDate) {
       if (events && events.length > 0) {
@@ -2075,53 +2285,39 @@ export default function AdminDashboard() {
     end.setHours(23, 59, 59, 999);
     
     const diffTime = end - start;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
     
-    // Generate 7 points
+    const numBars = 6;
     const points = [];
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     
-    for (let i = 0; i < 7; i++) {
-      let ptDate;
-      if (diffTime <= 0) {
-        ptDate = new Date(start);
-      } else {
-        ptDate = new Date(start.getTime() + (diffTime / 6) * i);
-      }
-      
-      const windowStart = new Date(ptDate);
-      windowStart.setHours(0, 0, 0, 0);
-      const windowEnd = new Date(ptDate);
-      windowEnd.setHours(23, 59, 59, 999);
+    for (let i = 0; i < numBars; i++) {
+      const segStart = new Date(start.getTime() + (diffTime / numBars) * i);
+      const segEnd = new Date(start.getTime() + (diffTime / numBars) * (i + 1));
       
       const count = events.filter(e => {
         if (!e.date) return false;
         const eDate = new Date(e.date);
-        return eDate >= windowStart && eDate <= windowEnd;
+        return eDate >= segStart && eDate <= segEnd;
       }).length;
       
+      let label = '';
+      if (diffDays <= 7) {
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        label = days[segStart.getDay()];
+      } else {
+        label = `${segStart.getDate()} ${months[segStart.getMonth()]}`;
+      }
+      
       points.push({
-        label: `${ptDate.getDate()} ${months[ptDate.getMonth()]}`,
-        count: count
+        label: label,
+        value: count
       });
     }
-    
-    const counts = points.map(p => p.count);
-    const maxVal = Math.max(...counts, 1);
-    
-    // Map to coordinates: x from 0 to 500, y from 40 to 160 (height 200)
-    const coords = points.map((p, idx) => {
-      const x = (500 / 6) * idx;
-      const height = 120; // safe height to avoid overflow inside svg
-      const y = 160 - (p.count / maxVal) * height;
-      return { x, y, count: p.count, label: p.label };
-    });
-    
-    return coords;
+    return points;
   };
 
-  const chartCoords = getChartData();
-  const chartAreaPath = `M 0 ${chartCoords[0].y} ` + chartCoords.map(c => `L ${c.x} ${c.y}`).join(' ') + ` L 500 200 L 0 200 Z`;
-  const chartLinePath = `M 0 ${chartCoords[0].y} ` + chartCoords.map(c => `L ${c.x} ${c.y}`).join(' ');
+  const eventsOverviewBarData = getEventsOverviewBarData();
 
   const timeAgo = (date) => {
     const seconds = Math.floor((new Date() - date) / 1000);
@@ -2185,31 +2381,45 @@ export default function AdminDashboard() {
   const generateChartData = () => {
     const start = new Date(reportStartDate);
     const end = new Date(reportEndDate);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+    
     const diffTime = Math.abs(end - start);
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
-    const stepDays = diffDays / 6;
-
+    
+    const numBars = 6;
     const points = [];
-    for (let i = 0; i <= 6; i++) {
-      const currentDate = new Date(start);
-      currentDate.setDate(start.getDate() + Math.round(i * stepDays));
-      const currentDateStr = currentDate.toISOString().split('T')[0];
-
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    for (let i = 0; i < numBars; i++) {
+      const segStart = new Date(start.getTime() + (diffTime / numBars) * i);
+      const segEnd = new Date(start.getTime() + (diffTime / numBars) * (i + 1));
+      
+      const segStartStr = segStart.toISOString().split('T')[0];
+      const segEndStr = segEnd.toISOString().split('T')[0];
+      
       const bookingsCount = reportsFilteredEvents.filter(e => {
         const d = e.date ? (typeof e.date === 'string' && e.date.includes('T') ? e.date.split('T')[0] : e.date) : '';
-        return d && d <= currentDateStr;
+        return d && d >= segStartStr && d <= segEndStr;
       }).length;
-
+      
       const revenueCount = reportsFilteredEvents
         .filter(e => {
           const d = e.date ? (typeof e.date === 'string' && e.date.includes('T') ? e.date.split('T')[0] : e.date) : '';
-          return d && d <= currentDateStr && (e.status === 'approved' || e.status === 'ongoing' || e.status === 'completed');
+          return d && d >= segStartStr && d <= segEndStr && (e.status === 'approved' || e.status === 'ongoing' || e.status === 'completed');
         })
         .reduce((sum, e) => sum + parseFloat(e.budget || 0), 0);
-
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      
+      let label = '';
+      if (diffDays <= 7) {
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        label = days[segStart.getDay()];
+      } else {
+        label = `${segStart.getDate()} ${months[segStart.getMonth()]}`;
+      }
+      
       points.push({
-        label: `${currentDate.getDate()} ${months[currentDate.getMonth()]}`,
+        label: label,
         bookings: bookingsCount,
         revenue: revenueCount
       });
@@ -2218,24 +2428,6 @@ export default function AdminDashboard() {
   };
 
   const chartPoints = generateChartData();
-
-  const maxBookingsVal = Math.max(...chartPoints.map(p => p.bookings)) || 1;
-  const bookingsPathPoints = chartPoints.map((p, i) => {
-    const x = i * (500 / 6);
-    const y = 200 - (p.bookings / maxBookingsVal) * 140 - 10;
-    return { x, y };
-  });
-  const bookingsPathD = `M ${bookingsPathPoints.map(p => `${p.x} ${p.y}`).join(' L ')}`;
-  const bookingsGlowPathD = `${bookingsPathD} L 500 200 L 0 200 Z`;
-
-  const maxRevenueVal = Math.max(...chartPoints.map(p => p.revenue)) || 1;
-  const revenuePathPoints = chartPoints.map((p, i) => {
-    const x = i * (500 / 6);
-    const y = 200 - (p.revenue / maxRevenueVal) * 140 - 10;
-    return { x, y };
-  });
-  const revenuePathD = `M ${revenuePathPoints.map(p => `${p.x} ${p.y}`).join(' L ')}`;
-  const revenueGlowPathD = `${revenuePathD} L 500 200 L 0 200 Z`;
 
   const handleExportFeedback = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(filteredFeedbacks, null, 2));
@@ -2312,9 +2504,15 @@ export default function AdminDashboard() {
                         const end = new Date();
                         const start = new Date();
                         start.setDate(end.getDate() - 7);
-                        setDashboardStartDate(start.toISOString().split('T')[0]);
-                        setDashboardEndDate(end.toISOString().split('T')[0]);
+                        const startStr = start.toISOString().split('T')[0];
+                        const endStr = end.toISOString().split('T')[0];
+                        setDashboardStartDate(startStr);
+                        setDashboardEndDate(endStr);
+                        setEventsChartStartDate(startStr);
+                        setEventsChartEndDate(endStr);
                         setEventsChartRangeLabel('This Week');
+                        setRevenueChartStartDate(startStr);
+                        setRevenueChartEndDate(endStr);
                         setRevenueChartRangeLabel('This Week');
                         setIsDashboardDatePickerOpen(false);
                       }}
@@ -2330,9 +2528,15 @@ export default function AdminDashboard() {
                         const end = new Date();
                         const start = new Date();
                         start.setDate(end.getDate() - 30);
-                        setDashboardStartDate(start.toISOString().split('T')[0]);
-                        setDashboardEndDate(end.toISOString().split('T')[0]);
+                        const startStr = start.toISOString().split('T')[0];
+                        const endStr = end.toISOString().split('T')[0];
+                        setDashboardStartDate(startStr);
+                        setDashboardEndDate(endStr);
+                        setEventsChartStartDate(startStr);
+                        setEventsChartEndDate(endStr);
                         setEventsChartRangeLabel('Last 30 Days');
+                        setRevenueChartStartDate(startStr);
+                        setRevenueChartEndDate(endStr);
                         setRevenueChartRangeLabel('Last 30 Days');
                         setIsDashboardDatePickerOpen(false);
                       }}
@@ -2348,9 +2552,15 @@ export default function AdminDashboard() {
                         const now = new Date();
                         const start = new Date(now.getFullYear(), now.getMonth(), 1);
                         const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-                        setDashboardStartDate(start.toISOString().split('T')[0]);
-                        setDashboardEndDate(end.toISOString().split('T')[0]);
+                        const startStr = start.toISOString().split('T')[0];
+                        const endStr = end.toISOString().split('T')[0];
+                        setDashboardStartDate(startStr);
+                        setDashboardEndDate(endStr);
+                        setEventsChartStartDate(startStr);
+                        setEventsChartEndDate(endStr);
                         setEventsChartRangeLabel('This Month');
+                        setRevenueChartStartDate(startStr);
+                        setRevenueChartEndDate(endStr);
                         setRevenueChartRangeLabel('This Month');
                         setIsDashboardDatePickerOpen(false);
                       }}
@@ -2365,7 +2575,11 @@ export default function AdminDashboard() {
                       onClick={() => {
                         setDashboardStartDate('');
                         setDashboardEndDate('');
+                        setEventsChartStartDate('');
+                        setEventsChartEndDate('');
                         setEventsChartRangeLabel('All Time');
+                        setRevenueChartStartDate('');
+                        setRevenueChartEndDate('');
                         setRevenueChartRangeLabel('All Time');
                         setIsDashboardDatePickerOpen(false);
                       }}
@@ -2410,7 +2624,11 @@ export default function AdminDashboard() {
                   <button
                     type="button"
                     onClick={() => {
+                      setEventsChartStartDate(dashboardStartDate);
+                      setEventsChartEndDate(dashboardEndDate);
                       setEventsChartRangeLabel('Custom');
+                      setRevenueChartStartDate(dashboardStartDate);
+                      setRevenueChartEndDate(dashboardEndDate);
                       setRevenueChartRangeLabel('Custom');
                       setIsDashboardDatePickerOpen(false);
                     }}
@@ -2427,9 +2645,7 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             
             {/* Card 1: Total Events */}
-            <div className={`p-4 rounded-2xl border flex items-center justify-between transition-all duration-300 hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 text-gray-800 shadow-sm' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center justify-between transition-all duration-300 hover:-translate-y-0.5">
               <div className="flex flex-col gap-0.5 text-left">
                 <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>Total Events</span>
                 <span className="text-2xl font-extrabold tracking-tight">{displayEvents}</span>
@@ -2443,9 +2659,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Card 2: Total Users */}
-            <div className={`p-4 rounded-2xl border flex items-center justify-between transition-all duration-300 hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 text-gray-800 shadow-sm' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center justify-between transition-all duration-300 hover:-translate-y-0.5">
               <div className="flex flex-col gap-0.5 text-left">
                 <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>Total Users</span>
                 <span className="text-2xl font-extrabold tracking-tight">{displayUsers.toLocaleString()}</span>
@@ -2459,9 +2673,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Card 3: Total Venues */}
-            <div className={`p-4 rounded-2xl border flex items-center justify-between transition-all duration-300 hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 text-gray-800 shadow-sm' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center justify-between transition-all duration-300 hover:-translate-y-0.5">
               <div className="flex flex-col gap-0.5 text-left">
                 <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>Total Venues</span>
                 <span className="text-2xl font-extrabold tracking-tight">{displayVenues}</span>
@@ -2475,9 +2687,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Card 4: Total Vendors */}
-            <div className={`p-4 rounded-2xl border flex items-center justify-between transition-all duration-300 hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 text-gray-800 shadow-sm' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center justify-between transition-all duration-300 hover:-translate-y-0.5">
               <div className="flex flex-col gap-0.5 text-left">
                 <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>Total Vendors</span>
                 <span className="text-2xl font-extrabold tracking-tight">{displayVendors}</span>
@@ -2491,9 +2701,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Card 5: Total Revenue */}
-            <div className={`p-4 rounded-2xl border flex items-center justify-between transition-all duration-300 hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 text-gray-800 shadow-sm' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center justify-between transition-all duration-300 hover:-translate-y-0.5">
               <div className="flex flex-col gap-0.5 text-left">
                 <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>Total Revenue</span>
                 <span className="text-xl font-extrabold tracking-tight text-indigo-600 dark:text-indigo-400 font-outfit">{displayRevenue}</span>
@@ -2512,7 +2720,7 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
             
             {/* Box 1: Events Overview Line Graph (Width: 5cols on lg) */}
-            <div className={`p-5 rounded-2xl border flex flex-col gap-4 lg:col-span-5 ${
+            <div className={`p-5 rounded-2xl border flex flex-col gap-4 lg:col-span-5 h-auto lg:h-[390px] ${
               isLight ? 'bg-white border-gray-200/80 shadow-sm' : 'bg-white/5 border-white/5'
             }`}>
               <div className="flex justify-between items-center pb-2 border-b border-white/5">
@@ -2603,55 +2811,20 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* SVG Line Graph */}
-              <div className="flex-1 min-h-[200px] flex items-end justify-center py-2 relative">
-                <svg viewBox="0 0 500 200" className="w-full h-full overflow-visible">
-                  <defs>
-                    <linearGradient id="chart-glow" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.25" />
-                      <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0" />
-                    </linearGradient>
-                  </defs>
-                  
-                  {/* Grid Lines */}
-                  <line x1="0" y1="50" x2="500" y2="50" stroke={isLight ? "#e5e7eb" : "#ffffff"} strokeOpacity="0.05" strokeWidth="1" />
-                  <line x1="0" y1="100" x2="500" y2="100" stroke={isLight ? "#e5e7eb" : "#ffffff"} strokeOpacity="0.05" strokeWidth="1" />
-                  <line x1="0" y1="150" x2="500" y2="150" stroke={isLight ? "#e5e7eb" : "#ffffff"} strokeOpacity="0.05" strokeWidth="1" />
-                  <line x1="0" y1="200" x2="500" y2="200" stroke={isLight ? "#e5e7eb" : "#ffffff"} strokeOpacity="0.1" strokeWidth="1" />
-
-                  {/* Gradient Area under line */}
-                  <path d={chartAreaPath} fill="url(#chart-glow)" />
-
-                  {/* Smooth line */}
-                  <path d={chartLinePath} fill="none" stroke="#8b5cf6" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
-
-                  {/* Daily Circles and Value Labels */}
-                  {chartCoords.map((c, idx) => (
-                    <g key={idx}>
-                      <circle cx={c.x} cy={c.y} r="5" fill="#8b5cf6" stroke={isLight ? "#fff" : "#0d1117"} strokeWidth="1.5" />
-                      <text
-                        x={c.x}
-                        y={c.y - 10}
-                        textAnchor="middle"
-                        className={`text-[9px] font-extrabold ${isLight ? 'fill-gray-700' : 'fill-gray-300'}`}
-                      >
-                        {c.count}
-                      </text>
-                    </g>
-                  ))}
-                </svg>
-              </div>
-
-              {/* Chart Dates Legend */}
-              <div className="flex justify-between items-center text-[9px] font-bold text-gray-500 uppercase px-1">
-                {chartCoords.map((c, idx) => (
-                  <span key={idx}>{c.label}</span>
-                ))}
+              {/* Premium Bar Chart */}
+              <div className="flex-1 min-h-[300px] flex items-stretch justify-center py-2 relative">
+                <PremiumBarChart
+                  data={eventsOverviewBarData}
+                  categoryLabel="Events"
+                  isCurrency={false}
+                  colorType="indigo"
+                  isLight={isLight}
+                />
               </div>
             </div>
 
             {/* Box 2: Recent Bookings List (Width: 4cols on lg) */}
-            <div className={`p-5 rounded-2xl border flex flex-col gap-4 lg:col-span-4 ${
+            <div className={`p-5 rounded-2xl border flex flex-col gap-4 lg:col-span-4 h-auto lg:h-[390px] ${
               isLight ? 'bg-white border-gray-200/80 shadow-sm' : 'bg-white/5 border-white/5'
             }`}>
               <div className="flex justify-between items-center pb-2 border-b border-white/5">
@@ -2704,7 +2877,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Box 3: Revenue Overview Donut Chart (Width: 3cols on lg) */}
-            <div className={`p-5 rounded-2xl border flex flex-col gap-4 lg:col-span-3 ${
+            <div className={`p-5 rounded-2xl border flex flex-col gap-4 lg:col-span-3 h-auto lg:h-[390px] ${
               isLight ? 'bg-white border-gray-200/80 shadow-sm' : 'bg-white/5 border-white/5'
             }`}>
               <div className="flex justify-between items-center pb-2 border-b border-white/5">
@@ -2849,6 +3022,10 @@ export default function AdminDashboard() {
                     <span className="w-2.5 h-2.5 rounded bg-[#f59e0b] shrink-0"></span>
                     <span className={`${isLight ? 'text-gray-600' : 'text-gray-400'}`}>Conf: {confPct}%</span>
                   </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded bg-[#6b7280] shrink-0"></span>
+                    <span className={`${isLight ? 'text-gray-600' : 'text-gray-400'}`}>Others: {otherPct}%</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2911,14 +3088,24 @@ export default function AdminDashboard() {
                 {reportsTopVenues.length === 0 ? (
                   <p className="text-xs text-gray-500 py-8 text-center font-bold">No venue bookings recorded</p>
                 ) : reportsTopVenues.map((v, idx) => (
-                  <div key={idx} className="flex items-center justify-between gap-3 text-xs border-b border-white/3 pb-2.5 last:border-0 last:pb-0">
+                  <div
+                    key={idx}
+                    className={`flex items-center justify-between p-2 rounded-xl border transition-all duration-300 group ${
+                      isLight 
+                        ? 'bg-gray-50/50 border-gray-100 hover:bg-gray-50 hover:border-gray-200/80 hover:shadow-sm' 
+                        : 'bg-white/[0.01] border-white/5 hover:bg-white/[0.03] hover:border-white/10 hover:shadow-md'
+                    }`}
+                  >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8.5 h-8.5 rounded-lg overflow-hidden shrink-0 bg-white/5">
-                        <img src={v.image} alt={v.name} className="w-full h-full object-cover" />
+                      <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0 bg-white/5 border border-white/5 relative">
+                        <img src={v.image} alt={v.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                       </div>
-                      <span className={`font-bold truncate text-left ${isLight ? 'text-gray-800' : 'text-white'}`}>{v.name}</span>
+                      <div className="flex flex-col min-w-0">
+                        <span className={`font-extrabold text-xs truncate leading-snug ${isLight ? 'text-gray-800' : 'text-white'} group-hover:text-indigo-400 transition-colors`}>{v.name}</span>
+                        <span className="text-[8px] text-indigo-400 font-bold uppercase tracking-wider mt-0.5">Venue</span>
+                      </div>
                     </div>
-                    <span className="text-[10px] font-bold text-indigo-500 shrink-0 font-outfit">{v.bookingsCount} bookings</span>
+                    <span className="text-[9px] font-black text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-md font-outfit shrink-0">{v.bookingsCount} Bookings</span>
                   </div>
                 ))}
               </div>
@@ -2972,23 +3159,13 @@ export default function AdminDashboard() {
             <div>
               <h2 className={`text-xl font-extrabold ${isLight ? 'text-gray-900' : 'text-white'}`}>Events</h2>
             </div>
-            
-            <button
-              onClick={() => router.push('/events/create')}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-3 px-4.5 rounded-xl transition-all shadow-lg shadow-indigo-600/15 cursor-pointer flex items-center gap-2"
-            >
-              <Plus className="w-4.5 h-4.5 shrink-0" />
-              <span>Add New Event</span>
-            </button>
           </div>
 
           {/* 4 Stats Cards Row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             
             {/* Stat Card 1: Total Events */}
-            <div className={`p-4 rounded-2xl border flex items-center gap-4 text-left transition-all hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 shadow-sm text-gray-800' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center gap-4 text-left transition-all hover:-translate-y-0.5">
               <div className="w-11 h-11 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
                 <Calendar className="w-5 h-5" />
               </div>
@@ -3000,9 +3177,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Stat Card 2: Published */}
-            <div className={`p-4 rounded-2xl border flex items-center gap-4 text-left transition-all hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 shadow-sm text-gray-800' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center gap-4 text-left transition-all hover:-translate-y-0.5">
               <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
                 <CheckCircle2 className="w-5 h-5" />
               </div>
@@ -3014,9 +3189,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Stat Card 3: Upcoming */}
-            <div className={`p-4 rounded-2xl border flex items-center gap-4 text-left transition-all hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 shadow-sm text-gray-800' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center gap-4 text-left transition-all hover:-translate-y-0.5">
               <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-500 flex items-center justify-center shrink-0">
                 <Clock className="w-5 h-5" />
               </div>
@@ -3028,9 +3201,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Stat Card 4: Cancelled */}
-            <div className={`p-4 rounded-2xl border flex items-center gap-4 text-left transition-all hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 shadow-sm text-gray-800' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center gap-4 text-left transition-all hover:-translate-y-0.5">
               <div className="w-11 h-11 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
                 <AlertCircle className="w-5 h-5" />
               </div>
@@ -3256,6 +3427,7 @@ export default function AdminDashboard() {
                 <tr className="border-b border-white/5 font-semibold text-gray-500">
                   <th className="py-4 px-4 font-semibold text-gray-500">Event Name</th>
                   <th className="py-4 px-4 font-semibold text-gray-500">Event Type</th>
+                  <th className="py-4 px-4 font-semibold text-gray-500">Created By</th>
                   <th className="py-4 px-4 font-semibold text-gray-500">Venue</th>
                   <th className="py-4 px-4 font-semibold text-gray-500">Date & Time</th>
                   <th className="py-4 px-4 font-semibold text-gray-500">Guests</th>
@@ -3266,7 +3438,7 @@ export default function AdminDashboard() {
               <tbody className={`divide-y divide-white/2 font-medium ${isLight ? 'text-gray-700' : 'text-gray-300'}`}>
                 {paginatedEvents.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="py-10 text-center text-gray-500 font-semibold">No moderated events match the filter query.</td>
+                    <td colSpan="8" className="py-10 text-center text-gray-500 font-semibold">No moderated events match the filter query.</td>
                   </tr>
                 ) : (
                   paginatedEvents.map((e) => {
@@ -3319,6 +3491,14 @@ export default function AdminDashboard() {
                           </span>
                         </td>
 
+                        {/* Created By Column */}
+                        <td className="py-4 px-4 text-left">
+                          <div className="flex flex-col gap-0.5 min-w-[120px]">
+                            <span className={`font-bold ${isLight ? 'text-gray-800' : 'text-gray-200'}`}>{e.user_name || 'System Admin'}</span>
+                            <span className={`text-[10px] ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>{e.user_email || 'admin@eventplanner.com'}</span>
+                          </div>
+                        </td>
+
                         {/* Location/Venue */}
                         <td className={`py-4 px-4 text-left ${isLight ? 'text-gray-600' : 'text-gray-400'}`}>{e.location}</td>
 
@@ -3342,7 +3522,7 @@ export default function AdminDashboard() {
 
                         {/* Actions Button Columns */}
                         <td className="py-4 px-4 text-right">
-                          <div className="flex items-center justify-end gap-2 relative">
+                          <div className="flex items-center justify-end gap-2 relative three-dot-menu-container">
                             <button
                               onClick={() => setViewingEventDetails(e)}
                               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
@@ -3530,9 +3710,7 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             
             {/* Card 1: Total Users */}
-            <div className={`p-4 rounded-2xl border flex items-center gap-4 text-left transition-all hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 shadow-sm text-gray-800' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center gap-4 text-left transition-all hover:-translate-y-0.5">
               <div className="w-11 h-11 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
                 <Users className="w-5 h-5" />
               </div>
@@ -3546,9 +3724,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Card 2: Active Users */}
-            <div className={`p-4 rounded-2xl border flex items-center gap-4 text-left transition-all hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 shadow-sm text-gray-800' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center gap-4 text-left transition-all hover:-translate-y-0.5">
               <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
                 <UserCheck className="w-5 h-5" />
               </div>
@@ -3562,9 +3738,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Card 3: Inactive Users */}
-            <div className={`p-4 rounded-2xl border flex items-center gap-4 text-left transition-all hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 shadow-sm text-gray-800' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center gap-4 text-left transition-all hover:-translate-y-0.5">
               <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-500 flex items-center justify-center shrink-0">
                 <UserX className="w-5 h-5" />
               </div>
@@ -3578,9 +3752,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Card 4: New Users */}
-            <div className={`p-4 rounded-2xl border flex items-center gap-4 text-left transition-all hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 shadow-sm text-gray-800' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center gap-4 text-left transition-all hover:-translate-y-0.5">
               <div className="w-11 h-11 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
                 <Users className="w-5 h-5" />
               </div>
@@ -3889,7 +4061,7 @@ export default function AdminDashboard() {
 
                         {/* Actions buttons */}
                         <td className="py-4 px-4 text-right">
-                          <div className="flex items-center justify-end gap-2 relative">
+                          <div className="flex items-center justify-end gap-2 relative three-dot-menu-container">
                             <button
                               onClick={() => setViewingUserProfile(u)}
                               className={`flex items-center justify-center p-1.5 rounded-lg border cursor-pointer ${
@@ -3936,17 +4108,6 @@ export default function AdminDashboard() {
                                   className="w-full text-left px-2 py-1 rounded-lg text-xs font-semibold text-gray-300 hover:bg-white/5 hover:text-white transition-all disabled:opacity-30 cursor-pointer"
                                 >
                                   👤 Make Standard User
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    handleChangeRole(u.id, 'vendor');
-                                    setActiveUserMenuId(null);
-                                  }}
-                                  disabled={u.id === user?.id}
-                                  className="w-full text-left px-2 py-1 rounded-lg text-xs font-semibold text-gray-300 hover:bg-white/5 hover:text-white transition-all disabled:opacity-30 cursor-pointer"
-                                >
-                                  🤝 Make Service Vendor
                                 </button>
                                 <button
                                   type="button"
@@ -4096,9 +4257,7 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             
             {/* Card 1: Total Venues */}
-            <div className={`p-4 rounded-2xl border flex items-center gap-4 text-left transition-all hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 shadow-sm text-gray-800' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center gap-4 text-left transition-all hover:-translate-y-0.5">
               <div className="w-11 h-11 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
                 <Building className="w-5 h-5" />
               </div>
@@ -4112,9 +4271,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Card 2: Active Venues */}
-            <div className={`p-4 rounded-2xl border flex items-center gap-4 text-left transition-all hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 shadow-sm text-gray-800' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center gap-4 text-left transition-all hover:-translate-y-0.5">
               <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
                 <Check className="w-5 h-5" />
               </div>
@@ -4128,9 +4285,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Card 3: Inactive Venues */}
-            <div className={`p-4 rounded-2xl border flex items-center gap-4 text-left transition-all hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 shadow-sm text-gray-800' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center gap-4 text-left transition-all hover:-translate-y-0.5">
               <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-500 flex items-center justify-center shrink-0">
                 <Pause className="w-4 h-4 transform rotate-90" />
               </div>
@@ -4144,9 +4299,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Card 4: New Venues */}
-            <div className={`p-4 rounded-2xl border flex items-center gap-4 text-left transition-all hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 shadow-sm text-gray-800' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center gap-4 text-left transition-all hover:-translate-y-0.5">
               <div className="w-11 h-11 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
                 <Building className="w-5 h-5" />
               </div>
@@ -4450,7 +4603,7 @@ export default function AdminDashboard() {
 
                         {/* Actions buttons */}
                         <td className="py-4 px-4 text-right">
-                          <div className="flex items-center justify-end gap-2 relative">
+                          <div className="flex items-center justify-end gap-2 relative three-dot-menu-container">
                             <button
                               onClick={() => setViewingVenueDetails(v)}
                               className={`flex items-center justify-center p-1.5 rounded-lg border cursor-pointer ${
@@ -4625,14 +4778,12 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             
             {/* Card 1: Total Vendors */}
-            <div className={`p-4 rounded-2xl border flex items-center gap-4 text-left transition-all hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 shadow-sm text-gray-800' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center gap-4 text-left transition-all hover:-translate-y-0.5">
               <div className="w-11 h-11 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
                 <Star className="w-5 h-5" />
               </div>
               <div className="flex flex-col gap-0.5">
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-gray-400' : 'text-gray-505'}`}>Total Vendors</span>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-gray-400' : 'text-gray-550'}`}>Total Vendors</span>
                 <h4 className="text-xl font-extrabold tracking-tight">{displayTotalVendorsCount.toLocaleString()}</h4>
                 <span className="text-[10px] font-semibold text-emerald-500 flex items-center gap-0.5 mt-0.5">
                   <TrendingUp className="w-3 h-3" /> 15% this month
@@ -4641,14 +4792,12 @@ export default function AdminDashboard() {
             </div>
 
             {/* Card 2: Active Vendors */}
-            <div className={`p-4 rounded-2xl border flex items-center gap-4 text-left transition-all hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 shadow-sm text-gray-800' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center gap-4 text-left transition-all hover:-translate-y-0.5">
               <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
                 <Check className="w-5 h-5" />
               </div>
               <div className="flex flex-col gap-0.5">
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-gray-400' : 'text-gray-505'}`}>Active Vendors</span>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-gray-400' : 'text-gray-550'}`}>Active Vendors</span>
                 <h4 className="text-xl font-extrabold tracking-tight">{displayActiveVendorsCount.toLocaleString()}</h4>
                 <span className="text-[10px] font-semibold text-emerald-500 flex items-center gap-0.5 mt-0.5">
                   <TrendingUp className="w-3 h-3" /> 12% this month
@@ -4657,14 +4806,12 @@ export default function AdminDashboard() {
             </div>
 
             {/* Card 3: Inactive Vendors */}
-            <div className={`p-4 rounded-2xl border flex items-center gap-4 text-left transition-all hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 shadow-sm text-gray-800' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center gap-4 text-left transition-all hover:-translate-y-0.5">
               <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-500 flex items-center justify-center shrink-0">
                 <Pause className="w-4 h-4 transform rotate-90" />
               </div>
               <div className="flex flex-col gap-0.5">
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-gray-400' : 'text-gray-505'}`}>Inactive Vendors</span>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-gray-400' : 'text-gray-555'}`}>Inactive Vendors</span>
                 <h4 className="text-xl font-extrabold tracking-tight">{displayInactiveVendorsCount.toLocaleString()}</h4>
                 <span className="text-[10px] font-semibold text-rose-500 flex items-center gap-0.5 mt-0.5">
                   <TrendingDown className="w-3 h-3" /> 2% this month
@@ -4673,14 +4820,12 @@ export default function AdminDashboard() {
             </div>
 
             {/* Card 4: New Vendors */}
-            <div className={`p-4 rounded-2xl border flex items-center gap-4 text-left transition-all hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 shadow-sm text-gray-800' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center gap-4 text-left transition-all hover:-translate-y-0.5">
               <div className="w-11 h-11 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
                 <Star className="w-5 h-5" />
               </div>
               <div className="flex flex-col gap-0.5">
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-gray-400' : 'text-gray-505'}`}>New Vendors (This Month)</span>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-gray-400' : 'text-gray-555'}`}>New Vendors (This Month)</span>
                 <h4 className="text-xl font-extrabold tracking-tight">{displayNewVendorsCount.toLocaleString()}</h4>
                 <span className="text-[10px] font-semibold text-emerald-500 flex items-center gap-0.5 mt-0.5">
                   <TrendingUp className="w-3 h-3" /> 10% this month
@@ -4990,7 +5135,7 @@ export default function AdminDashboard() {
 
                         {/* Actions buttons */}
                         <td className="py-4 px-4 text-right">
-                          <div className="flex items-center justify-end gap-2 relative">
+                          <div className="flex items-center justify-end gap-2 relative three-dot-menu-container">
                             <button
                               onClick={() => setViewingVendorDetails(v)}
                               className={`flex items-center justify-center p-1.5 rounded-lg border cursor-pointer ${
@@ -5146,9 +5291,7 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             
             {/* Card 1: Total Bookings */}
-            <div className={`p-4 rounded-2xl border flex items-center gap-4 text-left transition-all hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 shadow-sm text-gray-800' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center gap-4 text-left transition-all hover:-translate-y-0.5">
               <div className="w-11 h-11 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
                 <Calendar className="w-5 h-5" />
               </div>
@@ -5162,9 +5305,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Card 2: Confirmed */}
-            <div className={`p-4 rounded-2xl border flex items-center gap-4 text-left transition-all hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 shadow-sm text-gray-800' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center gap-4 text-left transition-all hover:-translate-y-0.5">
               <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
                 <CheckCircle2 className="w-5 h-5" />
               </div>
@@ -5178,9 +5319,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Card 3: Pending */}
-            <div className={`p-4 rounded-2xl border flex items-center gap-4 text-left transition-all hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 shadow-sm text-gray-800' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center gap-4 text-left transition-all hover:-translate-y-0.5">
               <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-500 flex items-center justify-center shrink-0">
                 <Clock className="w-5 h-5" />
               </div>
@@ -5194,9 +5333,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Card 4: Cancelled */}
-            <div className={`p-4 rounded-2xl border flex items-center gap-4 text-left transition-all hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 shadow-sm text-gray-800' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center gap-4 text-left transition-all hover:-translate-y-0.5">
               <div className="w-11 h-11 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
                 <AlertCircle className="w-5 h-5" />
               </div>
@@ -5526,9 +5663,9 @@ export default function AdminDashboard() {
 
                         {/* Actions buttons */}
                         <td className="py-4 px-4 text-right">
-                          <div className="flex items-center justify-end gap-2 relative">
+                          <div className="flex items-center justify-end gap-2 relative three-dot-menu-container">
                             <button
-                              onClick={() => showToast(`Viewing booking details for ${b.title}`, 'info')}
+                              onClick={() => setViewingEventDetails(b)}
                               className={`flex items-center justify-center p-1.5 rounded-lg border cursor-pointer ${
                                 isLight ? 'border-gray-200 hover:bg-gray-50 text-gray-700' : 'border-white/10 hover:bg-white/5 text-gray-300'
                               }`}
@@ -5789,9 +5926,7 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             
             {/* Card 1: Total Bookings */}
-            <div className={`p-4 rounded-2xl border flex items-center justify-between transition-all duration-300 hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 text-gray-800 shadow-sm' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center justify-between transition-all duration-300 hover:-translate-y-0.5">
               <div className="flex flex-col gap-0.5 text-left">
                 <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>Total Bookings</span>
                 <span className="text-2xl font-extrabold tracking-tight">{reportsTotalBookings}</span>
@@ -5805,9 +5940,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Card 2: Total Revenue */}
-            <div className={`p-4 rounded-2xl border flex items-center justify-between transition-all duration-300 hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 text-gray-800 shadow-sm' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center justify-between transition-all duration-300 hover:-translate-y-0.5">
               <div className="flex flex-col gap-0.5 text-left">
                 <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>Total Revenue</span>
                 <span className="text-xl font-extrabold tracking-tight text-indigo-600 dark:text-indigo-400 font-outfit">₹ {displayReportsRevenue.toLocaleString()}</span>
@@ -5821,9 +5954,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Card 3: Avg Booking Value */}
-            <div className={`p-4 rounded-2xl border flex items-center justify-between transition-all duration-300 hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 text-gray-800 shadow-sm' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center justify-between transition-all duration-300 hover:-translate-y-0.5">
               <div className="flex flex-col gap-0.5 text-left">
                 <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>Avg. Booking Value</span>
                 <span className="text-xl font-extrabold tracking-tight font-outfit">₹ {reportsAvgBookingValue.toLocaleString()}</span>
@@ -5837,9 +5968,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Card 4: Total Users */}
-            <div className={`p-4 rounded-2xl border flex items-center justify-between transition-all duration-300 hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 text-gray-800 shadow-sm' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center justify-between transition-all duration-300 hover:-translate-y-0.5">
               <div className="flex flex-col gap-0.5 text-left">
                 <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>Total Users</span>
                 <span className="text-2xl font-extrabold tracking-tight">{displayTotalUsersCount}</span>
@@ -5853,9 +5982,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Card 5: Total Vendors */}
-            <div className={`p-4 rounded-2xl border flex items-center justify-between transition-all duration-300 hover:-translate-y-0.5 ${
-              isLight ? 'bg-white border-gray-200/80 text-gray-800 shadow-sm' : 'bg-white/5 border-white/5 text-white'
-            }`}>
+            <div className="glass-card p-4 rounded-2xl flex items-center justify-between transition-all duration-300 hover:-translate-y-0.5">
               <div className="flex flex-col gap-0.5 text-left">
                 <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-gray-400' : 'text-gray-500'}`}>Total Vendors</span>
                 <span className="text-2xl font-extrabold tracking-tight">{displayTotalVendorsCount}</span>
@@ -5863,7 +5990,7 @@ export default function AdminDashboard() {
                   Registered platform vendors
                 </span>
               </div>
-              <div className="w-11 h-11 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-455 flex items-center justify-center shrink-0">
+              <div className="w-11 h-11 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
                 <Star className="w-5 h-5" />
               </div>
             </div>
@@ -5874,87 +6001,47 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
             
             {/* Box 1: Bookings Overview */}
-            <div className={`p-5 rounded-2xl border flex flex-col gap-4 lg:col-span-5 ${
+            <div className={`p-5 rounded-2xl border flex flex-col gap-4 lg:col-span-5 h-auto lg:h-[390px] ${
               isLight ? 'bg-white border-gray-200/80 shadow-sm' : 'bg-white/5 border-white/5'
             }`}>
               <div className="flex justify-between items-center pb-2 border-b border-white/5">
                 <span className={`text-xs font-bold uppercase tracking-wider ${isLight ? 'text-gray-800' : 'text-gray-200'}`}>Bookings Overview</span>
               </div>
 
-              {/* Bookings Overview Curve SVG */}
-              <div className="flex-1 min-h-[180px] flex items-end justify-center py-2 relative">
-                <svg viewBox="0 0 500 200" className="w-full h-full overflow-visible">
-                  <defs>
-                    <linearGradient id="bookings-glow" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.25" />
-                      <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0" />
-                    </linearGradient>
-                  </defs>
-                  <line x1="0" y1="50" x2="500" y2="50" stroke={isLight ? "#e5e7eb" : "#ffffff"} strokeOpacity="0.05" strokeWidth="1" />
-                  <line x1="0" y1="100" x2="500" y2="100" stroke={isLight ? "#e5e7eb" : "#ffffff"} strokeOpacity="0.05" strokeWidth="1" />
-                  <line x1="0" y1="150" x2="500" y2="150" stroke={isLight ? "#e5e7eb" : "#ffffff"} strokeOpacity="0.05" strokeWidth="1" />
-                  <line x1="0" y1="200" x2="500" y2="200" stroke={isLight ? "#e5e7eb" : "#ffffff"} strokeOpacity="0.1" strokeWidth="1" />
-
-                  {/* Dynamic Gradient Curve */}
-                  <path d={bookingsGlowPathD} fill="url(#bookings-glow)" />
-                  <path d={bookingsPathD} fill="none" stroke="#8b5cf6" strokeWidth="3" strokeLinecap="round" />
-                  
-                  {/* Dynamic Dots */}
-                  {bookingsPathPoints.map((pt, idx) => (
-                    <circle key={idx} cx={pt.x} cy={pt.y} r="4.5" fill="#8b5cf6" stroke={isLight ? "#fff" : "#0d1117"} strokeWidth="1.5" />
-                  ))}
-                </svg>
-              </div>
-
-              <div className="flex justify-between items-center text-[9px] font-bold text-gray-500 uppercase px-1">
-                {chartPoints.map((p, i) => (
-                  <span key={i}>{p.label}</span>
-                ))}
+              {/* Bookings Overview Bar Graph */}
+              <div className="flex-1 min-h-[300px] flex items-stretch justify-center py-2 relative">
+                <PremiumBarChart
+                  data={chartPoints.map(p => ({ label: p.label, value: p.bookings }))}
+                  categoryLabel="Bookings"
+                  isCurrency={false}
+                  colorType="indigo"
+                  isLight={isLight}
+                />
               </div>
             </div>
 
             {/* Box 2: Revenue Overview */}
-            <div className={`p-5 rounded-2xl border flex flex-col gap-4 lg:col-span-4 ${
+            <div className={`p-5 rounded-2xl border flex flex-col gap-4 lg:col-span-4 h-auto lg:h-[390px] ${
               isLight ? 'bg-white border-gray-200/80 shadow-sm' : 'bg-white/5 border-white/5'
             }`}>
               <div className="flex justify-between items-center pb-2 border-b border-white/5">
                 <span className={`text-xs font-bold uppercase tracking-wider ${isLight ? 'text-gray-800' : 'text-gray-200'}`}>Revenue Overview (₹)</span>
               </div>
 
-              {/* Revenue Overview Curve SVG */}
-              <div className="flex-1 min-h-[180px] flex items-end justify-center py-2 relative">
-                <svg viewBox="0 0 500 200" className="w-full h-full overflow-visible">
-                  <defs>
-                    <linearGradient id="revenue-glow" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#4f46e5" stopOpacity="0.25" />
-                      <stop offset="100%" stopColor="#4f46e5" stopOpacity="0" />
-                    </linearGradient>
-                  </defs>
-                  <line x1="0" y1="50" x2="500" y2="50" stroke={isLight ? "#e5e7eb" : "#ffffff"} strokeOpacity="0.05" strokeWidth="1" />
-                  <line x1="0" y1="100" x2="500" y2="100" stroke={isLight ? "#e5e7eb" : "#ffffff"} strokeOpacity="0.05" strokeWidth="1" />
-                  <line x1="0" y1="150" x2="500" y2="150" stroke={isLight ? "#e5e7eb" : "#ffffff"} strokeOpacity="0.05" strokeWidth="1" />
-                  <line x1="0" y1="200" x2="500" y2="200" stroke={isLight ? "#e5e7eb" : "#ffffff"} strokeOpacity="0.1" strokeWidth="1" />
-
-                  {/* Dynamic Gradient Curve */}
-                  <path d={revenueGlowPathD} fill="url(#revenue-glow)" />
-                  <path d={revenuePathD} fill="none" stroke="#4f46e5" strokeWidth="3" strokeLinecap="round" />
-                  
-                  {/* Dynamic Dots */}
-                  {revenuePathPoints.map((pt, idx) => (
-                    <circle key={idx} cx={pt.x} cy={pt.y} r="4.5" fill="#4f46e5" stroke={isLight ? "#fff" : "#0d1117"} strokeWidth="1.5" />
-                  ))}
-                </svg>
-              </div>
-
-              <div className="flex justify-between items-center text-[9px] font-bold text-gray-500 uppercase px-1">
-                {chartPoints.map((p, i) => (
-                  <span key={i}>{p.label}</span>
-                ))}
+              {/* Revenue Overview Bar Graph */}
+              <div className="flex-1 min-h-[300px] flex items-stretch justify-center py-2 relative">
+                <PremiumBarChart
+                  data={chartPoints.map(p => ({ label: p.label, value: p.revenue }))}
+                  categoryLabel="Revenue"
+                  isCurrency={true}
+                  colorType="indigo"
+                  isLight={isLight}
+                />
               </div>
             </div>
 
             {/* Box 3: Bookings by Status */}
-            <div className={`p-5 rounded-2xl border flex flex-col gap-4 lg:col-span-3 ${
+            <div className={`p-5 rounded-2xl border flex flex-col gap-4 lg:col-span-3 h-auto lg:h-[390px] ${
               isLight ? 'bg-white border-gray-200/80 shadow-sm' : 'bg-white/5 border-white/5'
             }`}>
               <div className="flex justify-between items-center pb-2 border-b border-white/5">
@@ -6046,14 +6133,26 @@ export default function AdminDashboard() {
                   <p className="text-center py-6 text-gray-500">No events found.</p>
                 ) : (
                   reportsTopEvents.map((item, idx) => (
-                    <div key={idx} className="flex justify-between items-center p-2 rounded-xl border border-white/5">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 bg-gray-150">
-                          <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                    <div
+                      key={idx}
+                      className={`flex items-center justify-between p-2.5 rounded-xl border transition-all duration-300 group ${
+                        isLight 
+                          ? 'bg-gray-50/50 border-gray-100 hover:bg-gray-50 hover:border-gray-200/80 hover:shadow-sm' 
+                          : 'bg-white/[0.01] border-white/5 hover:bg-white/[0.03] hover:border-white/10 hover:shadow-md'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-gray-150 border border-white/5 relative">
+                          <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                         </div>
-                        <span className={`truncate font-bold ${isLight ? 'text-gray-905' : 'text-white'}`}>{item.name}</span>
+                        <div className="flex flex-col min-w-0">
+                          <span className={`truncate font-extrabold text-xs leading-snug ${isLight ? 'text-gray-800' : 'text-white'} group-hover:text-indigo-400 transition-colors`}>{item.name}</span>
+                          <span className="text-[9px] text-indigo-400 font-bold uppercase tracking-wider mt-0.5">Event</span>
+                        </div>
                       </div>
-                      <span className="text-indigo-650 dark:text-indigo-400 font-bold shrink-0">{item.bookingsCount}</span>
+                      <div className="w-7 h-7 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center font-black text-indigo-400 text-[10px] shrink-0 font-outfit">
+                        {item.bookingsCount}
+                      </div>
                     </div>
                   ))
                 )}
@@ -6074,14 +6173,26 @@ export default function AdminDashboard() {
                   <p className="text-center py-6 text-gray-500">No venues found.</p>
                 ) : (
                   reportsTopVenues.map((item, idx) => (
-                    <div key={idx} className="flex justify-between items-center p-2 rounded-xl border border-white/5">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 bg-gray-150">
-                          <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                    <div
+                      key={idx}
+                      className={`flex items-center justify-between p-2.5 rounded-xl border transition-all duration-300 group ${
+                        isLight 
+                          ? 'bg-gray-50/50 border-gray-100 hover:bg-gray-50 hover:border-gray-200/80 hover:shadow-sm' 
+                          : 'bg-white/[0.01] border-white/5 hover:bg-white/[0.03] hover:border-white/10 hover:shadow-md'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-gray-150 border border-white/5 relative">
+                          <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                         </div>
-                        <span className={`truncate font-bold ${isLight ? 'text-gray-905' : 'text-white'}`}>{item.name}</span>
+                        <div className="flex flex-col min-w-0">
+                          <span className={`truncate font-extrabold text-xs leading-snug ${isLight ? 'text-gray-800' : 'text-white'} group-hover:text-indigo-400 transition-colors`}>{item.name}</span>
+                          <span className="text-[9px] text-indigo-400 font-bold uppercase tracking-wider mt-0.5">Venue</span>
+                        </div>
                       </div>
-                      <span className="text-indigo-650 dark:text-indigo-400 font-bold shrink-0">{item.bookingsCount}</span>
+                      <div className="w-7 h-7 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center font-black text-indigo-400 text-[10px] shrink-0 font-outfit">
+                        {item.bookingsCount}
+                      </div>
                     </div>
                   ))
                 )}
@@ -6102,14 +6213,26 @@ export default function AdminDashboard() {
                   <p className="text-center py-6 text-gray-500">No vendors found.</p>
                 ) : (
                   reportsTopVendors.map((item, idx) => (
-                    <div key={idx} className="flex justify-between items-center p-2 rounded-xl border border-white/5">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 bg-gray-150 border border-white/5">
-                          <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                    <div
+                      key={idx}
+                      className={`flex items-center justify-between p-2.5 rounded-xl border transition-all duration-300 group ${
+                        isLight 
+                          ? 'bg-gray-50/50 border-gray-100 hover:bg-gray-50 hover:border-gray-200/80 hover:shadow-sm' 
+                          : 'bg-white/[0.01] border-white/5 hover:bg-white/[0.03] hover:border-white/10 hover:shadow-md'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-gray-150 border border-white/5 relative">
+                          <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                         </div>
-                        <span className={`truncate font-bold ${isLight ? 'text-gray-905' : 'text-white'}`}>{item.name}</span>
+                        <div className="flex flex-col min-w-0">
+                          <span className={`truncate font-extrabold text-xs leading-snug ${isLight ? 'text-gray-800' : 'text-white'} group-hover:text-indigo-400 transition-colors`}>{item.name}</span>
+                          <span className="text-[9px] text-indigo-400 font-bold uppercase tracking-wider mt-0.5">{item.category || 'Vendor'}</span>
+                        </div>
                       </div>
-                      <span className="text-indigo-650 dark:text-indigo-400 font-bold shrink-0">{item.bookingsCount}</span>
+                      <div className="w-7 h-7 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center font-black text-indigo-400 text-[10px] shrink-0 font-outfit">
+                        {item.bookingsCount}
+                      </div>
                     </div>
                   ))
                 )}
@@ -6137,9 +6260,7 @@ export default function AdminDashboard() {
           {/* Stats Cards (4 metrics columns) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Card 1: Total */}
-            <div className={`p-5 rounded-2xl border flex items-center gap-4 ${
-              isLight ? 'bg-white border-gray-200/80 shadow-sm' : 'bg-white/5 border-white/5'
-            }`}>
+            <div className="glass-card p-5 rounded-2xl flex items-center gap-4 transition-all duration-300 hover:-translate-y-0.5">
               <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center shrink-0">
                 <MessageSquare className="w-5 h-5" />
               </div>
@@ -6151,9 +6272,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Card 2: Positive */}
-            <div className={`p-5 rounded-2xl border flex items-center gap-4 ${
-              isLight ? 'bg-white border-gray-200/80 shadow-sm' : 'bg-white/5 border-white/5'
-            }`}>
+            <div className="glass-card p-5 rounded-2xl flex items-center gap-4 transition-all duration-300 hover:-translate-y-0.5">
               <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
                 <Smile className="w-5 h-5" />
               </div>
@@ -6165,9 +6284,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Card 3: Neutral */}
-            <div className={`p-5 rounded-2xl border flex items-center gap-4 ${
-              isLight ? 'bg-white border-gray-200/80 shadow-sm' : 'bg-white/5 border-white/5'
-            }`}>
+            <div className="glass-card p-5 rounded-2xl flex items-center gap-4 transition-all duration-300 hover:-translate-y-0.5">
               <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
                 <Meh className="w-5 h-5" />
               </div>
@@ -6179,9 +6296,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Card 4: Negative */}
-            <div className={`p-5 rounded-2xl border flex items-center gap-4 ${
-              isLight ? 'bg-white border-gray-200/80 shadow-sm' : 'bg-white/5 border-white/5'
-            }`}>
+            <div className="glass-card p-5 rounded-2xl flex items-center gap-4 transition-all duration-300 hover:-translate-y-0.5">
               <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0">
                 <Frown className="w-5 h-5" />
               </div>
@@ -6442,10 +6557,16 @@ export default function AdminDashboard() {
 
                             <button
                               onClick={() => {
-                                if (confirm(`Are you sure you want to delete this feedback?`)) {
-                                  setFeedbacks(prev => prev.filter(item => item.id !== f.id));
-                                  showToast('Feedback removed from display', 'success');
-                                }
+                                showConfirm({
+                                  title: 'Delete Feedback',
+                                  message: 'Are you sure you want to delete this feedback?',
+                                  isDanger: true,
+                                  confirmText: 'Delete',
+                                  onConfirm: () => {
+                                    setFeedbacks(prev => prev.filter(item => item.id !== f.id));
+                                    showToast('Feedback removed from display', 'success');
+                                  }
+                                });
                               }}
                               title="Delete Feedback"
                               className={`p-1.5 rounded-lg border cursor-pointer transition-all hover:border-rose-500/30 hover:bg-rose-500/10 text-rose-450`}
@@ -6575,7 +6696,7 @@ export default function AdminDashboard() {
               <div className="flex flex-col gap-1">
                 <span className={`text-sm font-bold ${isLight ? 'text-gray-800' : 'text-white'}`}>{adminName || 'System Admin'}</span>
                 <span className="text-[10px] font-extrabold bg-indigo-500/10 text-indigo-500 px-2.5 py-0.5 rounded-full uppercase tracking-wider self-center border border-indigo-500/20">
-                  {adminDesignation || 'Super Admin'}
+                  ADMINISTRATOR
                 </span>
               </div>
 
@@ -6627,7 +6748,7 @@ export default function AdminDashboard() {
 
                     {/* Email Address */}
                     <div className="flex flex-col gap-1.5">
-                      <label className={`text-[10px] uppercase tracking-wider ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>Email Address</label>
+                      <label className={`text-[10px] uppercase tracking-wider ${isLight ? 'text-gray-555' : 'text-gray-400'}`}>Email Address</label>
                       <input
                         type="email"
                         required
@@ -6640,58 +6761,15 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    {/* Phone Number */}
-                    <div className="flex flex-col gap-1.5">
-                      <label className={`text-[10px] uppercase tracking-wider ${isLight ? 'text-gray-550' : 'text-gray-400'}`}>Phone Number</label>
-                      <input
-                        type="text"
-                        required
-                        value={adminPhone}
-                        onChange={(e) => setAdminPhone(e.target.value)}
-                        className={`w-full border rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-indigo-500 font-semibold ${
-                          isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-white'
-                        }`}
-                      />
-                    </div>
-
-                    {/* Designation */}
-                    <div className="flex flex-col gap-1.5">
-                      <label className={`text-[10px] uppercase tracking-wider ${isLight ? 'text-gray-555' : 'text-gray-400'}`}>Designation</label>
-                      <input
-                        type="text"
-                        required
-                        value={adminDesignation}
-                        onChange={(e) => setAdminDesignation(e.target.value)}
-                        className={`w-full border rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-indigo-500 font-semibold ${
-                          isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-white'
-                        }`}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Location */}
+                  {/* Phone Number */}
                   <div className="flex flex-col gap-1.5">
-                    <label className={`text-[10px] uppercase tracking-wider ${isLight ? 'text-gray-555' : 'text-gray-400'}`}>Office Location</label>
+                    <label className={`text-[10px] uppercase tracking-wider ${isLight ? 'text-gray-555' : 'text-gray-400'}`}>Phone Number</label>
                     <input
                       type="text"
                       required
-                      value={adminLocation}
-                      onChange={(e) => setAdminLocation(e.target.value)}
+                      value={adminPhone}
+                      onChange={(e) => setAdminPhone(e.target.value)}
                       className={`w-full border rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-indigo-500 font-semibold ${
-                        isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-white'
-                      }`}
-                    />
-                  </div>
-
-                  {/* Bio Area */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className={`text-[10px] uppercase tracking-wider ${isLight ? 'text-gray-555' : 'text-gray-400'}`}>Administrative Bio / Notes</label>
-                    <textarea
-                      value={adminBio}
-                      onChange={(e) => setAdminBio(e.target.value)}
-                      rows={4}
-                      className={`w-full border rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-indigo-500 resize-none leading-relaxed font-semibold ${
                         isLight ? 'bg-white border-gray-200 text-gray-800' : 'bg-[#0d0f14] border-white/5 text-white'
                       }`}
                     />
@@ -6894,23 +6972,16 @@ export default function AdminDashboard() {
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-bold uppercase text-gray-500">Thumbnail Cover</label>
-                <select
-                  value={editingVenue.image}
+                <input
+                  type="text"
+                  placeholder="e.g. /leela_palace.jpg or https://..."
+                  value={editingVenue.image || ''}
                   onChange={e => setEditingVenue({ ...editingVenue, image: e.target.value })}
                   className={`border rounded-lg text-xs py-2.5 px-3 focus:outline-none focus:border-indigo-500 ${
                     isLight ? 'bg-gray-50 border-gray-200 text-gray-900' : 'bg-white/5 border-white/5 text-white'
                   }`}
-                >
-                  <option value="/leela_palace.jpg">The Leela Palace</option>
-                  <option value="/monsoon_palace.jpg">Fateh Garh Resort</option>
-                  <option value="/hero_udaipur_3.jpg">Radisson Blu</option>
-                  <option value="/hero_udaipur_1.jpg">Bhanwar Singh Palace</option>
-                  <option value="/shiv_niwas.jpg">Ramada Resort</option>
-                  <option value="/jag_mandir.jpg">Bijolai Fort</option>
-                  <option value="/hero_udaipur_2.jpg">Hotel Hilltop Palace</option>
-                  <option value="/oberoi_udaivilas.jpg">The Oberoi Udaivilas</option>
-                  <option value="/taj_lake_palace.jpg">Taj Lake Palace</option>
-                </select>
+                  required
+                />
               </div>
             </div>
 
@@ -7022,23 +7093,16 @@ export default function AdminDashboard() {
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-bold uppercase text-gray-500">Thumbnail Cover</label>
-                <select
-                  value={newVenueData.image}
+                <input
+                  type="text"
+                  placeholder="e.g. /leela_palace.jpg or https://..."
+                  value={newVenueData.image || ''}
                   onChange={e => setNewVenueData({ ...newVenueData, image: e.target.value })}
                   className={`border rounded-lg text-xs py-2.5 px-3 focus:outline-none focus:border-indigo-500 ${
                     isLight ? 'bg-gray-50 border-gray-200 text-gray-900' : 'bg-white/5 border-white/5 text-white'
                   }`}
-                >
-                  <option value="/leela_palace.jpg">The Leela Palace</option>
-                  <option value="/monsoon_palace.jpg">Fateh Garh Resort</option>
-                  <option value="/hero_udaipur_3.jpg">Radisson Blu</option>
-                  <option value="/hero_udaipur_1.jpg">Bhanwar Singh Palace</option>
-                  <option value="/shiv_niwas.jpg">Ramada Resort</option>
-                  <option value="/jag_mandir.jpg">Bijolai Fort</option>
-                  <option value="/hero_udaipur_2.jpg">Hotel Hilltop Palace</option>
-                  <option value="/oberoi_udaivilas.jpg">The Oberoi Udaivilas</option>
-                  <option value="/taj_lake_palace.jpg">Taj Lake Palace</option>
-                </select>
+                  required
+                />
               </div>
             </div>
 
@@ -7721,7 +7785,7 @@ export default function AdminDashboard() {
             {viewingVenueDetails.image && (
               <div className="w-full h-40 rounded-xl overflow-hidden relative border border-white/5 shadow-inner">
                 <img
-                  src={viewingVenueDetails.image}
+                  src={resolveImage(viewingVenueDetails.image, 'venue', viewingVenueDetails.name)}
                   alt={viewingVenueDetails.name}
                   className="w-full h-full object-cover"
                 />
@@ -7800,7 +7864,7 @@ export default function AdminDashboard() {
             {viewingVendorDetails.image && (
               <div className="w-full h-40 rounded-xl overflow-hidden relative border border-white/5 shadow-inner">
                 <img
-                  src={viewingVendorDetails.image}
+                  src={resolveImage(viewingVendorDetails.image, 'vendor', viewingVendorDetails.category)}
                   alt={viewingVendorDetails.name}
                   className="w-full h-full object-cover"
                 />
@@ -7915,6 +7979,62 @@ export default function AdminDashboard() {
                 className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-2.5 px-4 rounded-xl transition-all cursor-pointer text-center font-semibold"
               >
                 Close Feedback
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Confirmation Dialog Modal */}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-xs transition-opacity duration-300">
+          <div className="glass-panel p-6 rounded-[24px] max-w-sm w-full mx-4 shadow-xl border border-white/10 flex flex-col gap-4 animate-scale-up text-center">
+            {/* Warning/Danger Header Icon */}
+            <div className="flex justify-center">
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center border ${
+                confirmModal.isDanger 
+                  ? 'bg-rose-500/10 border-rose-500/20 text-rose-500' 
+                  : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-500'
+              }`}>
+                {confirmModal.isDanger ? (
+                  <AlertCircle className="w-6 h-6 animate-pulse" />
+                ) : (
+                  <CheckCircle2 className="w-6 h-6" />
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <h3 className={`text-base font-extrabold tracking-tight ${isLight ? 'text-gray-900' : 'text-white'}`}>
+                {confirmModal.title}
+              </h3>
+              <p className={`text-xs leading-relaxed font-semibold ${isLight ? 'text-gray-500' : 'text-gray-400'}`}>
+                {confirmModal.message}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 mt-2">
+              <button
+                type="button"
+                onClick={confirmModal.onCancel}
+                className={`flex-1 py-2.5 px-4 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                  isLight 
+                    ? 'border-gray-200 text-gray-700 bg-white hover:bg-gray-50 shadow-xs' 
+                    : 'border-white/10 text-gray-300 hover:bg-white/5 hover:text-white'
+                }`}
+              >
+                {confirmModal.cancelText}
+              </button>
+              <button
+                type="button"
+                onClick={confirmModal.onConfirm}
+                className={`flex-1 py-2.5 px-4 rounded-xl text-white text-xs font-bold transition-all cursor-pointer shadow-md ${
+                  confirmModal.isDanger 
+                    ? 'bg-gradient-to-r from-rose-600 to-red-500 hover:from-rose-500 hover:to-red-400 shadow-rose-600/15' 
+                    : 'bg-gradient-to-r from-indigo-600 to-violet-500 hover:from-indigo-500 hover:to-violet-400 shadow-indigo-600/15'
+                }`}
+              >
+                {confirmModal.confirmText}
               </button>
             </div>
           </div>

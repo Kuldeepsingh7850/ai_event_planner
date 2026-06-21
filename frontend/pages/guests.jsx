@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import { useTheme } from '../context/ThemeContext';
 import {
   Users,
   Plus,
@@ -33,6 +34,8 @@ import {
 export default function GuestManagement() {
   const { authFetch } = useAuth();
   const { fetchNotifications, showToast } = useNotifications();
+  const { theme } = useTheme();
+  const isLight = theme === 'light';
 
   // General States
   const [events, setEvents] = useState([]);
@@ -125,7 +128,7 @@ export default function GuestManagement() {
           group_table: idx % 3 === 0 ? 'Family Table 1' : idx % 3 === 1 ? 'Friends Table 2' : 'Office Table 3',
           status: g.status, // confirmed, pending, declined
           dietary: idx % 2 === 0 ? 'Vegetarian' : 'Non-Vegetarian',
-          invited_on: new Date(g.created_at).toISOString().split('T')[0]
+          invited_on: new Date(g.created_at || Date.now()).toISOString().split('T')[0]
         }));
         setGuests(mapped);
       } else {
@@ -645,7 +648,7 @@ export default function GuestManagement() {
           </p>
         </div>
         <div className="glass-panel flex flex-col items-center justify-center py-20 text-center max-w-xl mx-auto gap-4 font-bold border border-white/5 rounded-2xl p-6 w-full">
-          <div className="w-16 h-16 rounded-full bg-[#5a2bd4]/10 border border-[#5a2bd4]/20 flex items-center justify-center text-[#5a2bd4] dark:text-indigo-400">
+          <div className="w-16 h-16 rounded-full bg-[#1d4ed8]/10 border border-[#1d4ed8]/20 flex items-center justify-center text-[#1d4ed8] dark:text-indigo-400">
             <AlertCircle className="w-8 h-8" />
           </div>
           <h2 className="text-lg font-extrabold text-white">No Events Found</h2>
@@ -655,7 +658,7 @@ export default function GuestManagement() {
           <div className="flex items-center gap-3.5 mt-2">
             <Link
               href="/ai"
-              className="px-4 py-2.5 rounded-xl bg-[#5a2bd4] hover:bg-[#4c24b5] always-white text-xs font-bold shadow-lg shadow-indigo-500/10 transition-all cursor-pointer"
+              className="px-4 py-2.5 rounded-xl bg-[#1d4ed8] hover:bg-[#1e3a8a] always-white text-xs font-bold shadow-lg shadow-indigo-500/10 transition-all cursor-pointer"
             >
               Create Event with AI
             </Link>
@@ -686,7 +689,7 @@ export default function GuestManagement() {
         <div className="flex items-center gap-3 w-full sm:w-auto shrink-0">
           <button
             onClick={handleAddClick}
-            className="px-4 py-2.5 rounded-xl bg-[#5a2bd4] hover:bg-[#4c24b5] always-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-indigo-500/10 transition-all transform hover:-translate-y-0.5 cursor-pointer"
+            className="px-4 py-2.5 rounded-xl bg-[#1d4ed8] hover:bg-[#1e3a8a] always-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-indigo-500/10 transition-all transform hover:-translate-y-0.5 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             Add Guests
@@ -776,11 +779,11 @@ export default function GuestManagement() {
             <div className="flex flex-col gap-1">
               <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total Guests</span>
               <span className="text-xl font-extrabold text-white dark:text-white">{totalCount}</span>
-              <button onClick={() => setActiveTab('All')} className="text-[9px] text-[#5a2bd4] dark:text-indigo-400 font-extrabold hover:underline text-left mt-1">
+              <button onClick={() => setActiveTab('All')} className="text-[9px] text-[#1d4ed8] dark:text-indigo-400 font-extrabold hover:underline text-left mt-1">
                 View all guests &rarr;
               </button>
             </div>
-            <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 text-[#5a2bd4] dark:text-indigo-400 flex items-center justify-center shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 text-[#1d4ed8] dark:text-indigo-400 flex items-center justify-center shrink-0">
               <Users className="w-4.5 h-4.5" />
             </div>
           </div>
@@ -929,7 +932,7 @@ export default function GuestManagement() {
                       </linearGradient>
                       {/* Glow Filter for line */}
                       <filter id="lineGlow" x="-20%" y="-20%" width="140%" height="140%">
-                        <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#5a2bd4" floodOpacity="0.25" />
+                        <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#1d4ed8" floodOpacity="0.25" />
                       </filter>
                     </defs>
 
@@ -946,7 +949,7 @@ export default function GuestManagement() {
                       <path
                         d={trend.pathD}
                         fill="transparent"
-                        stroke="#5a2bd4"
+                        stroke="#1d4ed8"
                         strokeWidth="3"
                         strokeLinecap="round"
                         filter="url(#lineGlow)"
@@ -969,7 +972,7 @@ export default function GuestManagement() {
                           cx={pt.x}
                           cy={pt.y}
                           r="6.5"
-                          fill="#5a2bd4"
+                          fill="#1d4ed8"
                           opacity={hoveredPoint && hoveredPoint.date === pt.date ? "0.3" : "0"}
                           className="transition-all duration-200"
                         />
@@ -979,7 +982,7 @@ export default function GuestManagement() {
                           cx={pt.x}
                           cy={pt.y}
                           r={hoveredPoint && hoveredPoint.date === pt.date ? "5.5" : "4"}
-                          fill="#5a2bd4"
+                          fill="#1d4ed8"
                           className="stroke-white dark:stroke-[#151c2c] transition-all duration-150"
                           strokeWidth="1.5"
                         />
@@ -990,17 +993,24 @@ export default function GuestManagement() {
                   {/* Tooltip Overlay */}
                   {hoveredPoint && (
                     <div
-                      className="absolute bg-slate-900/95 dark:bg-slate-900/95 text-white text-[9px] px-2.5 py-1.5 rounded-xl shadow-2xl pointer-events-none transition-all duration-150 z-20 flex flex-col items-center gap-0.5 border border-white/10"
+                      className={`absolute text-[9px] px-2.5 py-1.5 rounded-xl shadow-2xl pointer-events-none transition-all duration-150 z-20 flex flex-col items-center gap-0.5 border ${
+                        isLight 
+                          ? 'bg-white text-gray-800 border-gray-200' 
+                          : 'bg-slate-900/95 text-white border-white/10'
+                      }`}
                       style={{
                         left: `${(hoveredPoint.x / 500) * 100}%`,
                         top: `${(hoveredPoint.y / 150) * 100}%`,
-                        transform: 'translate(-50%, -130%)'
+                        transform: 'translate(-50%, -130%)',
+                        color: isLight ? '#1f2937' : '#ffffff',
+                        backgroundColor: isLight ? '#ffffff' : 'rgba(15, 23, 42, 0.95)',
+                        borderColor: isLight ? '#e5e7eb' : 'rgba(255, 255, 255, 0.1)'
                       }}
                     >
-                      <span className="text-[7.5px] text-indigo-400 font-extrabold uppercase tracking-wider">
+                      <span className="text-[7.5px] font-extrabold uppercase tracking-wider" style={{ color: isLight ? '#4f46e5' : '#818cf8' }}>
                         {new Date(hoveredPoint.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
                       </span>
-                      <span className="text-xs font-black">{hoveredPoint.count} Guests</span>
+                      <span className="text-xs font-black" style={{ color: isLight ? '#1f2937' : '#ffffff' }}>{hoveredPoint.count} Guests</span>
                     </div>
                   )}
 
@@ -1034,7 +1044,7 @@ export default function GuestManagement() {
                   onClick={() => setActiveTab(tab.id)}
                   className={`pb-1 relative cursor-pointer whitespace-nowrap transition-colors ${
                     activeTab === tab.id
-                      ? 'text-[#5a2bd4] dark:text-indigo-400 border-b-2 border-[#5a2bd4] dark:border-indigo-400'
+                      ? 'text-[#1d4ed8] dark:text-indigo-400 border-b-2 border-[#1d4ed8] dark:border-indigo-400'
                       : 'hover:text-gray-800 dark:hover:text-white'
                   }`}
                 >
@@ -1088,7 +1098,7 @@ export default function GuestManagement() {
                       </td>
                       <td className="py-3.5 px-3 w-[40%]">
                         <div className="flex items-center gap-3">
-                          <div className="w-7 h-7 rounded-full bg-indigo-500/10 text-indigo-400 font-extrabold flex items-center justify-center text-[10px] uppercase shrink-0 border border-[#5a2bd4]/20">
+                          <div className="w-7 h-7 rounded-full bg-indigo-500/10 text-indigo-400 font-extrabold flex items-center justify-center text-[10px] uppercase shrink-0 border border-[#1d4ed8]/20">
                             {guest.guest_name[0]}
                           </div>
                           <div className="flex flex-col min-w-0">
@@ -1175,7 +1185,7 @@ export default function GuestManagement() {
                         onClick={() => setCurrentPage(pNum)}
                         className={`w-6 h-6 rounded-lg text-[10px] font-bold transition-all flex items-center justify-center cursor-pointer ${
                           currentPage === pNum
-                            ? 'bg-[#5a2bd4] text-white'
+                            ? 'bg-[#1d4ed8] text-white'
                             : 'bg-white/3 border border-white/5 text-gray-400 hover:text-white hover:bg-white/5'
                         }`}
                       >
@@ -1218,7 +1228,7 @@ export default function GuestManagement() {
               <h3 className="text-xs font-bold text-gray-200 dark:text-white uppercase tracking-wider">
                 Recent Activities
               </h3>
-              <button onClick={() => showToast('Opening activity history logs...', 'info')} className="text-[10px] text-[#5a2bd4] dark:text-indigo-400 font-extrabold hover:underline">
+              <button onClick={() => showToast('Opening activity history logs...', 'info')} className="text-[10px] text-[#1d4ed8] dark:text-indigo-400 font-extrabold hover:underline">
                 View All
               </button>
             </div>
@@ -1319,7 +1329,7 @@ export default function GuestManagement() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-[#5a2bd4] hover:bg-[#4c24b5] always-white text-xs font-bold transition-all shadow-md shadow-indigo-600/15 cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-[#1d4ed8] hover:bg-[#1e3a8a] always-white text-xs font-bold transition-all shadow-md shadow-indigo-600/15 cursor-pointer"
                 >
                   {isEditMode ? 'Update Guest' : 'Register Guest'}
                 </button>

@@ -158,7 +158,7 @@ export default function Navbar({ isSidebarOpen, onToggleSidebar }) {
                 <img
                   src={user.avatar}
                   alt={user.name}
-                  className={`rounded-full object-cover border border-[#5a2bd4]/30 shrink-0 ${
+                  className={`rounded-full object-cover border border-indigo-500/30 shrink-0 ${
                     isAdminView ? 'w-8 h-8' : 'w-7 h-7'
                   }`}
                 />
@@ -167,7 +167,7 @@ export default function Navbar({ isSidebarOpen, onToggleSidebar }) {
                   {user.name ? user.name[0] : 'A'}
                 </div>
               ) : (
-                <div className="w-7 h-7 rounded-full bg-indigo-500/20 border border-[#5a2bd4]/30 flex items-center justify-center text-indigo-400 font-extrabold text-xs uppercase shrink-0">
+                <div className="w-7 h-7 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 font-extrabold text-xs uppercase shrink-0">
                   {user.name ? user.name[0] : 'U'}
                 </div>
               )}
@@ -176,7 +176,7 @@ export default function Navbar({ isSidebarOpen, onToggleSidebar }) {
                   {user.name || (isAdminView ? 'System Admin' : 'Rahul Sharma')}
                 </p>
                 {(isAdminView || user.role === 'admin') && (
-                  <p className="text-[9px] text-[#5a2bd4] font-bold capitalize leading-none mt-0.5">
+                  <p className="text-[9px] text-indigo-600 font-bold capitalize leading-none mt-0.5">
                     {isAdminView ? 'Super Admin' : 'Administrator'}
                   </p>
                 )}

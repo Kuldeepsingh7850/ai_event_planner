@@ -5,13 +5,11 @@ import { useNotifications } from '../context/NotificationContext';
 import {
   Receipt,
   Plus,
-  ArrowRight,
   TrendingUp,
   MapPin,
   Clock,
   Sparkles,
   Edit,
-  Download,
   AlertCircle,
   CheckCircle2,
   Trash2,
@@ -305,7 +303,7 @@ export default function BudgetPlanner() {
 
   // Default Categories structure based on template image ratios
   const categoriesList = [
-    { name: 'Venue', percent: 0.40, color: '#5a2bd4', committedRatio: 0.40 / 0.16 },
+    { name: 'Venue', percent: 0.40, color: '#1d4ed8', committedRatio: 0.40 / 0.16 },
     { name: 'Catering', percent: 0.30, color: '#10b981', committedRatio: 0.30 / 0.16 },
     { name: 'Decoration', percent: 0.15, color: '#f59e0b', committedRatio: 0.15 / 0.16 },
     { name: 'Entertainment', percent: 0.10, color: '#6366f1', committedRatio: 0.10 / 0.16 },
@@ -414,7 +412,7 @@ export default function BudgetPlanner() {
           </p>
         </div>
         <div className="glass-panel flex flex-col items-center justify-center py-20 text-center max-w-xl mx-auto gap-4 font-bold border border-white/5 rounded-2xl p-6 w-full">
-          <div className="w-16 h-16 rounded-full bg-[#5a2bd4]/10 border border-[#5a2bd4]/20 flex items-center justify-center text-[#5a2bd4] dark:text-indigo-400">
+          <div className="w-16 h-16 rounded-full bg-[#1d4ed8]/10 border border-[#1d4ed8]/20 flex items-center justify-center text-[#1d4ed8] dark:text-indigo-400">
             <AlertCircle className="w-8 h-8" />
           </div>
           <h2 className="text-lg font-extrabold text-white">No Events Found</h2>
@@ -424,7 +422,7 @@ export default function BudgetPlanner() {
           <div className="flex items-center gap-3.5 mt-2">
             <Link
               href="/ai"
-              className="px-4 py-2.5 rounded-xl bg-[#5a2bd4] hover:bg-[#4c24b5] always-white text-xs font-bold shadow-lg shadow-indigo-500/10 transition-all cursor-pointer"
+              className="px-4 py-2.5 rounded-xl bg-[#1d4ed8] hover:bg-[#1e3a8a] always-white text-xs font-bold shadow-lg shadow-indigo-500/10 transition-all cursor-pointer"
             >
               Create Event with AI
             </Link>
@@ -454,18 +452,8 @@ export default function BudgetPlanner() {
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto shrink-0">
           <button
-            onClick={() => {
-              showToast('Exporting budget statement to CSV...', 'success');
-              // Download CSV mock trigger
-            }}
-            className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-bold text-gray-300 dark:hover:text-white flex items-center gap-1.5 cursor-pointer"
-          >
-            <Download className="w-4 h-4" />
-            Export Report
-          </button>
-          <button
             onClick={() => setIsAddExpenseOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-[#5a2bd4] hover:bg-[#4c24b5] always-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-indigo-500/10 transition-all transform hover:-translate-y-0.5 cursor-pointer"
+            className="px-4 py-2.5 rounded-xl bg-[#1d4ed8] hover:bg-[#1e3a8a] always-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-indigo-500/10 transition-all transform hover:-translate-y-0.5 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             Create New Expense
@@ -485,7 +473,7 @@ export default function BudgetPlanner() {
             >
               {selectedEvent && (
                 <>
-                  <div className="w-10 h-10 rounded-lg bg-indigo-500/10 border border-[#5a2bd4]/20 flex items-center justify-center shrink-0">
+                  <div className="w-10 h-10 rounded-lg bg-indigo-500/10 border border-[#1d4ed8]/20 flex items-center justify-center shrink-0">
                     <Calendar className="w-5 h-5 text-indigo-400" />
                   </div>
                   <div className="flex flex-col min-w-0">
@@ -541,12 +529,12 @@ export default function BudgetPlanner() {
               <span className="text-xl font-extrabold text-white dark:text-white">{formatRupee(activeTotalBudget)}</span>
               <button
                 onClick={() => setIsEditBudgetOpen(true)}
-                className="text-[9px] text-[#5a2bd4] dark:text-indigo-400 font-extrabold flex items-center gap-1 hover:underline cursor-pointer"
+                className="text-[9px] text-[#1d4ed8] dark:text-indigo-400 font-extrabold flex items-center gap-1 hover:underline cursor-pointer"
               >
                 Edit Budget <Edit className="w-3 h-3" />
               </button>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 text-[#5a2bd4] dark:text-indigo-400 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 text-[#1d4ed8] dark:text-indigo-400 flex items-center justify-center shrink-0">
               <Receipt className="w-5 h-5" />
             </div>
           </div>
@@ -609,14 +597,14 @@ export default function BudgetPlanner() {
               <button
                 type="button"
                 onClick={() => setChartMode('allocated')}
-                className={`px-2.5 py-0.5 rounded-md cursor-pointer transition-all ${chartMode === 'allocated' ? 'bg-[#5a2bd4] text-white' : 'text-gray-500 hover:text-gray-300'}`}
+                className={`px-2.5 py-0.5 rounded-md cursor-pointer transition-all ${chartMode === 'allocated' ? 'bg-[#1d4ed8] text-white' : 'text-gray-500 hover:text-gray-300'}`}
               >
                 Allocated
               </button>
               <button
                 type="button"
                 onClick={() => setChartMode('spent')}
-                className={`px-2.5 py-0.5 rounded-md cursor-pointer transition-all ${chartMode === 'spent' ? 'bg-[#5a2bd4] text-white' : 'text-gray-500 hover:text-gray-300'}`}
+                className={`px-2.5 py-0.5 rounded-md cursor-pointer transition-all ${chartMode === 'spent' ? 'bg-[#1d4ed8] text-white' : 'text-gray-500 hover:text-gray-300'}`}
               >
                 Spent
               </button>
@@ -707,7 +695,7 @@ export default function BudgetPlanner() {
           {/* Chart bar graph */}
           <div className="flex flex-col gap-4 py-1">
             <div className="flex justify-end gap-4 text-[9px] font-bold text-gray-500 px-2">
-              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-[#5a2bd4]"></span> Budget</span>
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-[#1d4ed8]"></span> Budget</span>
               <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-[#10b981]"></span> Actual Spent</span>
             </div>
 
@@ -725,8 +713,8 @@ export default function BudgetPlanner() {
                     <div className="flex-1 flex flex-col gap-1.5">
                       {/* Budget Bar (Purple) */}
                       <div className="flex items-center gap-2">
-                        <div className="h-2 rounded-full bg-[#5a2bd4]/20 overflow-hidden flex-1 max-w-[200px]">
-                          <div className="h-full bg-[#5a2bd4] rounded-full" style={{ width: `${budgetWidth}%` }}></div>
+                        <div className="h-2 rounded-full bg-[#1d4ed8]/20 overflow-hidden flex-1 max-w-[200px]">
+                          <div className="h-full bg-[#1d4ed8] rounded-full" style={{ width: `${budgetWidth}%` }}></div>
                         </div>
                         <span className="text-[9px] text-gray-500 w-12 text-right">{formatRupee(cat.budget)}</span>
                       </div>
@@ -758,7 +746,7 @@ export default function BudgetPlanner() {
             </h3>
             <button
               onClick={() => setIsAddExpenseOpen(true)}
-              className="text-[10px] text-[#5a2bd4] dark:text-indigo-400 font-bold hover:underline cursor-pointer"
+              className="text-[10px] text-[#1d4ed8] dark:text-indigo-400 font-bold hover:underline cursor-pointer"
             >
               Add Ledger Item
             </button>
@@ -885,13 +873,6 @@ export default function BudgetPlanner() {
                 <span className="font-outfit text-white font-bold">{formatRupee(activeTotalBudget - activeTotalSpent)} ({getPercentage(activeTotalBudget - activeTotalSpent, activeTotalBudget)}%)</span>
               </div>
             </div>
-
-            <button
-              onClick={() => showToast('Redirecting to full budget reports analytics...', 'info')}
-              className="text-[10px] text-[#5a2bd4] dark:text-indigo-400 font-extrabold hover:underline text-center w-full mt-2 inline-flex items-center justify-center gap-1 cursor-pointer"
-            >
-              View Full Report <ArrowRight className="w-3.5 h-3.5" />
-            </button>
           </div>
 
           {/* Recent Transactions Card */}
@@ -902,7 +883,7 @@ export default function BudgetPlanner() {
               </h3>
               <button
                 onClick={() => setIsAddExpenseOpen(true)}
-                className="text-[9px] text-[#5a2bd4] dark:text-indigo-400 font-extrabold hover:underline"
+                className="text-[9px] text-[#1d4ed8] dark:text-indigo-400 font-extrabold hover:underline"
               >
                 Log New
               </button>
@@ -981,7 +962,7 @@ export default function BudgetPlanner() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-[#5a2bd4] hover:bg-[#4c24b5] always-white text-xs font-bold transition-all shadow-md shadow-indigo-600/15 cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-[#1d4ed8] hover:bg-[#1e3a8a] always-white text-xs font-bold transition-all shadow-md shadow-indigo-600/15 cursor-pointer"
                 >
                   Save Limit
                 </button>
@@ -1070,7 +1051,7 @@ export default function BudgetPlanner() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-[#5a2bd4] hover:bg-[#4c24b5] always-white text-xs font-bold transition-all shadow-md shadow-indigo-600/15 cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-[#1d4ed8] hover:bg-[#1e3a8a] always-white text-xs font-bold transition-all shadow-md shadow-indigo-600/15 cursor-pointer"
                 >
                   Log Transaction
                 </button>

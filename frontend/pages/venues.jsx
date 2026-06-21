@@ -24,6 +24,21 @@ import {
   Clock,
   Sparkles
 } from 'lucide-react';
+import { resolveImage } from '../utils/imageResolver';
+
+const getVenueCategoryInfo = (type) => {
+  const t = (type || '').toLowerCase();
+  if (t.includes('palace') || t.includes('fort')) {
+    return { icon: Sparkles, color: 'bg-amber-500/10 border-amber-500/20 text-amber-400' };
+  }
+  if (t.includes('resort')) {
+    return { icon: Sparkles, color: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' };
+  }
+  if (t.includes('hotel')) {
+    return { icon: Building, color: 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400' };
+  }
+  return { icon: Building, color: 'bg-purple-500/10 border-purple-500/20 text-purple-400' };
+};
 
 export default function VenuesCatalog() {
   const { user, authFetch } = useAuth();
@@ -171,9 +186,9 @@ export default function VenuesCatalog() {
       created_at: '2024-04-22T10:00:00.000Z',
       gallery: [
         '/jag_mandir.jpg',
-        'https://images.unsplash.com/photo-1585983224974-084a8e065e76?auto=format&fit=crop&w=600&q=80',
+        'https://images.unsplash.com/photo-1596394516093-501ba68a0ba6?auto=format&fit=crop&w=600&q=80',
         'https://images.unsplash.com/photo-1590001155093-a3c66ab0c3ff?auto=format&fit=crop&w=600&q=80',
-        'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=600&q=80'
+        'https://images.unsplash.com/photo-1605538032432-a9f0c8d9ba5e?auto=format&fit=crop&w=600&q=80'
       ]
     },
     {
@@ -282,7 +297,7 @@ export default function VenuesCatalog() {
   const [search, setSearch] = useState('');
   const [selectedLocation, setSelectedLocation] = useState('All');
   const [selectedType, setSelectedType] = useState('All');
-  const [capacityRange, setCapacityRange] = useState(600);
+  const [capacityRange, setCapacityRange] = useState('');
   const [priceTierFilter, setPriceTierFilter] = useState('All');
   const [selectedAmenity, setSelectedAmenity] = useState('All');
   const [sortBy, setSortBy] = useState('Recently Added');
@@ -296,10 +311,13 @@ export default function VenuesCatalog() {
   // Get dynamic gallery images for the venue card details popup
   const getVenueGallery = (venue) => {
     if (!venue) return [];
-    if (venue.gallery && venue.gallery.length > 0) {
-      return venue.gallery;
+    const resolvedGallery = (venue.gallery && venue.gallery.length > 0)
+      ? venue.gallery.map(img => resolveImage(img, 'venue', venue.name))
+      : [];
+    if (resolvedGallery.length > 0) {
+      return resolvedGallery;
     }
-    const primary = venue.image || '/leela_palace.jpg';
+    const primary = resolveImage(venue.image, 'venue', venue.name);
     
     // Category-specific high-quality Unsplash fallbacks for custom/added venues
     const type = (venue.type || '').toLowerCase();
@@ -313,7 +331,7 @@ export default function VenuesCatalog() {
     } else if (type.includes('palace') || type.includes('fort') || type.includes('heritage')) {
       fallbacks = [
         'https://images.unsplash.com/photo-1508672019048-805c876b67e2?auto=format&fit=crop&w=600&q=80',
-        'https://images.unsplash.com/photo-1585983224974-084a8e065e76?auto=format&fit=crop&w=600&q=80',
+        'https://images.unsplash.com/photo-1596394516093-501ba68a0ba6?auto=format&fit=crop&w=600&q=80',
         'https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=600&q=80'
       ];
     } else { // resort / hotel
@@ -333,7 +351,7 @@ export default function VenuesCatalog() {
 
   useEffect(() => {
     if (selectedVenueDetail) {
-      setActiveGalleryImage(selectedVenueDetail.image);
+      setActiveGalleryImage(resolveImage(selectedVenueDetail.image, 'venue', selectedVenueDetail.name));
     } else {
       setActiveGalleryImage(null);
     }
@@ -439,15 +457,68 @@ export default function VenuesCatalog() {
     }
   }, [router.isReady, router.query.id, venues]);
 
+  // Sync liked venues state with LocalStorage favorites
+  useEffect(() => {
+    try {
+      const localKey = user ? `event_planner_favorites_${user.id}` : 'event_planner_favorites';
+      const stored = localStorage.getItem(localKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const venueIds = parsed.filter(item => item.category === 'Venue').map(item => item.id);
+        setLikedVenues(venueIds);
+      } else {
+        setLikedVenues([]);
+      }
+    } catch (e) {
+      console.error('Failed to load favorites in venues:', e);
+    }
+  }, [user]);
+
   // Handle Likes
   const toggleLike = (venueId, venueName, e) => {
     e.preventDefault();
     e.stopPropagation();
+
+    const localKey = user ? `event_planner_favorites_${user.id}` : 'event_planner_favorites';
+    let currentFavorites = [];
+    try {
+      const stored = localStorage.getItem(localKey);
+      if (stored) {
+        currentFavorites = JSON.parse(stored);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+
     if (likedVenues.includes(venueId)) {
       setLikedVenues(prev => prev.filter(id => id !== venueId));
+      const updated = currentFavorites.filter(item => !(item.category === 'Venue' && item.id === venueId));
+      try {
+        localStorage.setItem(localKey, JSON.stringify(updated));
+      } catch (err) {
+        console.error(err);
+      }
       showToast(`Removed "${venueName}" from favorites`, 'info');
     } else {
+      const venue = venues.find(v => v.id === venueId);
+      if (!venue) return;
+
       setLikedVenues(prev => [...prev, venueId]);
+      const newFavItem = {
+        id: venue.id,
+        title: venue.name,
+        category: 'Venue',
+        subCategory: venue.type || 'Venue',
+        location: venue.location || 'Udaipur, Rajasthan',
+        image: venue.image || '/leela_palace.jpg',
+        metadataType: 'location'
+      };
+      const updated = [...currentFavorites, newFavItem];
+      try {
+        localStorage.setItem(localKey, JSON.stringify(updated));
+      } catch (err) {
+        console.error(err);
+      }
       showToast(`Added "${venueName}" to favorites!`, 'success');
     }
   };
@@ -457,7 +528,7 @@ export default function VenuesCatalog() {
     setSearch('');
     setSelectedLocation('All');
     setSelectedType('All');
-    setCapacityRange(600);
+    setCapacityRange('');
     setPriceTierFilter('All');
     setSelectedAmenity('All');
     setSortBy('Recently Added');
@@ -472,7 +543,7 @@ export default function VenuesCatalog() {
 
     const matchesLoc = selectedLocation === 'All' || v.location.toLowerCase() === selectedLocation.toLowerCase();
     const matchesType = selectedType === 'All' || v.type.toLowerCase() === selectedType.toLowerCase();
-    const matchesCap = v.minCapacity <= capacityRange;
+    const matchesCap = !capacityRange || (v.maxCapacity >= capacityRange);
     const matchesPrice = priceTierFilter === 'All' || v.priceTier === priceTierFilter;
     const matchesAmenity = selectedAmenity === 'All' || v.amenities.includes(selectedAmenity);
     const matchesStatus = v.status !== 'inactive';
@@ -617,21 +688,13 @@ export default function VenuesCatalog() {
             Discover and compare the best venues for your events.
           </p>
         </div>
-        {user?.role === 'admin' ? (
+        {user?.role === 'admin' && (
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-[#5a2bd4] hover:bg-[#4c24b5] always-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-indigo-500/10 transition-all transform hover:-translate-y-0.5 cursor-pointer"
+            className="px-4 py-2.5 rounded-xl bg-[#1d4ed8] hover:bg-[#1e3a8a] always-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-indigo-500/10 transition-all transform hover:-translate-y-0.5 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             Add New Venue
-          </button>
-        ) : (
-          <button
-            onClick={() => showToast('Contact support or Administrator to request venue listings!', 'info')}
-            className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs font-bold text-gray-300 dark:hover:text-white flex items-center gap-1.5 cursor-pointer"
-          >
-            <Sparkles className="w-4 h-4 text-indigo-400" />
-            Request Venue listing
           </button>
         )}
       </div>
@@ -646,7 +709,7 @@ export default function VenuesCatalog() {
             </h3>
             <button
               onClick={handleResetFilters}
-              className="text-[10px] text-gray-500 hover:text-[#5a2bd4] dark:hover:text-indigo-400 font-bold flex items-center gap-1 cursor-pointer"
+              className="text-[10px] text-gray-500 hover:text-[#1d4ed8] dark:hover:text-indigo-400 font-bold flex items-center gap-1 cursor-pointer"
             >
               <RotateCcw className="w-3 h-3" />
               Reset
@@ -669,19 +732,6 @@ export default function VenuesCatalog() {
               </div>
             </div>
 
-            {/* Location Selector */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] text-gray-500 uppercase tracking-wider">Location</label>
-              <select
-                value={selectedLocation}
-                onChange={(e) => setSelectedLocation(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500 cursor-pointer"
-              >
-                <option value="All" className="bg-[#151c2c]">All Locations</option>
-                <option value="Udaipur" className="bg-[#151c2c]">Udaipur</option>
-              </select>
-            </div>
-
             {/* Venue Type Selector */}
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] text-gray-500 uppercase tracking-wider">Venue Type</label>
@@ -700,25 +750,19 @@ export default function VenuesCatalog() {
               </select>
             </div>
 
-            {/* Capacity Limit Slider */}
-            <div className="flex flex-col gap-2.5">
-              <div className="flex justify-between items-center text-[10px] text-gray-500 uppercase tracking-wider">
-                <span>Capacity</span>
-                <span className="text-indigo-400 font-extrabold">{capacityRange}+ Guests</span>
-              </div>
+            {/* Capacity Limit Input */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] text-gray-500 uppercase tracking-wider">Capacity</label>
               <input
-                type="range"
-                min="50"
-                max="1000"
-                step="50"
+                type="number"
                 value={capacityRange}
-                onChange={(e) => setCapacityRange(parseInt(e.target.value))}
-                className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#5a2bd4] dark:accent-indigo-500"
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setCapacityRange(val === '' ? '' : parseInt(val));
+                }}
+                placeholder="Enter minimum guest capacity..."
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-gray-200 focus:outline-none focus:border-indigo-500 transition-colors"
               />
-              <div className="flex justify-between text-[9px] text-gray-500">
-                <span>50</span>
-                <span>2000+</span>
-              </div>
             </div>
 
             {/* Price Tiers Selector */}
@@ -737,26 +781,9 @@ export default function VenuesCatalog() {
               </select>
             </div>
 
-            {/* Amenities Selector */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] text-gray-500 uppercase tracking-wider">Amenities</label>
-              <select
-                value={selectedAmenity}
-                onChange={(e) => setSelectedAmenity(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500 cursor-pointer"
-              >
-                <option value="All" className="bg-[#151c2c]">Select Amenities</option>
-                <option value="Pool" className="bg-[#151c2c]">Swimming Pool</option>
-                <option value="AC Hall" className="bg-[#151c2c]">AC Banquets Hall</option>
-                <option value="Parking" className="bg-[#151c2c]">Valet Parking</option>
-                <option value="Bar" className="bg-[#151c2c]">In-house Bar Lounge</option>
-                <option value="Stage" className="bg-[#151c2c]">Stage Setup</option>
-              </select>
-            </div>
-
             <button
               onClick={() => showToast('Filters applied successfully!', 'success')}
-              className="w-full py-2.5 rounded-xl bg-[#5a2bd4] hover:bg-[#4c24b5] always-white font-bold text-center mt-2 cursor-pointer shadow-md transition-all uppercase tracking-wider"
+              className="w-full py-2.5 rounded-xl bg-[#1d4ed8] hover:bg-[#1e3a8a] always-white font-bold text-center mt-2 cursor-pointer shadow-md transition-all uppercase tracking-wider"
             >
               Apply Filters
             </button>
@@ -790,7 +817,7 @@ export default function VenuesCatalog() {
                 <button
                   onClick={() => setViewMode('grid')}
                   className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                    viewMode === 'grid' ? 'bg-[#5a2bd4] text-white' : 'text-gray-400 hover:text-white'
+                    viewMode === 'grid' ? 'bg-[#1d4ed8] text-white' : 'text-gray-400 hover:text-white'
                   }`}
                   title="Grid View"
                 >
@@ -799,7 +826,7 @@ export default function VenuesCatalog() {
                 <button
                   onClick={() => setViewMode('list')}
                   className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                    viewMode === 'list' ? 'bg-[#5a2bd4] text-white' : 'text-gray-400 hover:text-white'
+                    viewMode === 'list' ? 'bg-[#1d4ed8] text-white' : 'text-gray-400 hover:text-white'
                   }`}
                   title="List View"
                 >
@@ -824,126 +851,155 @@ export default function VenuesCatalog() {
           ) : viewMode === 'grid' ? (
             /* GRID VIEW */
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-              {sortedVenues.map(venue => (
-                <div
-                  key={venue.id}
-                  onClick={() => {
-                    setSelectedVenueDetail(venue);
-                    setIsBookingSuccess(false);
-                  }}
-                  className="glass-card rounded-2xl border border-white/5 overflow-hidden flex flex-col justify-between group cursor-pointer shadow-sm"
-                >
-                  <div className="relative overflow-hidden aspect-video">
-                    <img
-                      src={venue.image}
-                      alt={venue.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 filter brightness-[1.02]"
-                    />
-                    <button
-                      onClick={(e) => toggleLike(venue.id, venue.name, e)}
-                      className="absolute top-3 right-3 p-1.5 rounded-full backdrop-blur-md border border-white/10 transition-all cursor-pointer bg-[#07080a]/40"
-                    >
-                      <Heart
-                        className={`w-3.5 h-3.5 ${
-                          likedVenues.includes(venue.id)
-                            ? 'text-rose-500 fill-rose-500 scale-110'
-                            : 'text-white'
-                        }`}
+              {sortedVenues.map(venue => {
+                const resolvedImg = resolveImage(venue.image, 'venue', venue.name);
+                const catInfo = getVenueCategoryInfo(venue.type);
+                const Icon = catInfo.icon;
+                return (
+                  <div
+                    key={venue.id}
+                    onClick={() => {
+                      setSelectedVenueDetail(venue);
+                      setIsBookingSuccess(false);
+                    }}
+                    className="glass-card rounded-[24px] border border-white/5 overflow-hidden flex flex-col justify-between group cursor-pointer shadow-md hover:-translate-y-1.5 transition-all duration-300"
+                  >
+                    {/* Aspect ratio cover image with hover zoom */}
+                    <div className="relative aspect-[16/10] w-full overflow-hidden border-b border-white/5">
+                      <img
+                        src={resolvedImg}
+                        alt={venue.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 filter brightness-105"
                       />
-                    </button>
-                  </div>
-
-                  <div className="p-4 flex flex-col gap-3">
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-[10px] text-gray-500 font-extrabold uppercase">{venue.type}</span>
-                      <h4 className="text-xs sm:text-sm font-extrabold text-white dark:text-white leading-tight truncate group-hover:text-[#5a2bd4] dark:group-hover:text-indigo-400 transition-colors">
-                        {venue.name}
-                      </h4>
-                    </div>
-
-                    <div className="flex items-center gap-1 text-[10px] text-gray-400 font-bold">
-                      <Users className="w-3.5 h-3.5 text-gray-500 shrink-0" />
-                      <span>{venue.minCapacity} - {venue.maxCapacity} Guests</span>
-                    </div>
-
-                    <div className="flex justify-between items-center border-t border-white/5 pt-3">
-                      <div className="flex items-center gap-2 text-indigo-400 font-black text-xs font-outfit">
-                        <span>{venue.priceTier}</span>
-                        <span className="text-gray-600 font-bold font-sans">•</span>
-                        <span className="text-gray-500 font-sans font-bold flex items-center gap-0.5">
-                          <MapPin className="w-3 h-3 shrink-0" />
-                          {venue.location}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-0.5 text-emerald-500 font-extrabold text-xs font-outfit">
-                        <span>{venue.rating}</span>
-                        <Star className="w-3 h-3 text-emerald-500 fill-emerald-500 shrink-0" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            /* LIST VIEW */
-            <div className="flex flex-col gap-4">
-              {sortedVenues.map(venue => (
-                <div
-                  key={venue.id}
-                  onClick={() => {
-                    setSelectedVenueDetail(venue);
-                    setIsBookingSuccess(false);
-                  }}
-                  className="glass-card rounded-2xl border border-white/5 overflow-hidden flex flex-col sm:flex-row gap-4 p-3 items-center cursor-pointer group shadow-sm"
-                >
-                  <img
-                    src={venue.image}
-                    alt={venue.name}
-                    className="w-full sm:w-40 h-28 object-cover rounded-xl border border-white/5 shrink-0 group-hover:scale-102 transition-transform filter brightness-[1.02]"
-                  />
-                  <div className="flex-1 flex flex-col justify-between h-full py-1 min-w-0 w-full gap-2">
-                    <div className="flex justify-between items-start gap-4">
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-[9px] text-gray-500 font-extrabold uppercase">{venue.type}</span>
-                        <h4 className="text-sm font-extrabold text-white dark:text-white truncate group-hover:text-[#5a2bd4] dark:group-hover:text-indigo-400 transition-colors">
-                          {venue.name}
-                        </h4>
-                        <p className="text-[10px] text-gray-500 line-clamp-1 leading-normal font-semibold mt-1">
-                          {venue.description}
-                        </p>
-                      </div>
                       <button
                         onClick={(e) => toggleLike(venue.id, venue.name, e)}
-                        className="p-1.5 rounded-full border border-white/5 transition-all hover:bg-white/5 cursor-pointer shrink-0"
+                        className="absolute top-3 right-3 p-1.5 rounded-full backdrop-blur-md border border-white/10 transition-all cursor-pointer bg-[#07080a]/40"
                       >
                         <Heart
                           className={`w-3.5 h-3.5 ${
                             likedVenues.includes(venue.id)
-                              ? 'text-rose-500 fill-rose-500'
-                              : 'text-gray-400'
+                              ? 'text-rose-500 fill-rose-500 scale-110'
+                              : 'text-white'
                           }`}
                         />
                       </button>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] font-bold text-gray-400 mt-1">
-                      <span className="flex items-center gap-1">
-                        <Users className="w-3.5 h-3.5 text-gray-500" />
-                        {venue.minCapacity} - {venue.maxCapacity} Guests
-                      </span>
-                      <span className="flex items-center gap-1 font-outfit text-indigo-400 font-black">
-                        {venue.priceTier}
-                      </span>
-                      <span className="flex items-center gap-1 font-outfit text-emerald-500 font-black">
-                        {venue.rating} <Star className="w-3.5 h-3.5 fill-emerald-500 text-emerald-500" />
-                      </span>
-                      <span className="flex items-center gap-1 font-sans text-gray-500 font-bold">
-                        <MapPin className="w-3.5 h-3.5" /> {venue.location}
-                      </span>
+                    {/* Content block */}
+                    <div className="p-5 flex flex-col gap-4 flex-1 justify-between">
+                      <div className="flex items-start gap-3.5">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 border ${catInfo.color}`}>
+                          <Icon className="w-4.5 h-4.5" />
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <h4 className="text-xs sm:text-sm font-extrabold text-white dark:text-white leading-tight mb-1 truncate group-hover:text-indigo-400 transition-colors">
+                            {venue.name}
+                          </h4>
+                          <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">
+                            {venue.type}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Metadata row */}
+                      <div className="flex flex-col gap-2 border-t border-white/5 pt-3.5 text-[10px] text-gray-500 dark:text-gray-400 font-semibold">
+                        <span className="flex items-center gap-1.5">
+                          <Users className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                          <span>{venue.minCapacity} - {venue.maxCapacity} Guests</span>
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                          <span>{venue.location}</span>
+                        </span>
+                      </div>
+
+                      {/* Pricing and Rating */}
+                      <div className="flex justify-between items-center border-t border-white/5 pt-3 mt-1">
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider border bg-indigo-500/5 border-indigo-500/25 text-indigo-400 font-outfit">
+                          {venue.priceTier}
+                        </span>
+                        <div className="flex items-center gap-1 text-emerald-500 font-extrabold text-xs font-outfit">
+                          <span>{venue.rating}</span>
+                          <Star className="w-3.5 h-3.5 text-emerald-500 fill-emerald-500 shrink-0" />
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
+            </div>
+          ) : (
+            /* LIST VIEW */
+            <div className="flex flex-col gap-4">
+              {sortedVenues.map(venue => {
+                const resolvedImg = resolveImage(venue.image, 'venue', venue.name);
+                const catInfo = getVenueCategoryInfo(venue.type);
+                const Icon = catInfo.icon;
+                return (
+                  <div
+                    key={venue.id}
+                    onClick={() => {
+                      setSelectedVenueDetail(venue);
+                      setIsBookingSuccess(false);
+                    }}
+                    className="glass-card rounded-[24px] border border-white/5 overflow-hidden flex flex-col sm:flex-row gap-4 p-4 items-center cursor-pointer group shadow-md hover:-translate-y-1 transition-all duration-300"
+                  >
+                    <div className="w-full sm:w-48 h-32 overflow-hidden rounded-xl border border-white/5 shrink-0 relative">
+                      <img
+                        src={resolvedImg}
+                        alt={venue.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 filter brightness-105"
+                      />
+                    </div>
+                    <div className="flex-1 flex flex-col justify-between h-full py-1 min-w-0 w-full gap-3">
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="flex items-start gap-3 min-w-0">
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 border ${catInfo.color}`}>
+                            <Icon className="w-4 h-4" />
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-[9px] text-gray-500 font-extrabold uppercase tracking-wider">{venue.type}</span>
+                            <h4 className="text-sm font-extrabold text-white dark:text-white truncate group-hover:text-indigo-400 transition-colors">
+                              {venue.name}
+                            </h4>
+                            <p className="text-[10px] text-gray-500 dark:text-gray-400 line-clamp-1 leading-normal font-semibold mt-1">
+                              {venue.description}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => toggleLike(venue.id, venue.name, e)}
+                          className="p-1.5 rounded-full border border-white/5 transition-all hover:bg-white/5 cursor-pointer shrink-0"
+                        >
+                          <Heart
+                            className={`w-3.5 h-3.5 ${
+                              likedVenues.includes(venue.id)
+                                ? 'text-rose-500 fill-rose-500 scale-110'
+                                : 'text-gray-400'
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] font-semibold text-gray-500 dark:text-gray-400 mt-1 border-t border-white/5 pt-2">
+                        <span className="flex items-center gap-1">
+                          <Users className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                          {venue.minCapacity} - {venue.maxCapacity} Guests
+                        </span>
+                        <span className="flex items-center gap-1 font-outfit text-indigo-400 font-black">
+                          {venue.priceTier}
+                        </span>
+                        <span className="flex items-center gap-1 font-outfit text-emerald-500 font-black">
+                          {venue.rating} <Star className="w-3.5 h-3.5 fill-emerald-500 text-emerald-500 shrink-0" />
+                        </span>
+                        <span className="flex items-center gap-1 font-sans text-gray-500 font-bold ml-auto font-sans">
+                          <MapPin className="w-3.5 h-3.5 text-indigo-400 shrink-0" /> {venue.location}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -955,7 +1011,7 @@ export default function VenuesCatalog() {
                 <button className="p-1.5 rounded-lg border border-white/5 bg-white/3 text-gray-400 disabled:opacity-35 disabled:pointer-events-none cursor-pointer" disabled>
                   <ChevronLeft className="w-3.5 h-3.5" />
                 </button>
-                <button className="w-6 h-6 rounded-lg bg-[#5a2bd4] text-white flex items-center justify-center cursor-pointer">1</button>
+                <button className="w-6 h-6 rounded-lg bg-[#1d4ed8] text-white flex items-center justify-center cursor-pointer">1</button>
                 <button className="w-6 h-6 rounded-lg bg-white/3 border border-white/5 text-gray-400 hover:text-white cursor-pointer">2</button>
                 <button className="p-1.5 rounded-lg border border-white/5 bg-white/3 text-gray-400 hover:text-white cursor-pointer">
                   <ChevronRight className="w-3.5 h-3.5" />
@@ -1093,7 +1149,7 @@ export default function VenuesCatalog() {
                       onClick={() => handleFormAmenityToggle(amenity)}
                       className={`px-3 py-1.5 rounded-xl border text-[10px] font-bold transition-all cursor-pointer ${
                         newVenueAmenities.includes(amenity)
-                          ? 'bg-[#5a2bd4] border-[#5a2bd4] always-white'
+                          ? 'bg-[#1d4ed8] border-[#1d4ed8] always-white'
                           : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
                       }`}
                     >
@@ -1125,7 +1181,7 @@ export default function VenuesCatalog() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-[#5a2bd4] hover:bg-[#4c24b5] always-white text-xs font-bold transition-all shadow-md shadow-indigo-600/15 cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-[#1d4ed8] hover:bg-[#1e3a8a] always-white text-xs font-bold transition-all shadow-md shadow-indigo-600/15 cursor-pointer"
                 >
                   Add Venue
                 </button>
@@ -1151,7 +1207,7 @@ export default function VenuesCatalog() {
               <div className="flex flex-col gap-2">
                 <div className="w-full h-44 rounded-xl overflow-hidden border border-white/5 shrink-0 relative bg-slate-800">
                   <img
-                    src={activeGalleryImage || selectedVenueDetail.image}
+                    src={resolveImage(activeGalleryImage || selectedVenueDetail.image, 'venue', selectedVenueDetail.name)}
                     alt={selectedVenueDetail.name}
                     className="w-full h-full object-cover transition-all duration-300"
                   />
@@ -1159,14 +1215,14 @@ export default function VenuesCatalog() {
                 {/* Thumbnails row */}
                 <div className="flex gap-2">
                   {getVenueGallery(selectedVenueDetail).map((imgUrl, idx) => {
-                    const isActive = (activeGalleryImage || selectedVenueDetail.image) === imgUrl;
+                    const isActive = resolveImage(activeGalleryImage || selectedVenueDetail.image, 'venue', selectedVenueDetail.name) === imgUrl;
                     return (
                       <button
                         key={idx}
                         type="button"
                         onClick={() => setActiveGalleryImage(imgUrl)}
                         className={`w-12 h-10 rounded-lg overflow-hidden border transition-all cursor-pointer ${
-                          isActive ? 'border-[#5a2bd4] scale-105 shadow-md shadow-indigo-600/10' : 'border-white/5 hover:border-white/20'
+                          isActive ? 'border-[#1d4ed8] scale-105 shadow-md shadow-indigo-600/10' : 'border-white/5 hover:border-white/20'
                         }`}
                       >
                         <img src={imgUrl} alt="gallery thumbnail" className="w-full h-full object-cover" />
@@ -1281,7 +1337,7 @@ export default function VenuesCatalog() {
                       ) : (
                         <div className="text-[10px] text-amber-400 font-bold bg-amber-500/10 border border-amber-500/25 p-2 rounded-lg flex flex-col gap-1.5">
                           <span>You have no active events to book for.</span>
-                          <Link href="/ai" className="text-[#5a2bd4] dark:text-indigo-400 hover:underline">
+                          <Link href="/ai" className="text-[#1d4ed8] dark:text-indigo-400 hover:underline">
                             Create Event first &rarr;
                           </Link>
                         </div>
@@ -1310,7 +1366,7 @@ export default function VenuesCatalog() {
                     <button
                       type="submit"
                       disabled={events.length === 0}
-                      className="w-full py-2 bg-[#5a2bd4] hover:bg-[#4c24b5] disabled:opacity-40 disabled:pointer-events-none always-white text-[10px] font-extrabold rounded-xl transition-all shadow-md uppercase tracking-wider cursor-pointer"
+                      className="w-full py-2 bg-[#1d4ed8] hover:bg-[#1e3a8a] disabled:opacity-40 disabled:pointer-events-none always-white text-[10px] font-extrabold rounded-xl transition-all shadow-md uppercase tracking-wider cursor-pointer"
                     >
                       Book Venue
                     </button>

@@ -18,7 +18,12 @@ const getEvents = async (req, res) => {
 const getAdminEvents = async (req, res) => {
   try {
     console.log(`[DEBUG] getAdminEvents called by User ID: ${req.user.id}, Email: ${req.user.email}`);
-    const events = await db.query('SELECT e.*, b.expenses, b.remaining_budget FROM events e LEFT JOIN budget b ON e.id = b.event_id');
+    const events = await db.query(
+      'SELECT e.*, u.name AS user_name, u.email AS user_email, b.expenses, b.remaining_budget ' +
+      'FROM events e ' +
+      'LEFT JOIN users u ON e.user_id = u.id ' +
+      'LEFT JOIN budget b ON e.id = b.event_id'
+    );
     console.log(`[DEBUG] Found ${events.length} events for admin moderation.`);
     res.json(events);
   } catch (error) {
@@ -57,7 +62,7 @@ const getEventById = async (req, res) => {
 // @route   POST /api/create-event
 // @access  Private
 const createEvent = async (req, res) => {
-  const { title, description, event_type, date, time, location, budget, guest_count, theme, timeline, venue } = req.body;
+  const { title, event_type, date, time, location, budget, guest_count, theme, timeline, venue } = req.body;
 
   if (!title || !event_type || !date || !time || !location || !budget || !guest_count) {
     return res.status(400).json({ message: 'Please provide all required fields' });
@@ -66,8 +71,8 @@ const createEvent = async (req, res) => {
   try {
     // 1. Insert Event
     const result = await db.query(
-      'INSERT INTO events (user_id, title, description, event_type, date, time, location, budget, guest_count, status, theme) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [req.user.id, title, description || '', event_type, date, time, location, parseFloat(budget), parseInt(guest_count), 'planning', theme || 'Royal / Traditional']
+      'INSERT INTO events (user_id, title, event_type, date, time, location, budget, guest_count, status, theme) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [req.user.id, title, event_type, date, time, location, parseFloat(budget), parseInt(guest_count), 'planning', theme || 'Royal / Traditional']
     );
 
     const eventId = result.insertId;
@@ -104,11 +109,23 @@ const createEvent = async (req, res) => {
       [req.user.id, `Event "${title}" has been successfully created.`, 'unread']
     );
 
+    // Send event creation notification to admins
+    try {
+      const admins = await db.query("SELECT id FROM users WHERE role = 'admin'");
+      for (const admin of admins) {
+        await db.query(
+          "INSERT INTO notifications (user_id, message, status) VALUES (?, ?, 'unread')",
+          [admin.id, `New event added: "${title}" by ${req.user.name || 'User'}`]
+        );
+      }
+    } catch (err) {
+      console.error('Failed to create admin notification for event:', err.message);
+    }
+
     res.status(201).json({
       id: eventId,
       user_id: req.user.id,
       title,
-      description,
       event_type,
       date,
       time,
@@ -129,7 +146,7 @@ const createEvent = async (req, res) => {
 // @access  Private
 const updateEvent = async (req, res) => {
   const eventId = req.params.id;
-  const { title, description, event_type, date, time, location, budget, guest_count, status, theme } = req.body;
+  const { title, event_type, date, time, location, budget, guest_count, status, theme } = req.body;
 
   try {
     // Check if event exists
@@ -148,19 +165,26 @@ const updateEvent = async (req, res) => {
     // Format date properly to YYYY-MM-DD for MySQL to prevent E_INVALID_DATE errors
     let formattedDate = date || event.date;
     if (formattedDate) {
-      if (formattedDate instanceof Date) {
-        formattedDate = formattedDate.toISOString().split('T')[0];
+      if (typeof formattedDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(formattedDate)) {
+        // Already in YYYY-MM-DD format
       } else if (typeof formattedDate === 'string' && formattedDate.includes('T')) {
         formattedDate = formattedDate.split('T')[0];
+      } else {
+        const parsedDate = new Date(formattedDate);
+        if (!isNaN(parsedDate.getTime())) {
+          const year = parsedDate.getFullYear();
+          const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
+          const day = String(parsedDate.getDate()).padStart(2, '0');
+          formattedDate = `${year}-${month}-${day}`;
+        }
       }
     }
 
     // Update event details
     await db.query(
-      'UPDATE events SET title=?, description=?, event_type=?, date=?, time=?, location=?, budget=?, guest_count=?, status=?, theme=? WHERE id=?',
+      'UPDATE events SET title=?, event_type=?, date=?, time=?, location=?, budget=?, guest_count=?, status=?, theme=? WHERE id=?',
       [
         title || event.title,
-        description !== undefined ? description : event.description,
         event_type || event.event_type,
         formattedDate,
         time || event.time,
@@ -189,7 +213,7 @@ const updateEvent = async (req, res) => {
     res.json({ message: 'Event updated successfully' });
   } catch (error) {
     console.error('Update event error:', error.message);
-    res.status(500).json({ message: 'Server error updating event' });
+    res.status(500).json({ message: `Server error updating event: ${error.message}` });
   }
 };
 

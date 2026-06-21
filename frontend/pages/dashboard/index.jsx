@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
+import { getEventCover, resolveImage } from '../../utils/imageResolver';
 
 import {
   Calendar,
@@ -20,7 +21,12 @@ import {
   CheckCircle2,
   Activity,
   UserPlus,
-  MessageSquare
+  MessageSquare,
+  Heart,
+  Cake,
+  GraduationCap,
+  Wine,
+  Building
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -30,6 +36,7 @@ export default function Dashboard() {
 
   // General states
   const [events, setEvents] = useState([]);
+  const [localCovers, setLocalCovers] = useState({});
   const [loading, setLoading] = useState(true);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
 
@@ -70,7 +77,7 @@ export default function Dashboard() {
           const allGuests = guestsLists.flat();
           setTotalGuestsCount(allGuests.length);
 
-          const allTasks = tasksLists.flat();
+          const allTasks = tasksLists.flat().filter(t => !/^\d{1,2}:\d{2}\s*(AM|PM)/i.test(t.title || ''));
           setTotalTasksCount(allTasks.length);
 
           let completed = 0;
@@ -175,6 +182,20 @@ export default function Dashboard() {
       };
     }
   }, [user]);
+
+  // Sync custom event cover poster images from localStorage client-side
+  useEffect(() => {
+    if (events && events.length > 0) {
+      const covers = {};
+      events.forEach(e => {
+        const stored = localStorage.getItem(`event_cover_${e.id}`);
+        if (stored && stored.startsWith('data:')) {
+          covers[e.id] = stored;
+        }
+      });
+      setLocalCovers(covers);
+    }
+  }, [events]);
 
   // Fetch expenses for a selected event dynamically
   useEffect(() => {
@@ -1212,15 +1233,22 @@ export default function Dashboard() {
     return '₹ ' + Math.round(num).toLocaleString('en-IN');
   };
 
-  // Cover image mapping helper
-  const getEventCover = (category) => {
+  // Category Details Mapping Helper
+  const getEventCategoryInfo = (category) => {
     const cat = (category || '').toLowerCase();
-    if (cat.includes('wed')) return '/leela_palace.jpg';
-    if (cat.includes('birth')) return '/hero_udaipur_3.jpg';
-    if (cat.includes('corp') || cat.includes('conf')) return '/oberoi_udaivilas.jpg';
-    if (cat.includes('coll') || cat.includes('fest')) return '/monsoon_palace.jpg';
-    if (cat.includes('priv') || cat.includes('party')) return '/jag_mandir.jpg';
-    return '/hero_udaipur_1.jpg';
+    if (cat.includes('wed') || cat.includes('marr') || cat.includes('shaadi')) {
+      return { icon: Heart, color: 'text-pink-500 bg-pink-500/10 border-pink-500/20 dark:text-pink-400' };
+    }
+    if (cat.includes('birth') || cat.includes('anniv') || cat.includes('janam')) {
+      return { icon: Cake, color: 'text-purple-500 bg-purple-500/10 border-purple-500/20 dark:text-purple-400' };
+    }
+    if (cat.includes('corp') || cat.includes('conf') || cat.includes('seminar') || cat.includes('work')) {
+      return { icon: Building, color: 'text-blue-500 bg-blue-500/10 border-blue-500/20 dark:text-blue-400' };
+    }
+    if (cat.includes('college') || cat.includes('school') || cat.includes('fest') || cat.includes('edu')) {
+      return { icon: GraduationCap, color: 'text-amber-500 bg-amber-500/10 border-amber-500/20 dark:text-amber-400' };
+    }
+    return { icon: Wine, color: 'text-indigo-500 bg-indigo-500/10 border-indigo-500/20 dark:text-indigo-400' };
   };
 
   // Dynamic stats mapping
@@ -1229,7 +1257,38 @@ export default function Dashboard() {
   const displayUpcomingCount = upcomingEvents.length;
 
   // Real-time notifications processing & fallback mockup data
-  const fallbackNotifications = [
+  const fallbackNotifications = user?.role === 'admin' ? [
+    {
+      id: 'f1_admin',
+      message: 'New user registered: Aarav Sharma (aarav@gmail.com)',
+      status: 'unread',
+      created_at: new Date(Date.now() - 10 * 60000).toISOString()
+    },
+    {
+      id: 'f2_admin',
+      message: 'New feedback received: "Loved the UI design and event flow!"',
+      status: 'unread',
+      created_at: new Date(Date.now() - 4 * 3600000).toISOString()
+    },
+    {
+      id: 'f3_admin',
+      message: 'New venue added: Radisson Blu Udaipur Palace Resort',
+      status: 'read',
+      created_at: new Date(Date.now() - 24 * 3600000).toISOString()
+    },
+    {
+      id: 'f4_admin',
+      message: 'New event added: Royal Wedding by user Amit Kumar',
+      status: 'read',
+      created_at: new Date('2024-05-23T18:15:00').toISOString()
+    },
+    {
+      id: 'f5_admin',
+      message: 'New vendor added: Udaipur Royal Caterers',
+      status: 'read',
+      created_at: new Date('2024-05-22T12:00:00').toISOString()
+    }
+  ] : [
     {
       id: 'f1',
       message: 'Your booking for The Leela Palace, Udaipur on 25 Dec 2024 is confirmed.',
@@ -1287,10 +1346,30 @@ export default function Dashboard() {
     let colorClass = "bg-slate-500/10 text-slate-500 dark:text-slate-400";
     let text = notif.message;
 
-    if (msg.includes("booking") || msg.includes("venue")) {
+    if (msg.includes("new user registered")) {
+      title = "New User Registration";
+      iconName = "user-plus";
+      colorClass = "bg-blue-500/10 text-blue-600 dark:text-blue-400";
+    } else if (msg.includes("new feedback received")) {
+      title = "Feedback Submitted";
+      iconName = "message-square";
+      colorClass = "bg-amber-500/10 text-amber-600 dark:text-amber-400";
+    } else if (msg.includes("new venue added")) {
+      title = "New Venue Added";
+      iconName = "calendar";
+      colorClass = "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+    } else if (msg.includes("new vendor added")) {
+      title = "New Vendor Added";
+      iconName = "user-plus";
+      colorClass = "bg-purple-500/10 text-purple-600 dark:text-purple-400";
+    } else if (msg.includes("new event added")) {
+      title = "New Event Created";
+      iconName = "calendar";
+      colorClass = "bg-indigo-500/10 text-indigo-650 dark:text-indigo-400";
+    } else if (msg.includes("booking") || msg.includes("venue")) {
       title = "Venue Booking Confirmed";
       iconName = "calendar";
-      colorClass = "bg-purple-500/10 text-[#5a2bd4] dark:text-purple-400";
+      colorClass = "bg-purple-500/10 text-[#1d4ed8] dark:text-purple-400";
     } else if (msg.includes("guest") || msg.includes("invited")) {
       title = "New Guest Added";
       iconName = "user-plus";
@@ -1310,7 +1389,7 @@ export default function Dashboard() {
     } else if (msg.includes("budget") || msg.includes("expense")) {
       title = "Budget Updated";
       iconName = "receipt";
-      colorClass = "bg-[#efe9fc] text-[#5a2bd4] dark:bg-indigo-500/10 dark:text-indigo-400";
+      colorClass = "bg-[#eff6ff] text-[#1d4ed8] dark:bg-indigo-500/10 dark:text-indigo-400";
     } else if (msg.includes("completed") || msg.includes("marked completed")) {
       title = "Task Completed";
       iconName = "check-circle";
@@ -1383,7 +1462,7 @@ export default function Dashboard() {
         </div>
         <Link
           href="/ai"
-          className="px-4 py-2.5 rounded-xl bg-[#5a2bd4] hover:bg-[#4c24b5] always-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-indigo-500/10 transition-all transform hover:-translate-y-0.5"
+          className="px-4 py-2.5 rounded-xl bg-[#1d4ed8] hover:bg-[#1e3a8a] always-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-indigo-500/10 transition-all transform hover:-translate-y-0.5"
         >
           <Plus className="w-4 h-4" />
           Create New Event
@@ -1397,11 +1476,11 @@ export default function Dashboard() {
           <div className="flex flex-col gap-1">
             <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Upcoming Events</span>
             <span className="text-2xl font-extrabold text-white dark:text-white">{displayUpcomingCount}</span>
-            <Link href="/events" className="text-[10px] text-[#5a2bd4] dark:text-indigo-400 font-bold hover:underline mt-1 inline-flex items-center gap-0.5">
+            <Link href="/events" className="text-[10px] text-[#1d4ed8] dark:text-indigo-400 font-bold hover:underline mt-1 inline-flex items-center gap-0.5">
               View all events &rarr;
             </Link>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 text-[#5a2bd4] dark:text-indigo-400 flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 text-[#1d4ed8] dark:text-indigo-400 flex items-center justify-center shrink-0">
             <Calendar className="w-5 h-5" />
           </div>
         </div>
@@ -1411,7 +1490,7 @@ export default function Dashboard() {
           <div className="flex flex-col gap-1">
             <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total Budget</span>
             <span className="text-2xl font-extrabold text-white dark:text-white">{formatRupee(displayBudget)}</span>
-            <Link href="/budget" className="text-[10px] text-[#5a2bd4] dark:text-indigo-400 font-bold hover:underline mt-1 inline-flex items-center gap-0.5">
+            <Link href="/budget" className="text-[10px] text-[#1d4ed8] dark:text-indigo-400 font-bold hover:underline mt-1 inline-flex items-center gap-0.5">
               View budget &rarr;
             </Link>
           </div>
@@ -1425,7 +1504,7 @@ export default function Dashboard() {
           <div className="flex flex-col gap-1">
             <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total Guests</span>
             <span className="text-2xl font-extrabold text-white dark:text-white">{displayGuests}</span>
-            <Link href="/guests" className="text-[10px] text-[#5a2bd4] dark:text-indigo-400 font-bold hover:underline mt-1 inline-flex items-center gap-0.5">
+            <Link href="/guests" className="text-[10px] text-[#1d4ed8] dark:text-indigo-400 font-bold hover:underline mt-1 inline-flex items-center gap-0.5">
               View guests &rarr;
             </Link>
           </div>
@@ -1441,7 +1520,7 @@ export default function Dashboard() {
             <span className="text-2xl font-extrabold text-white dark:text-white">
               {totalTasksCount > 0 ? `${Math.round((tasksCompletedCount / totalTasksCount) * 100)}%` : '0%'}
             </span>
-            <Link href="/tasks" className="text-[10px] text-[#5a2bd4] dark:text-indigo-400 font-bold hover:underline mt-1 inline-flex items-center gap-0.5">
+            <Link href="/tasks" className="text-[10px] text-[#1d4ed8] dark:text-indigo-400 font-bold hover:underline mt-1 inline-flex items-center gap-0.5">
               View tasks &rarr;
             </Link>
           </div>
@@ -1461,7 +1540,7 @@ export default function Dashboard() {
               <h3 className="text-xs font-bold text-gray-200 dark:text-white uppercase tracking-wider">
                 Upcoming Events
               </h3>
-              <Link href="/events" className="text-[10px] text-[#5a2bd4] dark:text-indigo-400 font-bold flex items-center gap-0.5 hover:underline">
+              <Link href="/events" className="text-[10px] text-[#1d4ed8] dark:text-indigo-400 font-bold flex items-center gap-0.5 hover:underline">
                 View All
                 <ArrowRight className="w-3.5 h-3.5" />
               </Link>
@@ -1478,58 +1557,74 @@ export default function Dashboard() {
                 </Link>
               </div>
             ) : (
-              <div className="flex flex-col gap-4">
-                {events.slice(0, 3).map((event, idx) => (
-                  <Link
-                    key={event.id}
-                    href={`/events/${event.id}`}
-                    className="p-3 rounded-xl bg-white/2 border border-white/5 hover:border-indigo-500/25 hover:bg-white/4 transition-all flex items-center justify-between gap-4"
-                  >
-                    <div className="flex items-center gap-4">
-                      {/* Image Thumbnail */}
-                      <img
-                        src={getEventCover(event.event_type)}
-                        alt={event.title}
-                        className="w-20 h-14 rounded-xl object-cover border border-white/5 filter brightness-105 shrink-0"
-                      />
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="text-xs font-bold text-gray-200 dark:text-white">{event.title}</h4>
-                          <span className="px-2 py-0.5 rounded text-[8px] font-bold uppercase bg-white/5 text-gray-400 border border-white/5">
-                            {event.event_type}
-                          </span>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {events.slice(0, 3).map((event) => {
+                  const catInfo = getEventCategoryInfo(event.event_type);
+                  const Icon = catInfo.icon;
+                  return (
+                    <Link
+                      key={event.id}
+                      href={`/events/${event.id}`}
+                      className="glass-card rounded-[24px] border border-white/5 overflow-hidden flex flex-col justify-between group cursor-pointer shadow-md hover:-translate-y-1.5 transition-all duration-300"
+                    >
+                      {/* Aspect ratio cover image with hover zoom */}
+                      <div className="relative aspect-[16/10] w-full overflow-hidden border-b border-white/5">
+                        <img
+                          src={localCovers[event.id] || getEventCover(event.event_type, event.title)}
+                          alt={event.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 filter brightness-105"
+                        />
+                      </div>
+
+                      {/* Content block */}
+                      <div className="p-5 flex flex-col gap-4 flex-1 justify-between">
+                        <div className="flex items-start gap-3.5">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 border ${catInfo.color}`}>
+                            <Icon className="w-4.5 h-4.5" />
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <h4 className="text-xs sm:text-sm font-extrabold text-white dark:text-white leading-tight mb-1 truncate">
+                              {event.title}
+                            </h4>
+                            <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">
+                              {event.event_type}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-gray-500">
-                          <span className="flex items-center gap-1">
-                            <MapPin className="w-3 h-3 text-indigo-400 shrink-0" />
+
+                        {/* Metadata row */}
+                        <div className="flex flex-col gap-2 border-t border-white/5 pt-3.5 text-[10px] text-gray-500 dark:text-gray-400 font-semibold">
+                          <span className="flex items-center gap-1.5">
+                            <MapPin className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                             {event.location}
                           </span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3 text-indigo-400 shrink-0" />
+                          <span className="flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                             {new Date(event.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
                           </span>
-                          <span className="hidden sm:inline">•</span>
-                          <span className="hidden sm:inline">{event.guest_count} Guests</span>
+                        </div>
+
+                        {/* Status + CTA */}
+                        <div className="flex justify-between items-center border-t border-white/5 pt-3 mt-1">
+                          <span className={`px-2.5 py-1 rounded-full text-[8px] font-extrabold uppercase tracking-wider border ${
+                            event.status === 'planning'
+                              ? 'bg-indigo-500/5 border-indigo-500/25 text-indigo-400'
+                              : event.status === 'ongoing' || event.status === 'in progress'
+                              ? 'bg-emerald-500/5 border-emerald-500/25 text-emerald-500'
+                              : event.status === 'completed'
+                              ? 'bg-blue-500/5 border-blue-500/25 text-blue-400'
+                              : 'bg-amber-500/5 border-amber-500/25 text-amber-500'
+                          }`}>
+                            {event.status === 'ongoing' || event.status === 'in progress' ? 'In Progress' : event.status}
+                          </span>
+                          <span className="text-[10px] text-[#1d4ed8] dark:text-indigo-400 font-bold flex items-center gap-0.5 hover:underline">
+                            Details &rarr;
+                          </span>
                         </div>
                       </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className={`px-2.5 py-1 rounded-full text-[8px] font-extrabold uppercase tracking-wider border ${
-                        event.status === 'planning'
-                          ? 'bg-indigo-500/5 border-indigo-500/25 text-indigo-400'
-                          : event.status === 'ongoing' || event.status === 'in progress'
-                          ? 'bg-emerald-500/5 border-emerald-500/25 text-emerald-500'
-                          : event.status === 'completed'
-                          ? 'bg-blue-500/5 border-blue-500/25 text-blue-400'
-                          : 'bg-amber-500/5 border-amber-500/25 text-amber-500'
-                      }`}>
-                        {event.status === 'ongoing' || event.status === 'in progress' ? 'In Progress' : event.status}
-                      </span>
-                      <ChevronRight className="w-4 h-4 text-gray-500" />
-                    </div>
-                  </Link>
-                ))}
+                    </Link>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1540,7 +1635,7 @@ export default function Dashboard() {
               <h3 className="text-xs font-bold text-gray-200 dark:text-white uppercase tracking-wider">
                 Task Overview
               </h3>
-              <Link href="/tasks" className="text-[10px] text-[#5a2bd4] dark:text-indigo-400 font-bold hover:underline">
+              <Link href="/tasks" className="text-[10px] text-[#1d4ed8] dark:text-indigo-400 font-bold hover:underline">
                 View All Tasks
               </Link>
             </div>
@@ -1552,7 +1647,7 @@ export default function Dashboard() {
                 <span>{totalTasksCount > 0 ? `${Math.round((tasksCompletedCount / totalTasksCount) * 100)}%` : '0%'}</span>
               </div>
               <div className="w-full h-2.5 bg-white/5 rounded-full overflow-hidden border border-white/5">
-                <div className="h-full bg-[#5a2bd4] rounded-full" style={{ width: totalTasksCount > 0 ? `${Math.round((tasksCompletedCount / totalTasksCount) * 100)}%` : '0%' }}></div>
+                <div className="h-full bg-[#1d4ed8] rounded-full" style={{ width: totalTasksCount > 0 ? `${Math.round((tasksCompletedCount / totalTasksCount) * 100)}%` : '0%' }}></div>
               </div>
             </div>
 
@@ -1609,7 +1704,7 @@ export default function Dashboard() {
               <h3 className="text-xs font-bold text-gray-200 dark:text-white uppercase tracking-wider">
                 Budget Overview
               </h3>
-              <Link href="/budget" className="text-[10px] text-[#5a2bd4] dark:text-indigo-400 font-bold hover:underline">
+              <Link href="/budget" className="text-[10px] text-[#1d4ed8] dark:text-indigo-400 font-bold hover:underline">
                 View Details
               </Link>
             </div>
@@ -1624,7 +1719,7 @@ export default function Dashboard() {
                     cy="50"
                     r="40"
                     fill="transparent"
-                    stroke="#5a2bd4"
+                    stroke="#1d4ed8"
                     strokeWidth="10"
                     strokeDasharray="100.48 251.2"
                     strokeDashoffset="0"
@@ -1688,7 +1783,7 @@ export default function Dashboard() {
               <div className="flex flex-col gap-2 w-full text-[10px] font-bold text-gray-300">
                 <div className="flex justify-between items-center border-b border-white/5 pb-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#5a2bd4] shrink-0"></span>
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#1d4ed8] shrink-0"></span>
                     <span>Venue (40%)</span>
                   </div>
                   <span className="font-outfit text-gray-400">{formatRupee(displayBudget * 0.40)}</span>
@@ -1732,7 +1827,7 @@ export default function Dashboard() {
               <h3 className="text-xs font-bold text-gray-200 dark:text-white uppercase tracking-wider">
                 Notifications
               </h3>
-              <Link href="/notifications" className="text-[10px] text-[#5a2bd4] dark:text-indigo-400 font-bold hover:underline">
+              <Link href="/notifications" className="text-[10px] text-[#1d4ed8] dark:text-indigo-400 font-bold hover:underline">
                 View All
               </Link>
             </div>
@@ -1769,11 +1864,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* 4. Footer */}
-      <div className="mt-8 pt-6 border-t border-white/5 flex flex-col sm:flex-row justify-between items-center gap-4 text-[10px] font-bold text-gray-500">
-        <span>&copy; {new Date().getFullYear()} JAGAH Udaipur. All Rights Reserved.</span>
-        <span>Made with &hearts; in Udaipur</span>
-      </div>
+
 
       {/* AI Suggestions Modal Overlay */}
       {isAiModalOpen && (

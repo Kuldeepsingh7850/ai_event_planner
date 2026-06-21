@@ -1,4 +1,4 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const db = require('../config/db');
 require('dotenv').config();
 
 // Helper to shift timeline relative to user start time
@@ -273,7 +273,7 @@ const normalizeSuggestions = (data, budget, startTimeStr) => {
 // @route   POST /api/ai/suggestions
 // @access  Private
 const getAISuggestions = async (req, res) => {
-  const { title, eventType, budget, guestCount, location, time, specialRequests, description } = req.body;
+  const { title, eventType, budget, guestCount, location, time, specialRequests, description, venues } = req.body;
 
   if (!title || !eventType || !budget || !guestCount) {
     return res.status(400).json({ message: 'Please provide all details: title, eventType, budget, guestCount' });
@@ -302,8 +302,6 @@ const getAISuggestions = async (req, res) => {
   }
 
   const groqKey = process.env.GROQ_API_KEY;
-  const grokKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
-  const geminiKey = process.env.GEMINI_API_KEY;
 
   const prompt = `
     You are an expert AI Event Planner & Organizer. Generate professional and highly customized ideas for an event.
@@ -337,40 +335,16 @@ const getAISuggestions = async (req, res) => {
       ],
       "venues": [
         {
-          "id": "venue_1",
-          "name": "Name of a real/realistic Venue 1 in ${eventLocation}",
+          "id": "unique_id_string_like_ananta",
+          "name": "Name of a real/realistic Venue in ${eventLocation} from internet/knowledge base",
           "rating": "4.8 ★",
-          "img": "one of these exact strings: /leela_palace.jpg, /monsoon_palace.jpg, /hero_udaipur_3.jpg, /shiv_niwas.jpg, /oberoi_udaivilas.jpg, /taj_lake_palace.jpg, /jag_mandir.jpg",
-          "location": "Specific area / address in ${eventLocation}",
+          "img": "image_path_or_url",
+          "location": "Specific area / address in Udaipur",
           "capacity": "Capacity range (e.g. 150 - 300 Guests)",
-          "type": "Venue type (e.g. Luxury Resort, Heritage Hotel, Banquet)",
+          "type": "Venue type (e.g. Luxury Resort, Hilltop Retreat, Open Lawn)",
           "cost": 400000,
           "availability": "Available",
           "desc": "Short description of this venue and why it fits this specific event"
-        },
-        {
-          "id": "venue_2",
-          "name": "Name of Venue 2 in ${eventLocation}",
-          "rating": "4.5 ★",
-          "img": "one of these exact strings: /leela_palace.jpg, /monsoon_palace.jpg, /hero_udaipur_3.jpg, /shiv_niwas.jpg, /oberoi_udaivilas.jpg, /taj_lake_palace.jpg, /jag_mandir.jpg",
-          "location": "Specific area / address in ${eventLocation}",
-          "capacity": "Capacity range",
-          "type": "Venue type",
-          "cost": 300000,
-          "availability": "Available",
-          "desc": "Short description"
-        },
-        {
-          "id": "venue_3",
-          "name": "Name of Venue 3 in ${eventLocation}",
-          "rating": "4.6 ★",
-          "img": "one of these exact strings: /leela_palace.jpg, /monsoon_palace.jpg, /hero_udaipur_3.jpg, /shiv_niwas.jpg, /oberoi_udaivilas.jpg, /taj_lake_palace.jpg, /jag_mandir.jpg",
-          "location": "Specific area / address in ${eventLocation}",
-          "capacity": "Capacity range",
-          "type": "Venue type",
-          "cost": 350000,
-          "availability": "Available",
-          "desc": "Short description"
         }
       ],
       "tips": ["Tip 1", "Tip 2", "Tip 3", "Tip 4"]
@@ -378,8 +352,33 @@ const getAISuggestions = async (req, res) => {
 
     Requirements for values:
     1. The budgetAllocation category amounts must sum up to exactly ₹${budget}. Let the percentages vary dynamically depending on what fits a "${eventType}" best (e.g., weddings spend more on venues, corporate seminars spend more on AV equipment).
-    2. Generate 3 real or highly realistic venues in "${eventLocation}". Ensure venue 'cost' represents a realistic portion of the total budget (typically 25% to 45% of the total budget). Set the capacity to comfortably accommodate ${guestCount} guests. Choose the image path matching the style of the hotel.
-    3. Generate a realistic timeline customized to a "${eventType}" starting exactly at the event start time "${startTime}".
+    2. Suggest exactly 3 or 4 real venues in Udaipur based strictly on the Total Budget of ₹${budget}:
+       - If the Total Budget is LOW (Budget < ₹1,00,000, like a small birthday party or event under ₹1,00,000):
+         You MUST NOT suggest ultra-luxury hotels/palaces (like The Leela Palace, Oberoi Udaivilas, Taj Lake Palace, Fateh Garh, Shiv Niwas Palace, Radisson Blu, Ramada Resort, Chunda Palace, etc.) because booking them is completely unrealistic for this budget. Instead, suggest real budget venues, party halls, restaurants, or community gardens in Udaipur, such as Ashoka Palace, Hotel Hilltop Palace, Valley View, Aravali Lawn, Tribute Restaurant, Ambrai Restaurant, Mewar Food Court, local community halls, or dharamshalas. Ensure the venue "cost" is realistic (e.g. ₹5,000 to ₹15,000).
+       - If the Total Budget is MID-RANGE (Budget ₹1,00,000 - ₹5,00,000):
+         Suggest mid-range hotels/resorts in Udaipur, such as Spectrum Resort, Mewar Garh, Labh Garh Palace, Justa Rajputana, Shaurya Garh, Bijolai Fort, Aravali Lawn, or Hotel Hilltop Palace. Ensure venue "cost" is realistic (e.g. ₹25,000 to ₹1,20,000).
+       - If the Total Budget is LUXURY/HIGH (Budget > ₹5,00,000):
+         You may suggest ultra-luxury hotels, heritage resorts, and royal palaces in Udaipur, such as The Leela Palace Udaipur, Taj Lake Palace, The Oberoi Udaivilas, Fateh Garh Resort, Bhanwar Singh Palace, Radisson Blu Udaipur, Ramada Resort, or Shiv Niwas Palace. Ensure the venue "cost" is realistic (e.g. ₹1,50,000 to ₹4,00,000).
+    3. For the "img" field of each suggested venue:
+       - If you suggest any of these local assets, use their exact path:
+         * The Leela Palace Udaipur -> /leela_palace.jpg
+         * Fateh Garh Resort -> /monsoon_palace.jpg
+         * Radisson Blu Udaipur -> /hero_udaipur_3.jpg
+         * Ramada Resort Udaipur -> /shiv_niwas.jpg
+         * The Oberoi Udaivilas -> /oberoi_udaivilas.jpg
+         * Taj Lake Palace -> /taj_lake_palace.jpg
+         * Jag Mandir Island Palace -> /jag_mandir.jpg
+       - Otherwise, you MUST choose one of these beautiful, high-quality, stable hotel/event-space Unsplash image URLs:
+         * https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80 (Luxury Resort)
+         * https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80 (Heritage Mansion)
+         * https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=800&q=80 (Poolside Resort)
+         * https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=800&q=80 (Luxury Hotel)
+         * https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80 (Grand Entrance)
+         * https://images.unsplash.com/photo-1564507592333-c60657eea523?auto=format&fit=crop&w=800&q=80 (Heritage Hotel)
+         * https://images.unsplash.com/photo-1596394516093-501ba68a0ba6?auto=format&fit=crop&w=800&q=80 (Resort Courtyard)
+         * https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=800&q=80 (Outdoor Event Lawn)
+         * https://images.unsplash.com/photo-1533105079780-92b9be482077?auto=format&fit=crop&w=800&q=80 (Banquet Hall)
+    4. Generate a realistic timeline customized to a "${eventType}" starting exactly at the event start time "${startTime}".
   `;
 
   // 1. Try Groq if key is present
@@ -396,51 +395,121 @@ const getAISuggestions = async (req, res) => {
       console.log('Groq API recommendations generated successfully!');
       return res.json(normalizeSuggestions(parsedData, budget, time));
     } catch (err) {
-      console.error('Groq API error, trying next option:', err.message);
+      console.error('Groq API error, falling back to mock:', err.message);
     }
   }
 
-  // 2. Try Grok (xAI) if key is present
-  if (grokKey) {
-    try {
-      console.log('Attempting xAI Grok API for suggestions...');
-      const responseText = await callOpenAICompatibleAPI(
-        grokKey,
-        'https://api.x.ai/v1/chat/completions',
-        'grok-beta',
-        prompt
-      );
-      const parsedData = parseJSONResponse(responseText);
-      console.log('xAI Grok API recommendations generated successfully!');
-      return res.json(normalizeSuggestions(parsedData, budget, time));
-    } catch (err) {
-      console.error('xAI Grok API error, trying next option:', err.message);
-    }
-  }
-
-  // 3. Try Gemini if key is present
-  if (geminiKey) {
-    try {
-      console.log('Attempting Gemini API for suggestions...');
-      const genAI = new GoogleGenerativeAI(geminiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      let text = response.text();
-      const parsedData = parseJSONResponse(text);
-      console.log('Gemini API recommendations generated successfully!');
-      return res.json(normalizeSuggestions(parsedData, budget, time));
-    } catch (err) {
-      console.error('Gemini API error, falling back to mock:', err.message);
-    }
-  }
-
-  // 4. Default Fallback
+  // 2. Default Fallback
   console.log('Using local fallback for suggestions...');
   const suggestions = generateFallbackSuggestions(title, eventType, budget, guestCount, time);
   return res.json(suggestions);
 };
 
+const chatWithAI = async (req, res) => {
+  const { eventId, message, history } = req.body;
+
+  if (!eventId || !message) {
+    return res.status(400).json({ message: 'Event ID and message are required' });
+  }
+
+  try {
+    // 1. Fetch Event details
+    const events = await db.query('SELECT * FROM events WHERE id = ?', [eventId]);
+    if (events.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    const event = events[0];
+
+    // 2. Fetch Budget details
+    const budgets = await db.query('SELECT * FROM budget WHERE event_id = ?', [eventId]);
+    const budget = budgets[0] || null;
+
+    // 3. Fetch Tasks
+    const tasks = await db.query('SELECT * FROM tasks WHERE event_id = ?', [eventId]);
+    const totalTasks = tasks.length;
+    const completedTasks = tasks.filter(t => t.status === 'completed').length;
+
+    // 4. Fetch Guests
+    const guests = await db.query('SELECT * FROM guests WHERE event_id = ?', [eventId]);
+    const totalGuests = guests.length;
+    const confirmedGuests = guests.filter(g => g.status === 'confirmed').length;
+
+    // 5. Fetch Vendors
+    const vendors = await db.query('SELECT * FROM vendors WHERE event_id = ?', [eventId]);
+    const vendorsList = vendors.map(v => `${v.vendor_name} (${v.category}, Cost: ₹${v.cost}, Status: ${v.status})`).join(', ');
+
+    // 6. Construct Event Context Prompt
+    const eventContext = `
+You are an expert AI Event Planner assistant. The user is planning an event with the following live details:
+- Title: "${event.title}"
+- Type: "${event.event_type}"
+- Date: "${event.date ? event.date.toISOString().split('T')[0] : 'N/A'}"
+- Location: "${event.location}"
+- Total Budget: ₹${event.budget}
+- Spent Budget: ₹${budget ? budget.expenses : 0}
+- Remaining Budget: ₹${budget ? budget.remaining_budget : event.budget}
+- Guests: ${totalGuests} invited (${confirmedGuests} confirmed)
+- Tasks: ${totalTasks} total (${completedTasks} completed)
+- Hired Vendors: ${vendorsList || 'None hired yet'}
+
+Provide a helpful, polite, and contextual answer to the user's question. Answer in the same language the user asks the question (Hinglish/Hindi or English). Keep your response concise and focused on planning the event.
+`;
+
+    // 7. Format messages history for the LLM
+    const messages = [
+      { role: 'system', content: eventContext }
+    ];
+
+    if (history && Array.isArray(history)) {
+      history.slice(-10).forEach(msg => {
+        messages.push({
+          role: msg.sender === 'user' ? 'user' : 'assistant',
+          content: msg.text
+        });
+      });
+    }
+
+    messages.push({ role: 'user', content: message });
+
+    const groqKey = process.env.GROQ_API_KEY;
+
+    let reply = "";
+
+    if (groqKey) {
+      try {
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${groqKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'llama-3.1-8b-instant',
+            messages: messages,
+            temperature: 0.7
+          })
+        });
+        if (response.ok) {
+          const data = await response.json();
+          reply = data.choices[0].message.content;
+        }
+      } catch (err) {
+        console.error('Groq Chat Error:', err.message);
+      }
+    }
+
+    if (!reply) {
+      reply = `I'm here to help you plan your event "${event.title}". Unfortunately, I cannot connect to the AI service right now. Please check back later!`;
+    }
+
+    return res.json({ reply });
+  } catch (err) {
+    console.error('Chat controller error:', err);
+    return res.status(500).json({ message: 'Internal Server Error' });
+  }
+};
+
 module.exports = {
-  getAISuggestions
+  getAISuggestions,
+  chatWithAI
 };
