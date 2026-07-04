@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import { useTheme } from '../context/ThemeContext';
 import {
   User,
   Camera,
@@ -18,6 +19,8 @@ import {
 export default function Profile() {
   const { user, authFetch, updateUserAvatar, updateUserName } = useAuth();
   const { showToast } = useNotifications();
+  const { theme } = useTheme();
+  const isLight = theme === 'light';
 
   // Active Tab: 'Profile Information', 'Account Settings', 'Password & Security', 'Preferences'
   const [activeTab, setActiveTab] = useState('Profile Information');
@@ -282,8 +285,12 @@ export default function Profile() {
             )}
           </div>
 
-          <label className="px-4 py-2 border border-white/10 hover:border-indigo-500/35 bg-white/5 hover:bg-white/10 text-gray-300 dark:hover:text-white text-xs font-bold rounded-xl flex items-center gap-2 transition-all cursor-pointer">
-            <Camera className="w-4 h-4 text-indigo-400" />
+          <label className={`px-4 py-2 border text-xs font-bold rounded-xl flex items-center gap-2 transition-all cursor-pointer ${
+            isLight
+              ? 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700 hover:text-slate-900 shadow-sm'
+              : 'bg-white/5 hover:bg-white/10 border-white/10 text-gray-300 dark:hover:text-white'
+          }`}>
+            <Camera className={`w-4 h-4 ${isLight ? 'text-indigo-600' : 'text-indigo-400'}`} />
             <span>Change Photo</span>
             <input
               type="file"

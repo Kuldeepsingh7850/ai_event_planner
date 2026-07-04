@@ -10,6 +10,7 @@ import {
   Receipt,
   Sparkles,
   CheckSquare,
+  Camera,
   PhoneCall,
   Info,
   Clock,
@@ -1219,9 +1220,10 @@ export default function EventDetailHub() {
             />
             <button
               onClick={() => document.getElementById('event-cover-upload').click()}
-              className="absolute bottom-3 left-3 bg-black/60 hover:bg-black/85 text-white text-[9px] font-black uppercase tracking-wider px-2.5 py-1.5 rounded-lg border border-white/10 transition-colors cursor-pointer"
+              className="absolute bottom-3 left-3 bg-black/60 hover:bg-black/85 always-white text-[9px] font-black uppercase tracking-wider px-2.5 py-1.5 rounded-lg border always-border-white transition-colors cursor-pointer flex items-center gap-1.5"
             >
-              Change Photo
+              <Camera className="w-3 h-3 always-white" />
+              <span>Change Photo</span>
             </button>
           </div>
 
@@ -1761,7 +1763,7 @@ export default function EventDetailHub() {
               </div>
               <button
                 onClick={handleTriggerAISuggestions}
-                className="px-4 py-2.5 bg-[#1d4ed8] hover:bg-[#1e40af] text-white always-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-lg shadow-indigo-600/10 transition-colors cursor-pointer"
+                className="px-4 py-2.5 bg-[#1d4ed8] hover:bg-[#1e40af] always-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-lg shadow-indigo-600/10 transition-colors cursor-pointer"
               >
                 <Sparkles className="w-3.5 h-3.5" />
                 Ask AI Assistant
@@ -2589,7 +2591,7 @@ export default function EventDetailHub() {
                         <button
                           type="button"
                           onClick={handleAutoFillVendor}
-                          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white always-white font-extrabold text-[10px] rounded-xl tracking-wider transition-all cursor-pointer uppercase flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/15"
+                          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 always-white font-extrabold text-[10px] rounded-xl tracking-wider transition-all cursor-pointer uppercase flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/15"
                         >
                           Select 
                         </button>
@@ -3098,9 +3100,9 @@ export default function EventDetailHub() {
               <button
                 type="submit"
                 disabled={chatLoading || !chatInput.trim()}
-                className="p-2.5 bg-[#1d4ed8] hover:bg-[#1e40af] disabled:bg-gray-700/30 disabled:border-gray-700/10 text-white always-white rounded-xl shadow-lg flex items-center justify-center cursor-pointer transition-colors"
+                className="p-2.5 bg-[#1d4ed8] hover:bg-[#1e40af] disabled:bg-gray-700/30 disabled:border-gray-700/10 always-white rounded-xl shadow-lg flex items-center justify-center cursor-pointer transition-colors"
               >
-                <Send className="w-4 h-4 text-white always-white" />
+                <Send className="w-4 h-4 always-white" />
               </button>
             </form>
 

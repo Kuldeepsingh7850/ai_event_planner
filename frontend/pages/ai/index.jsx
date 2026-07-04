@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { LogoBrand } from '../../components/Logo';
+import { resolveImage } from '../../utils/imageResolver';
 import {
   Sparkles,
   Users,
@@ -47,6 +48,12 @@ export default function AIEventPlannerIntermediate() {
   const canvasRef = useRef(null);
   const [posterTheme, setPosterTheme] = useState('indigo');
 
+  const catLower = (category || '').toLowerCase();
+  const isCorporate = catLower.includes('corporate') || catLower.includes('conference') || catLower.includes('product') || catLower.includes('exhibition');
+  const isFestive = catLower.includes('birthday') || catLower.includes('shower') || catLower.includes('other') || catLower === '';
+  const isAcademic = catLower.includes('college') || catLower.includes('cultural') || catLower.includes('fest');
+  const isRoyal = !isCorporate && !isFestive && !isAcademic;
+
   const drawPoster = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -54,13 +61,6 @@ export default function AIEventPlannerIntermediate() {
     if (!ctx) return;
 
     ctx.clearRect(0, 0, 800, 1000);
-
-    const catLower = (category || '').toLowerCase();
-    
-    const isCorporate = catLower.includes('corporate') || catLower.includes('conference') || catLower.includes('product') || catLower.includes('exhibition');
-    const isFestive = catLower.includes('birthday') || catLower.includes('shower') || catLower.includes('other') || catLower === '';
-    const isAcademic = catLower.includes('college') || catLower.includes('cultural') || catLower.includes('fest');
-    const isRoyal = !isCorporate && !isFestive && !isAcademic; // default to royal/traditional for weddings, anniversaries, engagements
 
     // 1. Background Gradient
     let bgColor1 = '#1e1b4b'; // Indigo theme
@@ -406,7 +406,7 @@ export default function AIEventPlannerIntermediate() {
       drawDiamond(400, 290, 4);
     }
 
-    // Main Event Title (adjust size dynamically if long)
+    // Main Event Title (adjust size dynamically if long, and wrap text)
     let titleFontSize = 42;
     if (eventTitle && eventTitle.length > 25) titleFontSize = 32;
     if (eventTitle && eventTitle.length > 40) titleFontSize = 24;
@@ -422,7 +422,31 @@ export default function AIEventPlannerIntermediate() {
     ctx.shadowBlur = isCorporate ? 2 : 4;
     ctx.shadowOffsetX = 2;
     ctx.shadowOffsetY = 2;
-    ctx.fillText(eventTitle || 'Royal Celebration', 400, 360);
+
+    const maxTitleWidth = 640;
+    const titleLineHeight = titleFontSize * 1.3;
+    const titleText = eventTitle || 'Royal Celebration';
+    const words = titleText.split(' ');
+    let line = '';
+    let titleLines = [];
+    for (let n = 0; n < words.length; n++) {
+      let testLine = line + words[n] + ' ';
+      let metrics = ctx.measureText(testLine);
+      let testWidth = metrics.width;
+      if (testWidth > maxTitleWidth && n > 0) {
+        titleLines.push(line);
+        line = words[n] + ' ';
+      } else {
+        line = testLine;
+      }
+    }
+    titleLines.push(line);
+    
+    let startY = 360 - ((titleLines.length - 1) * titleLineHeight) / 2;
+    for (let i = 0; i < titleLines.length; i++) {
+      ctx.fillText(titleLines[i].trim(), 400, startY + (i * titleLineHeight));
+    }
+    
     ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
 
     // Invitation message text based on category
@@ -461,7 +485,7 @@ export default function AIEventPlannerIntermediate() {
       : 'bold 15px "Georgia", serif';
     ctx.fillStyle = borderGrad;
     if (ctx.letterSpacing !== undefined) ctx.letterSpacing = '3px';
-    ctx.fillText("DATE & TIME", 400, 495);
+    ctx.fillText("DATE & TIME", 400, 515);
 
     // Format Date string
     let formattedDateStr = eventDate;
@@ -484,54 +508,25 @@ export default function AIEventPlannerIntermediate() {
       : 'normal 20px "Georgia", serif';
     ctx.fillStyle = '#ffffff';
     if (ctx.letterSpacing !== undefined) ctx.letterSpacing = 'normal';
-    ctx.fillText(formattedDateStr || 'Wednesday, June 24, 2026', 400, 535);
+    ctx.fillText(formattedDateStr || 'Wednesday, June 24, 2026', 400, 565);
 
     // Time
     ctx.font = isCorporate
       ? 'normal 15px "system-ui", sans-serif'
       : 'normal 17px "Georgia", serif';
     ctx.fillStyle = '#d1d5db';
-    ctx.fillText(`at ${eventTime || '09:00 AM'} onwards`, 400, 575);
+    ctx.fillText(`at ${eventTime || '09:00 AM'} onwards`, 400, 615);
 
     // Separator line
     ctx.beginPath();
-    ctx.moveTo(280, 615);
-    ctx.lineTo(520, 615);
+    ctx.moveTo(280, 675);
+    ctx.lineTo(520, 675);
     ctx.stroke();
     if (isFestive) {
-      ctx.beginPath(); ctx.arc(400, 615, 4, 0, 2 * Math.PI); ctx.fillStyle = borderGrad; ctx.fill();
+      ctx.beginPath(); ctx.arc(400, 675, 4, 0, 2 * Math.PI); ctx.fillStyle = borderGrad; ctx.fill();
     } else if (!isCorporate) {
-      drawDiamond(400, 615, 4);
+      drawDiamond(400, 675, 4);
     }
-
-    // Venue Section
-    ctx.font = isCorporate
-      ? 'bold 12px "system-ui", sans-serif'
-      : 'bold 15px "Georgia", serif';
-    ctx.fillStyle = borderGrad;
-    if (ctx.letterSpacing !== undefined) ctx.letterSpacing = '3px';
-    ctx.fillText("VENUE & LOCATION", 400, 655);
-
-    // Venue Name
-    let venueName = chosenVenue ? chosenVenue.name : (location || 'Udaipur, Rajasthan');
-    let venueFontSize = 20;
-    if (venueName.length > 25) venueFontSize = 16;
-    if (venueName.length > 40) venueFontSize = 14;
-    
-    ctx.font = isCorporate
-      ? `bold ${venueFontSize}px "system-ui", sans-serif`
-      : `bold ${venueFontSize}px "Georgia", serif`;
-    ctx.fillStyle = '#ffffff';
-    if (ctx.letterSpacing !== undefined) ctx.letterSpacing = 'normal';
-    ctx.fillText(venueName, 400, 700);
-
-    // Venue Location Subtext
-    let venueLocStr = chosenVenue ? chosenVenue.location : 'Udaipur, Rajasthan';
-    ctx.font = isCorporate
-      ? 'normal 13px "system-ui", sans-serif'
-      : 'normal 14px "Georgia", serif';
-    ctx.fillStyle = '#9ca3af';
-    ctx.fillText(venueLocStr, 400, 735);
 
     // Theme Subtext
     const selectedTheme = suggestions && suggestions.themes ? (typeof suggestions.themes[0] === 'object' ? (suggestions.themes[0].name || suggestions.themes[0].description) : suggestions.themes[0]) : 'Royal / Traditional';
@@ -539,7 +534,7 @@ export default function AIEventPlannerIntermediate() {
       ? 'normal 13px "system-ui", sans-serif'
       : 'italic 14px "Georgia", serif';
     ctx.fillStyle = isCorporate ? '#bdc3c7' : '#bf953f';
-    ctx.fillText(`Theme: ${selectedTheme || 'Royal Mewari'}`, 400, 800);
+    ctx.fillText(`Theme: ${selectedTheme || 'Royal Mewari'}`, 400, 745);
 
     // Footer decoration
     ctx.strokeStyle = isCorporate ? 'rgba(189, 195, 199, 0.15)' : 'rgba(191, 149, 63, 0.2)';
@@ -960,7 +955,18 @@ export default function AIEventPlannerIntermediate() {
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Event Category</label>
                 <select
                   value={category}
-                  onChange={(e) => setCategory(e.target.value)}
+                  onChange={(e) => {
+                    const newCat = e.target.value;
+                    setCategory(newCat);
+                    const newCatLower = newCat.toLowerCase();
+                    if (newCatLower.includes('corporate') || newCatLower.includes('conference') || newCatLower.includes('product') || newCatLower.includes('exhibition')) {
+                      setPosterTheme('indigo');
+                    } else if (newCatLower.includes('birthday') || newCatLower.includes('shower') || newCatLower.includes('other')) {
+                      setPosterTheme('burgundy');
+                    } else {
+                      setPosterTheme('emerald');
+                    }
+                  }}
                   className="w-full bg-white/3 border border-white/5 rounded-xl px-3 py-2 text-xs text-gray-200 focus:outline-none focus:border-indigo-500/50 transition-all cursor-pointer font-semibold"
                   required
                 >
@@ -1156,9 +1162,20 @@ export default function AIEventPlannerIntermediate() {
                   </div>
 
                   <div className="flex flex-col gap-3 flex-1 text-left">
-                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">Udaipur Royal Invitation Card</h4>
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                      {isCorporate ? 'Udaipur Corporate Invitation Card' :
+                       isFestive ? 'Udaipur Celebration Invitation Card' :
+                       isAcademic ? 'Udaipur Academic Invitation Card' :
+                       'Udaipur Royal Invitation Card'}
+                    </h4>
                     <p className="text-[10px] text-gray-400 leading-relaxed">
-                      Customize your event theme above. This invitation card is dynamically compiled with your selected venue and event parameters.
+                      {isCorporate
+                        ? "Customize your corporate invite theme above. This card is dynamically compiled with sleek professional typography."
+                        : isFestive
+                        ? "Customize your celebration invite theme above. This card features playful accents and sparkles."
+                        : isAcademic
+                        ? "Customize your campus invite theme above. This card is styled with geometric cultural borders."
+                        : "Customize your royal invite theme above. This card is styled with traditional gold borders and mandala emblem."}
                     </p>
                     <div className="flex flex-col gap-2 w-full mt-2">
                       <button
@@ -1205,7 +1222,7 @@ export default function AIEventPlannerIntermediate() {
                       }`}
                     >
                       <div className="h-20 bg-[#151c2c] relative">
-                        <img src={venue.img} alt={venue.name} className="w-full h-full object-cover" />
+                        <img src={resolveImage(venue.img, 'venue', venue.name)} alt={venue.name} className="w-full h-full object-cover" />
                         {chosenVenue?.id === venue.id && (
                           <div className="absolute top-2 right-2 bg-emerald-600 text-white rounded-full px-1.5 py-0.5 text-[8px] font-bold shadow-md">
                             Selected
@@ -1233,16 +1250,21 @@ export default function AIEventPlannerIntermediate() {
                         <button
                           type="button"
                           onClick={() => {
-                            setChosenVenue(venue);
-                            showToast(`Selected "${venue.name}" as event venue!`, 'success');
+                            if (chosenVenue?.id === venue.id) {
+                              setChosenVenue(null);
+                              showToast(`Unselected "${venue.name}"!`, 'info');
+                            } else {
+                              setChosenVenue(venue);
+                              showToast(`Selected "${venue.name}" as event venue!`, 'success');
+                            }
                           }}
                           className={`flex-1 py-1 text-[8px] font-bold rounded-md cursor-pointer transition-colors ${
                             chosenVenue?.id === venue.id
-                              ? 'bg-emerald-600 text-white'
+                              ? 'bg-emerald-600 hover:bg-red-600 text-white'
                               : 'bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-300 border border-indigo-500/20'
                           }`}
                         >
-                          {chosenVenue?.id === venue.id ? 'Selected' : 'Select'}
+                          {chosenVenue?.id === venue.id ? 'Unselect' : 'Select'}
                         </button>
                       </div>
                     </div>
@@ -1393,7 +1415,7 @@ export default function AIEventPlannerIntermediate() {
             {/* Modal Image Banner */}
             <div className="relative h-44 bg-[#151c2c]">
               <img
-                src={selectedVenue.img}
+                src={resolveImage(selectedVenue.img, 'venue', selectedVenue.name)}
                 alt={selectedVenue.name}
                 className="w-full h-full object-cover"
               />

@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 
 const AuthContext = createContext();
 
-export const API_BASE_URL = 'http://localhost:5000/api';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export function AuthProvider({ children }) {
   const router = useRouter();

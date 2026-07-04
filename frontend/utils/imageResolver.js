@@ -92,8 +92,39 @@ export const resolveImage = (imgSrc, type, categoryOrName) => {
     return imgSrc;
   }
 
-  // If it's a valid local static image (but not one of the generic placeholder images)
+  // List of all valid local image files inside the /public directory
+  const validLocalImages = [
+    '/leela_palace.jpg',
+    '/monsoon_palace.jpg',
+    '/hero_udaipur_3.jpg',
+    '/shiv_niwas.jpg',
+    '/oberoi_udaivilas.jpg',
+    '/taj_lake_palace.jpg',
+    '/jag_mandir.jpg',
+    '/hero_udaipur_1.jpg',
+    '/hero_udaipur_2.jpg',
+    '/celebrate_collage1.png',
+    '/celebrate_collage2.png',
+    '/landing_wedding.png',
+    '/landing_birthday.png',
+    '/landing_corporate.png',
+    '/landing_college.png',
+    '/landing_private.png',
+    '/landing_custom.png',
+    '/services_scenarios.png',
+    '/services_unforgettable.png',
+    '/services_venues.png',
+    '/logo.png',
+    '/udaipur_palace.png',
+    '/udaipur_palace_light.png'
+  ];
+
+  // If it's a local path starting with '/' but not in our valid list, it's invalid/hallucinated
+  const isInvalidLocal = imgSrc && imgSrc.startsWith('/') && !validLocalImages.includes(imgSrc);
+
+  // If it's a generic placeholder or an invalid local image path, resolve dynamic covers
   const isGeneric = !imgSrc || 
+                    isInvalidLocal ||
                     imgSrc.includes('udaipur_palace') || 
                     imgSrc.includes('celebrate_collage') || 
                     imgSrc.includes('services_') || 

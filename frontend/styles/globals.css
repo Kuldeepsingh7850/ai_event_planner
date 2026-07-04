@@ -488,6 +488,10 @@ body {
   color: #c7d2fe !important;
 }
 
+.always-border-white {
+  border-color: #ffffff !important;
+}
+
 /* Fix text gradients from being overridden by background gradient white-text rules in Light Mode */
 [data-theme="light"] .bg-clip-text {
   color: transparent !important;
