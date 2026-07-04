@@ -74,6 +74,31 @@ const {
   chatWithAI
 } = require('../controllers/aiController');
 
+const jwt = require('jsonwebtoken');
+
+// --- DEBUG MODULE ---
+router.get('/test-jwt', (req, res) => {
+  const secret = process.env.JWT_SECRET || 'supersecretjwttokenforeventplanner2026';
+  try {
+    const token = jwt.sign({ id: 999 }, secret, { expiresIn: '1h' });
+    const decoded = jwt.verify(token, secret);
+    res.json({
+      success: true,
+      secretLength: secret.length,
+      prefix: secret.substring(0, 3) + '...',
+      hasEnvSecret: !!process.env.JWT_SECRET,
+      decodedId: decoded.id,
+      nodeVersion: process.version
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      secretLength: secret.length
+    });
+  }
+});
+
 // --- AUTHENTICATION MODULE ---
 router.post('/register', registerUser);
 router.post('/login', loginUser);
