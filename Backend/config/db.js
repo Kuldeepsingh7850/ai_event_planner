@@ -103,6 +103,17 @@ const initDb = async () => {
       console.warn("⚠️ Could not auto-verify or alter users table schema for phone:", schemaErr.message);
     }
 
+    // Auto-update schema to support avatar on users
+    try {
+      const [columns] = await conn.query("SHOW COLUMNS FROM `users` LIKE 'avatar'");
+      if (columns.length === 0) {
+        await conn.query("ALTER TABLE `users` ADD COLUMN `avatar` VARCHAR(255) DEFAULT NULL");
+        console.log("✅ Successfully updated users table schema for avatar column");
+      }
+    } catch (schemaErr) {
+      console.warn("⚠️ Could not auto-verify or alter users table schema for avatar:", schemaErr.message);
+    }
+
     try {
       const [columns] = await conn.query("SHOW COLUMNS FROM `guests` LIKE 'phone'");
       if (columns.length === 0) {
